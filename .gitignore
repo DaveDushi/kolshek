@@ -1,0 +1,26 @@
+node_modules/
+dist/
+package-lock.json
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+
+# Environment / secrets
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Bun
+bun.lock
