@@ -31,12 +31,12 @@ function parseDate(input: string): Date | null {
   // DD/MM/YYYY
   const ddmmyyyy = input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (ddmmyyyy) {
-    const d = new Date(
-      Number(ddmmyyyy[3]),
-      Number(ddmmyyyy[2]) - 1,
-      Number(ddmmyyyy[1]),
-    );
-    if (isValid(d)) return d;
+    const day = Number(ddmmyyyy[1]);
+    const month = Number(ddmmyyyy[2]) - 1;
+    const year = Number(ddmmyyyy[3]);
+    const d = new Date(Date.UTC(year, month, day));
+    // Validate components match to reject invalid dates like 32/01/2025
+    if (isValid(d) && d.getUTCFullYear() === year && d.getUTCMonth() === month && d.getUTCDate() === day) return d;
   }
 
   // ISO YYYY-MM-DD

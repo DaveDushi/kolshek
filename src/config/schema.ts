@@ -11,7 +11,7 @@ export const appConfigSchema = z.object({
   chromePath: z.string().optional(),
   initialSyncDays: z.number().int().positive().default(DEFAULT_CONFIG.initialSyncDays),
   syncOverlapDays: z.number().int().nonnegative().default(DEFAULT_CONFIG.syncOverlapDays),
-  concurrency: z.number().int().positive().default(DEFAULT_CONFIG.concurrency),
+  concurrency: z.number().int().positive().max(5).default(DEFAULT_CONFIG.concurrency),
   navigationRetryCount: z.number().int().nonnegative().default(DEFAULT_CONFIG.navigationRetryCount),
   viewport: viewportSchema.default(DEFAULT_CONFIG.viewport),
   screenshotPath: z.string().optional(),

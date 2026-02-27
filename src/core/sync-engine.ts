@@ -198,7 +198,7 @@ async function syncSingleProvider(
       accountsFound: 0,
       transactionsAdded: 0,
       transactionsUpdated: 0,
-      error: `No credentials found for ${companyId}. Run 'kolshek provider add' first.`,
+      error: `No credentials found for ${companyId}. Run 'kolshek providers add' first.`,
       durationMs: Date.now() - startTime,
     };
   }
@@ -232,7 +232,7 @@ async function syncSingleProvider(
         ? (type: string) => onProgress(companyId, type)
         : undefined,
       scraperOptions: {
-        timeout: 0,
+        timeout: 120000, // 2 minutes max per navigation
       },
     });
   } catch (err) {
@@ -268,58 +268,67 @@ async function syncSingleProvider(
 
   onProgress?.(companyId, "processing");
 
-  // Process accounts and transactions
+  // Process accounts and transactions inside a DB transaction for atomicity
+  const db = getDatabase();
   let totalAdded = 0;
   let totalUpdated = 0;
 
-  for (const acct of scrapeResult.accounts) {
-    const account = upsertAccount(
-      provider.id,
-      acct.accountNumber,
-      acct.balance,
-    );
+  db.exec("BEGIN");
+  try {
+    for (const acct of scrapeResult.accounts) {
+      const account = upsertAccount(
+        provider.id,
+        acct.accountNumber,
+        acct.balance,
+      );
 
-    // Deduplicate and upsert transactions
-    const seen = new Set<string>();
+      // Deduplicate and upsert transactions
+      const seen = new Set<string>();
 
-    for (const tx of acct.txns) {
-      const hash = transactionHash(tx, companyId, acct.accountNumber);
-      if (seen.has(hash)) continue;
-      seen.add(hash);
+      for (const tx of acct.txns) {
+        const hash = transactionHash(tx, companyId, acct.accountNumber);
+        if (seen.has(hash)) continue;
+        seen.add(hash);
 
-      const uniqueId = transactionUniqueId(tx, companyId, acct.accountNumber);
+        const uniqueId = transactionUniqueId(tx, companyId, acct.accountNumber);
 
-      const input: TransactionInput = {
-        accountId: account.id,
-        type: mapTransactionType(tx.type),
-        identifier: tx.identifier ?? null,
-        date: tx.date,
-        processedDate: tx.processedDate ?? tx.date,
-        originalAmount: tx.originalAmount ?? tx.chargedAmount,
-        originalCurrency: tx.originalCurrency ?? "ILS",
-        chargedAmount: tx.chargedAmount,
-        chargedCurrency: tx.chargedCurrency ?? null,
-        description: tx.description ?? "",
-        memo: tx.memo ?? null,
-        status: mapTransactionStatus(tx.status),
-        installmentNumber: tx.installments?.number ?? null,
-        installmentTotal: tx.installments?.total ?? null,
-        category: tx.category ?? null,
-        hash,
-        uniqueId,
-      };
+        const input: TransactionInput = {
+          accountId: account.id,
+          type: mapTransactionType(tx.type),
+          identifier: tx.identifier ?? null,
+          date: tx.date,
+          processedDate: tx.processedDate ?? tx.date,
+          originalAmount: tx.originalAmount ?? tx.chargedAmount,
+          originalCurrency: tx.originalCurrency ?? "ILS",
+          chargedAmount: tx.chargedAmount,
+          chargedCurrency: tx.chargedCurrency ?? null,
+          description: tx.description ?? "",
+          memo: tx.memo ?? null,
+          status: mapTransactionStatus(tx.status),
+          installmentNumber: tx.installments?.number ?? null,
+          installmentTotal: tx.installments?.total ?? null,
+          category: tx.category ?? null,
+          hash,
+          uniqueId,
+        };
 
-      const result = upsertTransaction(input);
-      if (result.action === "inserted") totalAdded++;
-      else if (result.action === "updated") totalUpdated++;
+        const result = upsertTransaction(input);
+        if (result.action === "inserted") totalAdded++;
+        else if (result.action === "updated") totalUpdated++;
+      }
     }
+
+    // Update provider last synced
+    updateLastSynced(provider.id, new Date().toISOString());
+
+    // Complete sync log
+    completeSyncLog(syncLog.id, "success", totalAdded, totalUpdated);
+
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
   }
-
-  // Update provider last synced
-  updateLastSynced(provider.id, new Date().toISOString());
-
-  // Complete sync log
-  completeSyncLog(syncLog.id, "success", totalAdded, totalUpdated);
 
   return {
     companyId,
@@ -356,8 +365,11 @@ function computeStartDate(
 ): Date {
   const lastSync = getLastSuccessfulSync(providerId);
   if (lastSync) {
-    // Go back syncOverlapDays from the last scrape start date
-    return subDays(parseISO(lastSync.scrapeStartDate), config.syncOverlapDays);
+    // Go back syncOverlapDays from when the last sync completed to catch late-posting transactions
+    const referenceDate = lastSync.completedAt
+      ? parseISO(lastSync.completedAt)
+      : parseISO(lastSync.scrapeStartDate);
+    return subDays(referenceDate, config.syncOverlapDays);
   }
   // First sync: go back initialSyncDays
   return subDays(new Date(), config.initialSyncDays);
@@ -387,9 +399,10 @@ async function runWithConcurrency<T, R>(
       results[index] = result;
     });
 
-    const tracked = p.then(() => {
-      executing.delete(tracked);
-    });
+    const tracked = p.then(
+      () => { executing.delete(tracked); },
+      () => { executing.delete(tracked); },
+    );
     executing.add(tracked);
 
     if (executing.size >= concurrency) {

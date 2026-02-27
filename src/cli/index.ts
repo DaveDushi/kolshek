@@ -73,6 +73,7 @@ registerTransactionsCommand(program);
 
 // Parse and run
 program.parseAsync(process.argv).catch((err) => {
-  console.error("Fatal:", err.message);
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error("Fatal:", msg.length > 500 ? msg.slice(0, 500) + "..." : msg);
   process.exit(ExitCode.Error);
 });

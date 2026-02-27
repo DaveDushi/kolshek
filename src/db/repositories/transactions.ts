@@ -5,6 +5,11 @@ import type {
 } from "../../types/index.js";
 import { getDatabase } from "../database.js";
 
+/** Escape SQL LIKE wildcards so they are treated as literals. */
+function escapeLike(s: string): string {
+  return s.replace(/[%_\\]/g, "\\$&");
+}
+
 interface TransactionWithContextRow {
   id: number;
   account_id: number;
@@ -178,7 +183,8 @@ function buildFilterClauses(filters: TransactionFilters): {
   }
   if (filters.to) {
     conditions.push("t.date <= $to");
-    params.$to = filters.to;
+    // Append end-of-day so date-only filters include the full day
+    params.$to = filters.to.length === 10 ? filters.to + "T23:59:59.999Z" : filters.to;
   }
   if (filters.providerId !== undefined) {
     conditions.push("a.provider_id = $providerId");
@@ -213,8 +219,8 @@ function buildFilterClauses(filters: TransactionFilters): {
     params.$status = filters.status;
   }
   if (filters.description) {
-    conditions.push("t.description LIKE $description");
-    params.$description = `%${filters.description}%`;
+    conditions.push("t.description LIKE $description ESCAPE '\\'");
+    params.$description = `%${escapeLike(filters.description)}%`;
   }
 
   return { conditions, params };
@@ -261,8 +267,8 @@ export function searchTransactions(
   }
   const { conditions, params } = buildFilterClauses(filters ?? {});
 
-  conditions.push("t.description LIKE $searchQuery");
-  params.$searchQuery = `%${query}%`;
+  conditions.push("t.description LIKE $searchQuery ESCAPE '\\'");
+  params.$searchQuery = `%${escapeLike(query)}%`;
 
   const whereClause = "WHERE " + conditions.join(" AND ");
 

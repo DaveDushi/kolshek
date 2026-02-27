@@ -78,10 +78,18 @@ export async function launchBrowser(chromePath: string): Promise<Browser> {
   if (process.env.CI || process.env.KOLSHEK_NO_SANDBOX) {
     args.push("--no-sandbox");
   }
+  // Filter out KOLSHEK_ env vars to prevent credential leakage to child process
+  const env: Record<string, string> = {};
+  for (const [key, val] of Object.entries(process.env)) {
+    if (!key.startsWith("KOLSHEK_") && val !== undefined) {
+      env[key] = val;
+    }
+  }
   return puppeteer.launch({
     executablePath: chromePath,
     headless: true,
     args,
+    env,
   });
 }
 
@@ -126,10 +134,10 @@ export async function scrapeProvider(
     context = await browser.createBrowserContext();
 
     const scraperOpts: ScraperOptions = {
+      ...scraperOptions,
       companyId: companyType,
       startDate,
       browserContext: context as any,
-      ...scraperOptions,
     };
 
     const scraper = createScraper(scraperOpts);
@@ -197,7 +205,10 @@ function mapErrorType(
     case ScraperErrorTypes.AccountBlocked:
       return "ACCOUNT_BLOCKED";
     case ScraperErrorTypes.Generic:
+    case ScraperErrorTypes.General:
       return "GENERAL_ERROR";
+    case ScraperErrorTypes.TwoFactorRetrieverMissing:
+      return "TWO_FACTOR_MISSING";
     default:
       return "UNKNOWN";
   }

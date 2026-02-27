@@ -37,12 +37,14 @@ function parseDate(input: string): string | null {
   }
   const ddmmyyyy = input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (ddmmyyyy) {
-    const d = new Date(
-      Number(ddmmyyyy[3]),
-      Number(ddmmyyyy[2]) - 1,
-      Number(ddmmyyyy[1]),
-    );
-    if (isValid(d)) return d.toISOString().slice(0, 10);
+    const day = Number(ddmmyyyy[1]);
+    const month = Number(ddmmyyyy[2]) - 1;
+    const year = Number(ddmmyyyy[3]);
+    const d = new Date(Date.UTC(year, month, day));
+    // Validate components match to reject invalid dates like 32/01/2025
+    if (isValid(d) && d.getUTCFullYear() === year && d.getUTCMonth() === month && d.getUTCDate() === day) {
+      return d.toISOString().slice(0, 10);
+    }
   }
   const iso = parseISO(input);
   if (isValid(iso)) return input;
@@ -321,11 +323,13 @@ export function registerTransactionsCommand(program: Command): void {
 }
 
 function csvEscape(value: string): string {
+  // Strip newlines to prevent formula injection in subsequent lines within a cell
+  value = value.replace(/[\r\n]+/g, " ");
   // Prevent formula injection in spreadsheet applications
-  if (/^[=+\-@\t\r]/.test(value)) {
+  if (/^[=+\-@\t;]/.test(value)) {
     value = "'" + value;
   }
-  if (value.includes(",") || value.includes('"') || value.includes("\n") || value.includes("'")) {
+  if (value.includes(",") || value.includes('"') || value.includes("'")) {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;

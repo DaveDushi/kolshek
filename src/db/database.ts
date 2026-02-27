@@ -8,6 +8,8 @@ let _db: Database | null = null;
  * Initialize the SQLite database: open, configure pragmas, run migrations.
  */
 export function initDatabase(dbPath: string): Database {
+  if (_db) return _db;
+
   const db = new Database(dbPath, { create: true });
 
   db.exec("PRAGMA journal_mode=WAL");

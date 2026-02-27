@@ -49,7 +49,7 @@ export function setOutputOptions(opts: Partial<OutputOptions>): void {
     _opts.noProgress = true;
     _opts.nonInteractive = true;
   }
-  if (process.env.NO_COLOR === "1") {
+  if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== "") {
     _opts.noColor = true;
   }
   if (_opts.noColor) {
@@ -191,7 +191,7 @@ export function createTable(
 export function createSpinner(text: string): Ora {
   return ora({
     text,
-    isSilent: _opts.quiet || _opts.noProgress,
+    isSilent: _opts.quiet || _opts.noProgress || _opts.json,
   });
 }
 

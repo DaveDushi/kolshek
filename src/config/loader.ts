@@ -21,9 +21,11 @@ export function getDbPath(): string {
 }
 
 export async function ensureDirectories(): Promise<void> {
+  // Use mode 0o700 to restrict access to the current user (owner-only on Linux/macOS)
+  const mode = process.platform !== "win32" ? 0o700 : undefined;
   await Promise.all([
-    mkdir(paths.config, { recursive: true }),
-    mkdir(paths.data, { recursive: true }),
+    mkdir(paths.config, { recursive: true, mode }),
+    mkdir(paths.data, { recursive: true, mode }),
   ]);
 }
 

@@ -20,12 +20,12 @@ function targetName(companyId: string): string {
 
 /** Base64-encode a JSON object for safe storage in credential password fields. */
 function encodePayload(data: Record<string, string>): string {
-  return btoa(JSON.stringify(data));
+  return Buffer.from(JSON.stringify(data), "utf-8").toString("base64");
 }
 
 /** Decode a base64-encoded JSON payload back to an object. */
 function decodePayload(encoded: string): Record<string, string> {
-  return JSON.parse(atob(encoded));
+  return JSON.parse(Buffer.from(encoded, "base64").toString("utf-8"));
 }
 
 /** Strip any credential values from an error message to prevent leaks. */
@@ -194,7 +194,8 @@ async function macStore(target: string, encoded: string): Promise<void> {
   } catch {
     // may not exist yet — that's fine
   }
-  await run(["security", "add-generic-password", "-s", SERVICE, "-a", target, "-w", encoded]);
+  // Pass password via stdin to avoid exposing credentials in process argument list
+  await run(["security", "add-generic-password", "-s", SERVICE, "-a", target, "-w"], encoded);
 }
 
 async function macRead(target: string): Promise<string | null> {
@@ -326,6 +327,7 @@ const NON_CREDENTIAL_VARS = new Set([
   "KOLSHEK_CONCURRENCY",
   "KOLSHEK_DATA_DIR",
   "KOLSHEK_OTP",
+  "KOLSHEK_NO_SANDBOX",
 ]);
 
 export function getCredentialSource(): "keychain" | "env" {

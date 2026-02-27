@@ -179,8 +179,9 @@ export function registerInitCommand(program: Command): void {
               info(`  Account: ${formatAccountNumber(acc.accountNumber)}${bal}`);
             }
           } else {
-            spinner.fail(`Connection failed: ${result.error}`);
-            printError("AUTH_FAILURE", sanitizeError(result.error ?? "Unknown error", credentials), {
+            const safeError = sanitizeError(result.error ?? "Unknown error", credentials);
+            spinner.fail(`Connection failed: ${safeError}`);
+            printError("AUTH_FAILURE", safeError, {
               provider: companyId,
               retryable: true,
               suggestions: [
