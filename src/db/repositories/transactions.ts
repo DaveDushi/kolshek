@@ -22,6 +22,7 @@ interface TransactionWithContextRow {
   charged_amount: number;
   charged_currency: string | null;
   description: string;
+  description_en: string | null;
   memo: string | null;
   status: string;
   installment_number: number | null;
@@ -51,6 +52,7 @@ function rowToTransactionWithContext(
     chargedAmount: row.charged_amount,
     chargedCurrency: row.charged_currency,
     description: row.description,
+    descriptionEn: row.description_en,
     memo: row.memo,
     status: row.status as TransactionWithContext["status"],
     installmentNumber: row.installment_number,
@@ -85,12 +87,12 @@ export function upsertTransaction(
       `INSERT INTO transactions (
         account_id, type, identifier, date, processed_date,
         original_amount, original_currency, charged_amount, charged_currency,
-        description, memo, status, installment_number, installment_total,
+        description, description_en, memo, status, installment_number, installment_total,
         category, hash, unique_id
       ) VALUES (
         $accountId, $type, $identifier, $date, $processedDate,
         $originalAmount, $originalCurrency, $chargedAmount, $chargedCurrency,
-        $description, $memo, $status, $installmentNumber, $installmentTotal,
+        $description, $descriptionEn, $memo, $status, $installmentNumber, $installmentTotal,
         $category, $hash, $uniqueId
       )`,
     ).run({
@@ -104,6 +106,7 @@ export function upsertTransaction(
       $chargedAmount: input.chargedAmount,
       $chargedCurrency: input.chargedCurrency ?? null,
       $description: input.description,
+      $descriptionEn: input.descriptionEn ?? null,
       $memo: input.memo ?? null,
       $status: input.status,
       $installmentNumber: input.installmentNumber ?? null,

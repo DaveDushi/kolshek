@@ -112,9 +112,10 @@ function txRow(tx: TransactionWithContext, masked: boolean): string[] {
     tx.installmentNumber,
     tx.installmentTotal,
   );
+  const displayDesc = tx.descriptionEn ?? tx.description;
   const desc = installment
-    ? `${tx.description} ${installment}`
-    : tx.description;
+    ? `${displayDesc} ${installment}`
+    : displayDesc;
 
   return [
     formatDate(tx.date),
@@ -133,6 +134,7 @@ function txToJson(tx: TransactionWithContext): Record<string, unknown> {
     date: tx.date,
     processedDate: tx.processedDate,
     description: tx.description,
+    descriptionEn: tx.descriptionEn ?? null,
     type: tx.type,
     identifier: tx.identifier,
     originalAmount: tx.originalAmount,
@@ -265,6 +267,7 @@ export function registerTransactionsCommand(program: Command): void {
           "date",
           "processed_date",
           "description",
+          "description_en",
           "charged_amount",
           "charged_currency",
           "original_amount",
@@ -284,6 +287,7 @@ export function registerTransactionsCommand(program: Command): void {
             tx.date,
             tx.processedDate,
             csvEscape(tx.description),
+            csvEscape(tx.descriptionEn ?? ""),
             String(tx.chargedAmount),
             csvEscape(tx.chargedCurrency ?? "ILS"),
             String(tx.originalAmount),

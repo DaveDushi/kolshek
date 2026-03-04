@@ -15,6 +15,7 @@ import { registerInitCommand } from "./commands/init.js";
 import { registerProvidersCommand } from "./commands/providers.js";
 import { registerFetchCommand } from "./commands/fetch.js";
 import { registerTransactionsCommand } from "./commands/transactions.js";
+import { registerAccountsCommand } from "./commands/accounts.js";
 import pkg from "../../package.json";
 
 const program = new Command();
@@ -70,6 +71,7 @@ registerInitCommand(program);
 registerProvidersCommand(program);
 registerFetchCommand(program);
 registerTransactionsCommand(program);
+registerAccountsCommand(program);
 
 // Parse and run
 program.parseAsync(process.argv).catch((err) => {

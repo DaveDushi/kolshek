@@ -18,6 +18,7 @@ export interface Transaction {
   chargedAmount: number;
   chargedCurrency: string | null;
   description: string;
+  descriptionEn: string | null;
   memo: string | null;
   status: TransactionStatus;
   installmentNumber: number | null;
@@ -41,6 +42,7 @@ export interface TransactionInput {
   chargedAmount: number;
   chargedCurrency?: string | null;
   description: string;
+  descriptionEn?: string | null;
   memo?: string | null;
   status: TransactionStatus;
   installmentNumber?: number | null;
