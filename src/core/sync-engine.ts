@@ -8,7 +8,7 @@ import type {
   TransactionStatus,
   TransactionType,
 } from "../types/index.js";
-import { PROVIDERS, isValidCompanyId } from "../types/index.js";
+import { PROVIDERS, isValidCompanyId, getScraperMaxDays } from "../types/index.js";
 import { loadConfig } from "../config/loader.js";
 import { getCredentials } from "../security/keychain.js";
 import { initDatabase, getDatabase } from "../db/database.js";
@@ -225,9 +225,12 @@ async function syncSingleProvider(
       provider = createProvider(companyId, info.displayName, info.type);
     }
 
-    // Determine start date
-    const startDate =
-      syncOptions?.fromDate ?? computeStartDate(provider.id, config);
+    // Determine start date, clamped to scraper's max history limit
+    const maxDays = getScraperMaxDays(companyId);
+    const earliestAllowed = subDays(new Date(), maxDays);
+    const rawStartDate =
+      syncOptions?.fromDate ?? computeStartDate(provider.id, companyId, config);
+    const startDate = rawStartDate < earliestAllowed ? earliestAllowed : rawStartDate;
     const startDateStr = formatISO(startDate, { representation: "date" });
 
     // Create sync log entry
@@ -374,7 +377,11 @@ async function syncSingleProvider(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function computeStartDate(providerId: number, config: AppConfig): Date {
+function computeStartDate(
+  providerId: number,
+  companyId: string,
+  config: AppConfig,
+): Date {
   const lastSync = getLastSuccessfulSync(providerId);
   if (lastSync) {
     // Go back syncOverlapDays from when the last sync completed to catch late-posting transactions
@@ -383,8 +390,11 @@ function computeStartDate(providerId: number, config: AppConfig): Date {
       : parseISO(lastSync.scrapeStartDate);
     return subDays(referenceDate, config.syncOverlapDays);
   }
-  // First sync: go back initialSyncDays
-  return subDays(new Date(), config.initialSyncDays);
+  // First sync: go back as far as the scraper allows to maximize initial data
+  const maxDays = isValidCompanyId(companyId)
+    ? getScraperMaxDays(companyId)
+    : config.initialSyncDays;
+  return subDays(new Date(), maxDays);
 }
 
 function mapTransactionType(type?: string): TransactionType {

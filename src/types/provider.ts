@@ -159,6 +159,38 @@ export const PROVIDERS: Record<CompanyId, ProviderInfo> = {
   },
 };
 
+/**
+ * Maximum number of days each scraper can fetch back.
+ * Based on israeli-bank-scrapers documentation.
+ * Scrapers without documented limits default to 365 (1 year).
+ */
+export const SCRAPER_MAX_DAYS: Record<CompanyId, number> = {
+  // Banks
+  hapoalim: 365,
+  leumi: 365,
+  discount: 364, // "up to one year minus 1 day"
+  mizrahi: 365,
+  mercantile: 364, // "up to one year minus 1 day"
+  otsarHahayal: 365,
+  union: 365,
+  beinleumi: 365,
+  massad: 365,
+  yahav: 180, // 6 months
+  oneZero: 365,
+  pagi: 365,
+  // Credit cards
+  visaCal: 365,
+  max: 365,
+  isracard: 365,
+  amex: 365,
+  beyahadBishvilha: 365,
+  behatsdaa: 365,
+};
+
+export function getScraperMaxDays(companyId: CompanyId): number {
+  return SCRAPER_MAX_DAYS[companyId];
+}
+
 export function getProvidersByType(type: ProviderType): ProviderInfo[] {
   return Object.values(PROVIDERS).filter((p) => p.type === type);
 }
