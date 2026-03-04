@@ -6,6 +6,7 @@ import type { Command } from "commander";
 import { listProviders } from "../../db/repositories/providers.js";
 import { syncProviders } from "../../core/sync-engine.js";
 import { applyCategoryRules } from "../../db/repositories/categories.js";
+import { applyTranslationRules } from "../../db/repositories/translations.js";
 import { loadConfig } from "../../config/loader.js";
 import type { ProviderType, SyncResult } from "../../types/index.js";
 import {
@@ -122,8 +123,13 @@ export async function runFetch(opts: FetchOptions = {}): Promise<void> {
 
   spinner.stop();
 
-  // Auto-apply category rules after successful sync
+  // Auto-apply translation rules then category rules after successful sync
   if (!result.hasErrors || result.totalAdded > 0) {
+    const transResult = applyTranslationRules();
+    if (!isJsonMode() && transResult.applied > 0) {
+      info(`Translated ${transResult.applied} transaction(s).`);
+    }
+
     const catResult = applyCategoryRules();
     if (!isJsonMode() && catResult.applied > 0) {
       info(`Categorized ${catResult.applied} transaction(s).`);

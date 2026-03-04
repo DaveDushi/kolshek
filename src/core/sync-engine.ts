@@ -34,7 +34,6 @@ import {
   type ScrapeResult,
 } from "./scraper.js";
 import { sanitizeErrorMessage } from "./sanitize.js";
-import { translateDescription } from "./merchant-names.js";
 
 // ---------------------------------------------------------------------------
 // Deduplication helpers
@@ -327,7 +326,7 @@ async function syncSingleProvider(
             chargedAmount: tx.chargedAmount,
             chargedCurrency: tx.chargedCurrency ?? null,
             description: tx.description ?? "",
-            descriptionEn: translateDescription(tx.description ?? "") ?? null,
+            descriptionEn: null,
             memo: tx.memo ?? null,
             status: mapTransactionStatus(tx.status),
             installmentNumber: tx.installments?.number ?? null,

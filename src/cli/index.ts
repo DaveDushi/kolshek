@@ -20,6 +20,7 @@ import { registerDbCommand } from "./commands/db.js";
 import { registerQueryCommand } from "./commands/query.js";
 import { registerReportsCommand } from "./commands/reports.js";
 import { registerCategorizeCommand } from "./commands/categorize.js";
+import { registerTranslateCommand } from "./commands/translate.js";
 import pkg from "../../package.json";
 
 const program = new Command();
@@ -80,6 +81,7 @@ registerDbCommand(program);
 registerQueryCommand(program);
 registerReportsCommand(program);
 registerCategorizeCommand(program);
+registerTranslateCommand(program);
 
 // Parse and run
 program.parseAsync(process.argv).catch((err) => {
