@@ -16,6 +16,10 @@ import { registerProvidersCommand } from "./commands/providers.js";
 import { registerFetchCommand } from "./commands/fetch.js";
 import { registerTransactionsCommand } from "./commands/transactions.js";
 import { registerAccountsCommand } from "./commands/accounts.js";
+import { registerDbCommand } from "./commands/db.js";
+import { registerQueryCommand } from "./commands/query.js";
+import { registerReportsCommand } from "./commands/reports.js";
+import { registerCategorizeCommand } from "./commands/categorize.js";
 import pkg from "../../package.json";
 
 const program = new Command();
@@ -72,6 +76,10 @@ registerProvidersCommand(program);
 registerFetchCommand(program);
 registerTransactionsCommand(program);
 registerAccountsCommand(program);
+registerDbCommand(program);
+registerQueryCommand(program);
+registerReportsCommand(program);
+registerCategorizeCommand(program);
 
 // Parse and run
 program.parseAsync(process.argv).catch((err) => {

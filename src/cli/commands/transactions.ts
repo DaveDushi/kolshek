@@ -4,18 +4,12 @@
 
 import type { Command } from "commander";
 import { resolve, relative } from "path";
-import { parseISO, subDays, isValid } from "date-fns";
 import {
   listTransactions,
   searchTransactions,
   countTransactions,
 } from "../../db/repositories/transactions.js";
-import { getProviderByCompanyId } from "../../db/repositories/providers.js";
-import type {
-  TransactionFilters,
-  TransactionStatus,
-  TransactionWithContext,
-} from "../../types/index.js";
+import type { TransactionWithContext } from "../../types/index.js";
 import {
   isJsonMode,
   printJson,
@@ -29,82 +23,7 @@ import {
   formatInstallments,
   ExitCode,
 } from "../output.js";
-
-/** Parse a date string: YYYY-MM-DD, DD/MM/YYYY, or relative like "30d" */
-function parseDate(input: string): string | null {
-  const relMatch = input.match(/^(\d+)d$/);
-  if (relMatch) {
-    return subDays(new Date(), Number(relMatch[1])).toISOString().slice(0, 10);
-  }
-  const ddmmyyyy = input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (ddmmyyyy) {
-    const day = Number(ddmmyyyy[1]);
-    const month = Number(ddmmyyyy[2]) - 1;
-    const year = Number(ddmmyyyy[3]);
-    const d = new Date(Date.UTC(year, month, day));
-    // Validate components match to reject invalid dates like 32/01/2025
-    if (isValid(d) && d.getUTCFullYear() === year && d.getUTCMonth() === month && d.getUTCDate() === day) {
-      return d.toISOString().slice(0, 10);
-    }
-  }
-  const iso = parseISO(input);
-  if (isValid(iso)) return input;
-  return null;
-}
-
-/** Build TransactionFilters from CLI options */
-function buildFilters(opts: Record<string, unknown>): TransactionFilters {
-  const filters: TransactionFilters = {};
-
-  if (opts.from) {
-    const d = parseDate(String(opts.from));
-    if (!d) {
-      printError("BAD_DATE", `Invalid --from date: ${opts.from}`);
-      process.exit(ExitCode.BadArgs);
-    }
-    filters.from = d;
-  }
-  if (opts.to) {
-    const d = parseDate(String(opts.to));
-    if (!d) {
-      printError("BAD_DATE", `Invalid --to date: ${opts.to}`);
-      process.exit(ExitCode.BadArgs);
-    }
-    filters.to = d;
-  }
-  if (opts.provider) {
-    const p = getProviderByCompanyId(String(opts.provider));
-    if (p) {
-      filters.providerId = p.id;
-    } else {
-      filters.providerCompanyId = String(opts.provider);
-    }
-  }
-  if (opts.type) {
-    filters.providerType = String(opts.type) as "bank" | "credit_card";
-  }
-  if (opts.account) {
-    filters.accountNumber = String(opts.account);
-  }
-  if (opts.min !== undefined) {
-    filters.minAmount = Number(opts.min);
-  }
-  if (opts.max !== undefined) {
-    filters.maxAmount = Number(opts.max);
-  }
-  if (opts.status) {
-    filters.status = String(opts.status) as TransactionStatus;
-  }
-  if (opts.sort) {
-    filters.sort = String(opts.sort) as "date" | "amount";
-  }
-  filters.sortDirection = "desc";
-  if (opts.limit) {
-    filters.limit = Number(opts.limit);
-  }
-
-  return filters;
-}
+import { buildFilters } from "../filter-utils.js";
 
 /** Format a transaction row for the table */
 function txRow(tx: TransactionWithContext, masked: boolean): string[] {

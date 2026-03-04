@@ -3,9 +3,9 @@
  */
 
 import type { Command } from "commander";
-import { parseISO, subDays, isValid } from "date-fns";
 import { listProviders } from "../../db/repositories/providers.js";
 import { syncProviders } from "../../core/sync-engine.js";
+import { applyCategoryRules } from "../../db/repositories/categories.js";
 import { loadConfig } from "../../config/loader.js";
 import type { ProviderType, SyncResult } from "../../types/index.js";
 import {
@@ -20,32 +20,7 @@ import {
   createSpinner,
   ExitCode,
 } from "../output.js";
-
-/** Parse a date string: YYYY-MM-DD, DD/MM/YYYY, or relative like "30d" */
-function parseDate(input: string): Date | null {
-  // Relative: "30d" = 30 days ago
-  const relMatch = input.match(/^(\d+)d$/);
-  if (relMatch) {
-    return subDays(new Date(), Number(relMatch[1]));
-  }
-
-  // DD/MM/YYYY
-  const ddmmyyyy = input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (ddmmyyyy) {
-    const day = Number(ddmmyyyy[1]);
-    const month = Number(ddmmyyyy[2]) - 1;
-    const year = Number(ddmmyyyy[3]);
-    const d = new Date(Date.UTC(year, month, day));
-    // Validate components match to reject invalid dates like 32/01/2025
-    if (isValid(d) && d.getUTCFullYear() === year && d.getUTCMonth() === month && d.getUTCDate() === day) return d;
-  }
-
-  // ISO YYYY-MM-DD
-  const iso = parseISO(input);
-  if (isValid(iso)) return iso;
-
-  return null;
-}
+import { parseDateToDate as parseDate } from "../date-utils.js";
 
 export interface FetchOptions {
   providers?: string[];
@@ -146,6 +121,14 @@ export async function runFetch(opts: FetchOptions = {}): Promise<void> {
   }
 
   spinner.stop();
+
+  // Auto-apply category rules after successful sync
+  if (!result.hasErrors || result.totalAdded > 0) {
+    const catResult = applyCategoryRules();
+    if (!isJsonMode() && catResult.applied > 0) {
+      info(`Categorized ${catResult.applied} transaction(s).`);
+    }
+  }
 
   // Output results
   if (isJsonMode()) {
