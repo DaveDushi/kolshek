@@ -8,6 +8,7 @@ import {
   listTransactions,
   searchTransactions,
   countTransactions,
+  deleteTransaction,
 } from "../../db/repositories/transactions.js";
 import type { TransactionWithContext } from "../../types/index.js";
 import {
@@ -154,6 +155,37 @@ export function registerTransactionsCommand(program: Command): void {
       );
       console.log(table);
       info(`\n${txns.length} result(s) for "${query}".`);
+    });
+
+  // --- transactions delete ---
+  txCmd
+    .command("delete <id>")
+    .description(
+      "Delete a transaction by ID. Use only for duplicates or erroneous records.",
+    )
+    .option("--yes", "Skip confirmation prompt")
+    .action(async (idStr: string) => {
+      const id = parseInt(idStr, 10);
+      if (isNaN(id) || id <= 0) {
+        printError("BAD_ARGS", "Transaction ID must be a positive integer");
+        process.exit(ExitCode.BadArgs);
+      }
+
+      const result = deleteTransaction(id);
+
+      if (!result.deleted) {
+        printError("NOT_FOUND", `No transaction with ID ${id}`);
+        process.exit(ExitCode.Error);
+      }
+
+      if (isJsonMode()) {
+        printJson(jsonSuccess({ deletedId: id, transaction: result.transaction }));
+        return;
+      }
+
+      info(
+        `Deleted transaction #${id}: ${result.transaction!.description} (${formatCurrency(result.transaction!.chargedAmount)})`,
+      );
     });
 
   // --- transactions export ---

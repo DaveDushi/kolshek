@@ -73,16 +73,56 @@ export function upsertTransaction(
 ): { action: "inserted" | "updated" | "unchanged" } {
   const db = getDatabase();
 
-  // Check if the transaction already exists
+  // Check if the transaction already exists by exact hash
   const existing = db
     .prepare(
-      "SELECT id, status FROM transactions WHERE account_id = $accountId AND hash = $hash",
+      "SELECT id, status, hash FROM transactions WHERE account_id = $accountId AND hash = $hash",
     )
     .get({ $accountId: input.accountId, $hash: input.hash }) as
-    | { id: number; status: string }
+    | { id: number; status: string; hash: string }
     | null;
 
   if (!existing) {
+    // No exact hash match — check for a pending transaction with the same unique_id.
+    // Pending transactions can shift timestamps across scrapes while being the same
+    // real transaction, so unique_id (date-only + amount + description) catches them.
+    const pendingMatch = db
+      .prepare(
+        `SELECT id, status, hash FROM transactions
+         WHERE account_id = $accountId AND unique_id = $uniqueId AND status = 'pending'`,
+      )
+      .get({ $accountId: input.accountId, $uniqueId: input.uniqueId }) as
+      | { id: number; status: string; hash: string }
+      | null;
+
+    if (pendingMatch) {
+      // Update the existing pending transaction with fresh data
+      db.prepare(
+        `UPDATE transactions
+         SET date = $date,
+             processed_date = $processedDate,
+             status = $status,
+             charged_amount = $chargedAmount,
+             charged_currency = $chargedCurrency,
+             original_amount = $originalAmount,
+             original_currency = $originalCurrency,
+             hash = $hash,
+             updated_at = datetime('now')
+         WHERE id = $id`,
+      ).run({
+        $id: pendingMatch.id,
+        $date: input.date,
+        $processedDate: input.processedDate,
+        $status: input.status,
+        $chargedAmount: input.chargedAmount,
+        $chargedCurrency: input.chargedCurrency ?? null,
+        $originalAmount: input.originalAmount,
+        $originalCurrency: input.originalCurrency,
+        $hash: input.hash,
+      });
+      return { action: "updated" };
+    }
+
     db.prepare(
       `INSERT INTO transactions (
         account_id, type, identifier, date, processed_date,
@@ -294,6 +334,31 @@ export function searchTransactions(
   const rows = db.prepare(sql).all(params) as TransactionWithContextRow[];
 
   return rows.map(rowToTransactionWithContext);
+}
+
+export function deleteTransaction(
+  id: number,
+): { deleted: boolean; transaction?: { description: string; chargedAmount: number; date: string } } {
+  const db = getDatabase();
+
+  const existing = db
+    .prepare("SELECT description, charged_amount, date FROM transactions WHERE id = $id")
+    .get({ $id: id }) as { description: string; charged_amount: number; date: string } | null;
+
+  if (!existing) {
+    return { deleted: false };
+  }
+
+  db.prepare("DELETE FROM transactions WHERE id = $id").run({ $id: id });
+
+  return {
+    deleted: true,
+    transaction: {
+      description: existing.description,
+      chargedAmount: existing.charged_amount,
+      date: existing.date,
+    },
+  };
 }
 
 export function countTransactions(filters?: TransactionFilters): number {
