@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { readFileSync, readdirSync } from "fs";
+import { readFileSync, readdirSync, chmodSync, existsSync } from "fs";
 import { join } from "path";
 
 let _db: Database | null = null;
@@ -12,12 +12,25 @@ export function initDatabase(dbPath: string): Database {
 
   const db = new Database(dbPath, { create: true });
 
+  // Restrict DB file permissions on Unix (owner-only read/write)
+  if (process.platform !== "win32") {
+    chmodSync(dbPath, 0o600);
+  }
+
   db.exec("PRAGMA journal_mode=WAL");
   db.exec("PRAGMA foreign_keys=ON");
   db.exec("PRAGMA busy_timeout=5000");
   db.exec("PRAGMA temp_store=2");
 
   runMigrations(db);
+
+  // Chmod WAL/SHM files created by WAL mode
+  if (process.platform !== "win32") {
+    const walPath = dbPath + "-wal";
+    const shmPath = dbPath + "-shm";
+    if (existsSync(walPath)) chmodSync(walPath, 0o600);
+    if (existsSync(shmPath)) chmodSync(shmPath, 0o600);
+  }
 
   _db = db;
   return db;

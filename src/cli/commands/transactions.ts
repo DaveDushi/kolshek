@@ -3,6 +3,7 @@
  */
 
 import type { Command } from "commander";
+import { resolve, relative } from "path";
 import { parseISO, subDays, isValid } from "date-fns";
 import {
   listTransactions,
@@ -302,7 +303,15 @@ export function registerTransactionsCommand(program: Command): void {
       }
 
       if (opts.output) {
-        await Bun.write(opts.output, output);
+        const resolved = resolve(opts.output);
+        const rel = relative(process.cwd(), resolved);
+        if (rel.startsWith("..")) {
+          printError("BAD_ARGS", "Output path must be within the current working directory", {
+            suggestions: ["Use a relative path like './export.csv' or an absolute path inside cwd"],
+          });
+          process.exit(ExitCode.BadArgs);
+        }
+        await Bun.write(resolved, output);
         if (!isJsonMode()) {
           info(`Exported ${txns.length} transactions to ${opts.output}`);
         }

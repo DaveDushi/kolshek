@@ -147,6 +147,10 @@ export function registerProvidersCommand(program: Command): void {
         });
 
         if (doTest) {
+          if (process.env.DEBUG) {
+            warn("DEBUG env var is set — upstream scrapers may log sensitive data (credentials, account numbers) to stderr.");
+          }
+
           const spinner = createSpinner("Testing connection...");
           spinner.start();
           try {
@@ -273,6 +277,10 @@ export function registerProvidersCommand(program: Command): void {
         process.exit(ExitCode.AuthFailure);
       }
 
+      if (process.env.DEBUG) {
+        warn("DEBUG env var is set — upstream scrapers may log sensitive data (credentials, account numbers) to stderr.");
+      }
+
       const spinner = createSpinner(
         `Testing ${provider.displayName}...`,
       );
@@ -302,7 +310,7 @@ export function registerProvidersCommand(program: Command): void {
                 provider: provider.companyId,
                 valid: true,
                 accounts: result.accounts.map((a) => ({
-                  accountNumber: a.accountNumber,
+                  accountNumber: formatAccountNumber(a.accountNumber),
                   balance: a.balance,
                 })),
               }),

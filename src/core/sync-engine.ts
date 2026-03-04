@@ -33,6 +33,7 @@ import {
   scrapeProvider,
   type ScrapeResult,
 } from "./scraper.js";
+import { sanitizeErrorMessage } from "./sanitize.js";
 
 // ---------------------------------------------------------------------------
 // Deduplication helpers
@@ -203,161 +204,153 @@ async function syncSingleProvider(
     };
   }
 
-  // Get or create provider record
-  let provider = getProviderByCompanyId(companyId);
-  if (!provider) {
-    const info = PROVIDERS[companyId];
-    provider = createProvider(companyId, info.displayName, info.type);
-  }
-
-  // Determine start date
-  const startDate = syncOptions?.fromDate ?? computeStartDate(provider.id, config);
-  const startDateStr = formatISO(startDate, { representation: "date" });
-
-  // Create sync log entry
-  const syncLog = createSyncLog(provider.id, startDateStr);
-
-  onProgress?.(companyId, "scraping");
-
-  // Scrape
-  let scrapeResult: ScrapeResult;
   try {
-    scrapeResult = await scrapeProvider({
-      companyId,
-      credentials,
-      startDate,
-      chromePath,
-      browser,
-      onProgress: onProgress
-        ? (type: string) => onProgress(companyId, type)
-        : undefined,
-      scraperOptions: {
-        timeout: 120000, // 2 minutes max per navigation
-      },
-    });
-  } catch (err) {
-    const errMsg = sanitizeErrorMessage(
-      err instanceof Error ? err.message : String(err),
-      credentials,
-    );
-    completeSyncLog(syncLog.id, "error", 0, 0, errMsg);
-    return {
-      companyId,
-      success: false,
-      accountsFound: 0,
-      transactionsAdded: 0,
-      transactionsUpdated: 0,
-      error: errMsg,
-      durationMs: Date.now() - startTime,
-    };
-  }
-
-  if (!scrapeResult.success) {
-    const safeError = sanitizeErrorMessage(scrapeResult.error ?? "", credentials);
-    completeSyncLog(syncLog.id, "error", 0, 0, safeError);
-    return {
-      companyId,
-      success: false,
-      accountsFound: scrapeResult.accounts.length,
-      transactionsAdded: 0,
-      transactionsUpdated: 0,
-      error: safeError,
-      durationMs: Date.now() - startTime,
-    };
-  }
-
-  onProgress?.(companyId, "processing");
-
-  // Process accounts and transactions inside a DB transaction for atomicity
-  const db = getDatabase();
-  let totalAdded = 0;
-  let totalUpdated = 0;
-
-  db.exec("BEGIN");
-  try {
-    for (const acct of scrapeResult.accounts) {
-      const account = upsertAccount(
-        provider.id,
-        acct.accountNumber,
-        acct.balance,
-      );
-
-      // Deduplicate and upsert transactions
-      const seen = new Set<string>();
-
-      for (const tx of acct.txns) {
-        const hash = transactionHash(tx, companyId, acct.accountNumber);
-        if (seen.has(hash)) continue;
-        seen.add(hash);
-
-        const uniqueId = transactionUniqueId(tx, companyId, acct.accountNumber);
-
-        const input: TransactionInput = {
-          accountId: account.id,
-          type: mapTransactionType(tx.type),
-          identifier: tx.identifier ?? null,
-          date: tx.date,
-          processedDate: tx.processedDate ?? tx.date,
-          originalAmount: tx.originalAmount ?? tx.chargedAmount,
-          originalCurrency: tx.originalCurrency ?? "ILS",
-          chargedAmount: tx.chargedAmount,
-          chargedCurrency: tx.chargedCurrency ?? null,
-          description: tx.description ?? "",
-          memo: tx.memo ?? null,
-          status: mapTransactionStatus(tx.status),
-          installmentNumber: tx.installments?.number ?? null,
-          installmentTotal: tx.installments?.total ?? null,
-          category: tx.category ?? null,
-          hash,
-          uniqueId,
-        };
-
-        const result = upsertTransaction(input);
-        if (result.action === "inserted") totalAdded++;
-        else if (result.action === "updated") totalUpdated++;
-      }
+    // Get or create provider record
+    let provider = getProviderByCompanyId(companyId);
+    if (!provider) {
+      const info = PROVIDERS[companyId];
+      provider = createProvider(companyId, info.displayName, info.type);
     }
 
-    // Update provider last synced
-    updateLastSynced(provider.id, new Date().toISOString());
+    // Determine start date
+    const startDate = syncOptions?.fromDate ?? computeStartDate(provider.id, config);
+    const startDateStr = formatISO(startDate, { representation: "date" });
 
-    // Complete sync log
-    completeSyncLog(syncLog.id, "success", totalAdded, totalUpdated);
+    // Create sync log entry
+    const syncLog = createSyncLog(provider.id, startDateStr);
 
-    db.exec("COMMIT");
-  } catch (err) {
-    db.exec("ROLLBACK");
-    throw err;
+    onProgress?.(companyId, "scraping");
+
+    // Scrape
+    let scrapeResult: ScrapeResult;
+    try {
+      scrapeResult = await scrapeProvider({
+        companyId,
+        credentials,
+        startDate,
+        chromePath,
+        browser,
+        onProgress: onProgress
+          ? (type: string) => onProgress(companyId, type)
+          : undefined,
+        scraperOptions: {
+          timeout: 120000, // 2 minutes max per navigation
+        },
+      });
+    } catch (err) {
+      const errMsg = sanitizeErrorMessage(
+        err instanceof Error ? err.message : String(err),
+        credentials,
+      );
+      completeSyncLog(syncLog.id, "error", 0, 0, errMsg);
+      return {
+        companyId,
+        success: false,
+        accountsFound: 0,
+        transactionsAdded: 0,
+        transactionsUpdated: 0,
+        error: errMsg,
+        durationMs: Date.now() - startTime,
+      };
+    }
+
+    if (!scrapeResult.success) {
+      const safeError = sanitizeErrorMessage(scrapeResult.error ?? "", credentials);
+      completeSyncLog(syncLog.id, "error", 0, 0, safeError);
+      return {
+        companyId,
+        success: false,
+        accountsFound: scrapeResult.accounts.length,
+        transactionsAdded: 0,
+        transactionsUpdated: 0,
+        error: safeError,
+        durationMs: Date.now() - startTime,
+      };
+    }
+
+    onProgress?.(companyId, "processing");
+
+    // Process accounts and transactions inside a DB transaction for atomicity
+    const db = getDatabase();
+    let totalAdded = 0;
+    let totalUpdated = 0;
+
+    db.exec("BEGIN");
+    try {
+      for (const acct of scrapeResult.accounts) {
+        const account = upsertAccount(
+          provider.id,
+          acct.accountNumber,
+          acct.balance,
+        );
+
+        // Deduplicate and upsert transactions
+        const seen = new Set<string>();
+
+        for (const tx of acct.txns) {
+          const hash = transactionHash(tx, companyId, acct.accountNumber);
+          if (seen.has(hash)) continue;
+          seen.add(hash);
+
+          const uniqueId = transactionUniqueId(tx, companyId, acct.accountNumber);
+
+          const input: TransactionInput = {
+            accountId: account.id,
+            type: mapTransactionType(tx.type),
+            identifier: tx.identifier ?? null,
+            date: tx.date,
+            processedDate: tx.processedDate ?? tx.date,
+            originalAmount: tx.originalAmount ?? tx.chargedAmount,
+            originalCurrency: tx.originalCurrency ?? "ILS",
+            chargedAmount: tx.chargedAmount,
+            chargedCurrency: tx.chargedCurrency ?? null,
+            description: tx.description ?? "",
+            memo: tx.memo ?? null,
+            status: mapTransactionStatus(tx.status),
+            installmentNumber: tx.installments?.number ?? null,
+            installmentTotal: tx.installments?.total ?? null,
+            category: tx.category ?? null,
+            hash,
+            uniqueId,
+          };
+
+          const result = upsertTransaction(input);
+          if (result.action === "inserted") totalAdded++;
+          else if (result.action === "updated") totalUpdated++;
+        }
+      }
+
+      // Update provider last synced
+      updateLastSynced(provider.id, new Date().toISOString());
+
+      // Complete sync log
+      completeSyncLog(syncLog.id, "success", totalAdded, totalUpdated);
+
+      db.exec("COMMIT");
+    } catch (err) {
+      db.exec("ROLLBACK");
+      throw err;
+    }
+
+    return {
+      companyId,
+      success: true,
+      accountsFound: scrapeResult.accounts.length,
+      transactionsAdded: totalAdded,
+      transactionsUpdated: totalUpdated,
+      durationMs: Date.now() - startTime,
+    };
+  } finally {
+    // Zero credential values to minimize exposure window
+    for (const key of Object.keys(credentials)) {
+      credentials[key] = "";
+    }
   }
-
-  return {
-    companyId,
-    success: true,
-    accountsFound: scrapeResult.accounts.length,
-    transactionsAdded: totalAdded,
-    transactionsUpdated: totalUpdated,
-    durationMs: Date.now() - startTime,
-  };
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Strip credential values from error messages to prevent leaks */
-function sanitizeErrorMessage(
-  message: string,
-  credentials: Record<string, string>,
-): string {
-  let safe = message;
-  for (const value of Object.values(credentials)) {
-    if (value) {
-      safe = safe.replaceAll(value, "***");
-      safe = safe.replaceAll(encodeURIComponent(value), "***");
-    }
-  }
-  return safe;
-}
 
 function computeStartDate(
   providerId: number,

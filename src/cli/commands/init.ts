@@ -154,6 +154,10 @@ export function registerInitCommand(program: Command): void {
       });
 
       if (testIt) {
+        if (process.env.DEBUG) {
+          warn("DEBUG env var is set — upstream scrapers may log sensitive data (credentials, account numbers) to stderr.");
+        }
+
         const spinner = createSpinner(
           `Testing connection to ${providerInfo.displayName}...`,
         );

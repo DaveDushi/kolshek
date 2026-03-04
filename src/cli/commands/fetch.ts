@@ -15,6 +15,7 @@ import {
   printError,
   success,
   info,
+  warn,
   createTable,
   createSpinner,
   ExitCode,
@@ -112,6 +113,11 @@ export async function runFetch(opts: FetchOptions = {}): Promise<void> {
       });
       process.exit(ExitCode.BadArgs);
     }
+  }
+
+  // Warn about DEBUG logging that may expose PII
+  if (process.env.DEBUG) {
+    warn("DEBUG env var is set — upstream scrapers may log sensitive data (credentials, account numbers) to stderr.");
   }
 
   // Run sync

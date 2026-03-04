@@ -70,11 +70,7 @@ async function run(
 // ---------------------------------------------------------------------------
 
 const WIN_PS_PREAMBLE = `
-Add-Type -Namespace Win32 -Name Cred -MemberDefinition @'
-  using System;
-  using System.Runtime.InteropServices;
-  using System.Text;
-
+Add-Type -Namespace Win32 -Name Cred -UsingNamespace System.Text -MemberDefinition @'
   [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
   public struct CREDENTIAL {
     public int Flags;

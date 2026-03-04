@@ -7,6 +7,7 @@ import {
   type ScraperCredentials,
 } from "israeli-bank-scrapers-core";
 import { ScraperErrorTypes } from "israeli-bank-scrapers-core/lib/scrapers/errors";
+import { sanitizeErrorMessage } from "./sanitize.js";
 
 // ---------------------------------------------------------------------------
 // Chrome detection
@@ -156,7 +157,7 @@ export async function scrapeProvider(
       return {
         success: false,
         accounts: [],
-        error: result.errorMessage ?? "Scraping failed",
+        error: sanitizeErrorMessage(result.errorMessage ?? "Scraping failed", credentials),
         errorType: mapErrorType(result.errorType),
       };
     }
@@ -169,7 +170,10 @@ export async function scrapeProvider(
 
     return { success: true, accounts };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = sanitizeErrorMessage(
+      err instanceof Error ? err.message : String(err),
+      credentials,
+    );
     return {
       success: false,
       accounts: [],
