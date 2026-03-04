@@ -40,12 +40,24 @@ import { sanitizeErrorMessage } from "./sanitize.js";
 // ---------------------------------------------------------------------------
 
 export function transactionHash(
-  tx: { date: string; chargedAmount: number; description: string; memo?: string | null },
+  tx: {
+    date: string;
+    chargedAmount: number;
+    description: string;
+    memo?: string | null;
+  },
   companyId: string,
   accountNumber: string,
 ): string {
   const date = roundToNearestMinutes(parseISO(tx.date)).toISOString();
-  return [date, tx.chargedAmount, tx.description, tx.memo, companyId, accountNumber]
+  return [
+    date,
+    tx.chargedAmount,
+    tx.description,
+    tx.memo,
+    companyId,
+    accountNumber,
+  ]
     .map((p) => String(p ?? ""))
     .join("_");
 }
@@ -121,7 +133,8 @@ export async function syncProviders(
   }
 
   // Find Chrome
-  const chromePath = options?.chromePath ?? config.chromePath ?? findChromePath();
+  const chromePath =
+    options?.chromePath ?? config.chromePath ?? findChromePath();
   if (!chromePath) {
     return {
       results: targetIds.map((id) => ({
@@ -213,7 +226,8 @@ async function syncSingleProvider(
     }
 
     // Determine start date
-    const startDate = syncOptions?.fromDate ?? computeStartDate(provider.id, config);
+    const startDate =
+      syncOptions?.fromDate ?? computeStartDate(provider.id, config);
     const startDateStr = formatISO(startDate, { representation: "date" });
 
     // Create sync log entry
@@ -255,7 +269,10 @@ async function syncSingleProvider(
     }
 
     if (!scrapeResult.success) {
-      const safeError = sanitizeErrorMessage(scrapeResult.error ?? "", credentials);
+      const safeError = sanitizeErrorMessage(
+        scrapeResult.error ?? "",
+        credentials,
+      );
       completeSyncLog(syncLog.id, "error", 0, 0, safeError);
       return {
         companyId,
@@ -275,7 +292,7 @@ async function syncSingleProvider(
     let totalAdded = 0;
     let totalUpdated = 0;
 
-    db.exec("BEGIN");
+    db.run("BEGIN");
     try {
       for (const acct of scrapeResult.accounts) {
         const account = upsertAccount(
@@ -292,7 +309,11 @@ async function syncSingleProvider(
           if (seen.has(hash)) continue;
           seen.add(hash);
 
-          const uniqueId = transactionUniqueId(tx, companyId, acct.accountNumber);
+          const uniqueId = transactionUniqueId(
+            tx,
+            companyId,
+            acct.accountNumber,
+          );
 
           const input: TransactionInput = {
             accountId: account.id,
@@ -326,9 +347,9 @@ async function syncSingleProvider(
       // Complete sync log
       completeSyncLog(syncLog.id, "success", totalAdded, totalUpdated);
 
-      db.exec("COMMIT");
+      db.run("COMMIT");
     } catch (err) {
-      db.exec("ROLLBACK");
+      db.run("ROLLBACK");
       throw err;
     }
 
@@ -352,10 +373,7 @@ async function syncSingleProvider(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function computeStartDate(
-  providerId: number,
-  config: AppConfig,
-): Date {
+function computeStartDate(providerId: number, config: AppConfig): Date {
   const lastSync = getLastSuccessfulSync(providerId);
   if (lastSync) {
     // Go back syncOverlapDays from when the last sync completed to catch late-posting transactions
@@ -393,8 +411,12 @@ async function runWithConcurrency<T, R>(
     });
 
     const tracked = p.then(
-      () => { executing.delete(tracked); },
-      () => { executing.delete(tracked); },
+      () => {
+        executing.delete(tracked);
+      },
+      () => {
+        executing.delete(tracked);
+      },
     );
     executing.add(tracked);
 

@@ -17,10 +17,10 @@ export function initDatabase(dbPath: string): Database {
     chmodSync(dbPath, 0o600);
   }
 
-  db.exec("PRAGMA journal_mode=WAL");
-  db.exec("PRAGMA foreign_keys=ON");
-  db.exec("PRAGMA busy_timeout=5000");
-  db.exec("PRAGMA temp_store=2");
+  db.run("PRAGMA journal_mode=WAL");
+  db.run("PRAGMA foreign_keys=ON");
+  db.run("PRAGMA busy_timeout=5000");
+  db.run("PRAGMA temp_store=2");
 
   runMigrations(db);
 
@@ -41,9 +41,7 @@ export function initDatabase(dbPath: string): Database {
  */
 export function getDatabase(): Database {
   if (!_db) {
-    throw new Error(
-      "Database not initialized. Call initDatabase() first.",
-    );
+    throw new Error("Database not initialized. Call initDatabase() first.");
   }
   return _db;
 }
@@ -63,7 +61,7 @@ export function closeDatabase(): void {
  * Tracks applied migrations in a _migrations table.
  */
 function runMigrations(db: Database): void {
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS _migrations (
       name TEXT NOT NULL UNIQUE,
       applied_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -82,7 +80,7 @@ function runMigrations(db: Database): void {
 
     if (!applied) {
       const sql = readFileSync(join(migrationsDir, file), "utf-8");
-      db.exec(sql);
+      db.run(sql);
       db.prepare("INSERT INTO _migrations (name) VALUES ($name)").run({
         $name: file,
       });
