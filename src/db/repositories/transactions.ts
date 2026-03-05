@@ -83,15 +83,33 @@ export function upsertTransaction(
     | null;
 
   if (!existing) {
-    // No exact hash match — check for a pending transaction with the same unique_id.
-    // Pending transactions can shift timestamps across scrapes while being the same
-    // real transaction, so unique_id (date-only + amount + description) catches them.
+    // No exact hash match — check for a pending transaction that matches.
+    // Strategy 1: exact unique_id match (same date + amount + description).
+    // Strategy 2: fuzzy match within ±3 days (banks can shift dates on completion).
     const pendingMatch = db
       .prepare(
         `SELECT id, status, hash FROM transactions
          WHERE account_id = $accountId AND unique_id = $uniqueId AND status = 'pending'`,
       )
       .get({ $accountId: input.accountId, $uniqueId: input.uniqueId }) as
+      | { id: number; status: string; hash: string }
+      | null
+    ?? db
+      .prepare(
+        `SELECT id, status, hash FROM transactions
+         WHERE account_id = $accountId
+           AND status = 'pending'
+           AND description = $description
+           AND charged_amount = $chargedAmount
+           AND date BETWEEN datetime($date, '-3 days') AND datetime($date, '+3 days')
+         LIMIT 1`,
+      )
+      .get({
+        $accountId: input.accountId,
+        $description: input.description,
+        $chargedAmount: input.chargedAmount,
+        $date: input.date,
+      }) as
       | { id: number; status: string; hash: string }
       | null;
 
@@ -106,7 +124,11 @@ export function upsertTransaction(
              charged_currency = $chargedCurrency,
              original_amount = $originalAmount,
              original_currency = $originalCurrency,
+             description = $description,
+             memo = $memo,
+             identifier = $identifier,
              hash = $hash,
+             unique_id = $uniqueId,
              updated_at = datetime('now')
          WHERE id = $id`,
       ).run({
@@ -118,7 +140,11 @@ export function upsertTransaction(
         $chargedCurrency: input.chargedCurrency ?? null,
         $originalAmount: input.originalAmount,
         $originalCurrency: input.originalCurrency,
+        $description: input.description,
+        $memo: input.memo ?? null,
+        $identifier: input.identifier ?? null,
         $hash: input.hash,
+        $uniqueId: input.uniqueId,
       });
       return { action: "updated" };
     }
