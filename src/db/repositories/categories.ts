@@ -79,7 +79,7 @@ export function applyCategoryRules(): { applied: number; uncategorized: number }
       .prepare(
         `UPDATE transactions
          SET category = $category, updated_at = datetime('now')
-         WHERE category IS NULL
+         WHERE (category IS NULL OR category = 'Uncategorized')
            AND (description LIKE $pattern ESCAPE '\\' OR description_en LIKE $pattern ESCAPE '\\')`,
       )
       .run({ $category: rule.category, $pattern: pattern });
