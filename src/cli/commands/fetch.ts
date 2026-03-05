@@ -29,6 +29,8 @@ export interface FetchOptions {
   to?: string;
   force?: boolean;
   type?: ProviderType;
+  stealth?: boolean;
+  visible?: boolean;
 }
 
 /**
@@ -110,6 +112,8 @@ export async function runFetch(opts: FetchOptions = {}): Promise<void> {
         fromDate,
         toDate,
         force: opts.force,
+        stealth: opts.stealth,
+        visible: opts.visible,
         config,
       },
     );
@@ -181,6 +185,8 @@ export function registerFetchCommand(program: Command): void {
     .option("--to <date>", "End date")
     .option("--force", "Re-fetch even if recently synced", false)
     .option("--type <type>", "Fetch only banks or credit cards")
+    .option("--stealth", "Use stealth browser to avoid bot detection", false)
+    .option("--visible", "Show the browser window (helps bypass bot detection)", false)
     .action(async (providers: string[], opts) => {
       await runFetch({
         providers: providers.length > 0 ? providers : undefined,
@@ -188,6 +194,8 @@ export function registerFetchCommand(program: Command): void {
         to: opts.to,
         force: opts.force,
         type: opts.type,
+        stealth: opts.stealth,
+        visible: opts.visible,
       });
     });
 }

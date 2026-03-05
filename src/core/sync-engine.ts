@@ -104,6 +104,10 @@ export interface SyncOptions {
   toDate?: Date;
   /** Force re-fetch even if recently synced */
   force?: boolean;
+  /** Use stealth mode to avoid bot detection */
+  stealth?: boolean;
+  /** Show the browser window (non-headless) */
+  visible?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +157,10 @@ export async function syncProviders(
   }
 
   // Launch a shared browser
-  const browser = await launchBrowser(chromePath);
+  const browser = await launchBrowser(chromePath, {
+    stealth: options?.stealth,
+    headless: options?.visible ? false : undefined,
+  });
 
   const concurrency = options?.concurrency ?? config.concurrency;
 

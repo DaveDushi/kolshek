@@ -1,5 +1,7 @@
 import { existsSync } from "fs";
-import puppeteer, { type Browser } from "puppeteer-core";
+import vanillaPuppeteer, { type Browser } from "puppeteer-core";
+import puppeteerExtra from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import {
   createScraper,
   CompanyTypes,
@@ -73,7 +75,10 @@ export interface ScrapeResult {
 // Browser lifecycle
 // ---------------------------------------------------------------------------
 
-export async function launchBrowser(chromePath: string): Promise<Browser> {
+export async function launchBrowser(
+  chromePath: string,
+  options?: { stealth?: boolean; headless?: boolean },
+): Promise<Browser> {
   const args = ["--disable-gpu"];
   // Only disable sandbox in CI/container environments where it's needed
   if (process.env.CI || process.env.KOLSHEK_NO_SANDBOX) {
@@ -86,17 +91,52 @@ export async function launchBrowser(chromePath: string): Promise<Browser> {
       env[key] = val;
     }
   }
-  return puppeteer.launch({
+
+  const launchOpts = {
     executablePath: chromePath,
-    headless: true,
+    headless: options?.headless ?? true,
     args,
     env,
-  });
+  };
+
+  if (options?.stealth) {
+    const stealth = puppeteerExtra.use(StealthPlugin());
+    return stealth.launch(launchOpts) as unknown as Browser;
+  }
+
+  return vanillaPuppeteer.launch(launchOpts);
 }
 
 export async function closeBrowser(browser: Browser): Promise<void> {
   await browser.close();
 }
+
+// ---------------------------------------------------------------------------
+// Rate-limit workaround for Isracard/Amex bot detection (PR #1027)
+// ---------------------------------------------------------------------------
+
+/** Providers that need throttled fetch() to avoid 429 "Block Automation" */
+const THROTTLED_PROVIDERS = new Set(["isracard", "amex"]);
+
+const THROTTLE_SCRIPT = `
+(function() {
+  const _origFetch = window.fetch;
+  let _lastFetch = 0;
+  const MIN_DELAY = 2500;
+  const JITTER = 500;
+
+  window.fetch = async function(...args) {
+    const delay = MIN_DELAY + Math.floor(Math.random() * JITTER);
+    const now = Date.now();
+    const wait = Math.max(0, _lastFetch + delay - now);
+    if (wait > 0) {
+      await new Promise(r => setTimeout(r, wait));
+    }
+    _lastFetch = Date.now();
+    return _origFetch.apply(this, args);
+  };
+})();
+`;
 
 // ---------------------------------------------------------------------------
 // Scraper wrapper
@@ -133,6 +173,16 @@ export async function scrapeProvider(
 
   try {
     context = await browser.createBrowserContext();
+
+    // Inject fetch throttling for providers prone to bot detection
+    if (THROTTLED_PROVIDERS.has(companyId)) {
+      const origNewPage = context.newPage.bind(context);
+      context.newPage = async () => {
+        const page = await origNewPage();
+        await page.evaluateOnNewDocument(THROTTLE_SCRIPT);
+        return page;
+      };
+    }
 
     const scraperOpts: ScraperOptions = {
       ...scraperOptions,
