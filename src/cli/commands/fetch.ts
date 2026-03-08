@@ -3,7 +3,7 @@
  */
 
 import type { Command } from "commander";
-import { listProviders } from "../../db/repositories/providers.js";
+import { listProviders, resolveProviders } from "../../db/repositories/providers.js";
 import { syncProviders } from "../../core/sync-engine.js";
 import { applyCategoryRules } from "../../db/repositories/categories.js";
 import { applyTranslationRules } from "../../db/repositories/translations.js";
@@ -49,14 +49,16 @@ export async function runFetch(opts: FetchOptions = {}): Promise<void> {
     process.exit(ExitCode.Error);
   }
 
-  // Filter providers
+  // Filter providers — resolve each identifier via alias/companyId/ID
   let targetProviders = allProviders;
   if (opts.providers?.length) {
-    targetProviders = allProviders.filter(
-      (p) =>
-        opts.providers!.includes(p.companyId) ||
-        opts.providers!.includes(String(p.id)),
-    );
+    const resolved = new Map<number, typeof allProviders[0]>();
+    for (const identifier of opts.providers) {
+      for (const p of resolveProviders(identifier)) {
+        resolved.set(p.id, p);
+      }
+    }
+    targetProviders = [...resolved.values()];
     if (targetProviders.length === 0) {
       printError("NOT_FOUND", "No matching providers found", {
         suggestions: [
@@ -107,7 +109,7 @@ export async function runFetch(opts: FetchOptions = {}): Promise<void> {
   let result: SyncResult;
   try {
     result = await syncProviders(
-      targetProviders.map((p) => p.companyId),
+      targetProviders,
       {
         fromDate,
         toDate,

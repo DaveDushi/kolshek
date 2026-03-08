@@ -294,8 +294,9 @@ function getCredentialsFromEnv(companyId: string): Record<string, string> | null
     }
   }
 
-  // Per-field env vars: KOLSHEK_{COMPANYID}_{FIELD}
-  const prefix = `KOLSHEK_${companyId.toUpperCase()}_`;
+  // Per-field env vars: KOLSHEK_{ALIAS}_{FIELD}
+  // Convert dashes to underscores for env var compatibility (e.g. leumi-joint → KOLSHEK_LEUMI_JOINT_)
+  const prefix = `KOLSHEK_${companyId.replace(/-/g, "_").toUpperCase()}_`;
   const fields: Record<string, string> = {};
   let found = false;
   for (const [key, val] of Object.entries(process.env)) {

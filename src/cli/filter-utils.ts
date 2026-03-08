@@ -3,7 +3,7 @@
  */
 
 import type { TransactionFilters, TransactionStatus } from "../types/index.js";
-import { getProviderByCompanyId } from "../db/repositories/providers.js";
+import { resolveProviders } from "../db/repositories/providers.js";
 import { printError, ExitCode } from "./output.js";
 import { parseDateToString as parseDate } from "./date-utils.js";
 
@@ -28,9 +28,11 @@ export function buildFilters(opts: Record<string, unknown>): TransactionFilters 
     filters.to = d;
   }
   if (opts.provider) {
-    const p = getProviderByCompanyId(String(opts.provider));
-    if (p) {
-      filters.providerId = p.id;
+    const resolved = resolveProviders(String(opts.provider));
+    if (resolved.length === 1) {
+      filters.providerId = resolved[0].id;
+    } else if (resolved.length > 1) {
+      filters.providerCompanyId = resolved[0].companyId;
     } else {
       filters.providerCompanyId = String(opts.provider);
     }

@@ -2,20 +2,19 @@ import { subDays, formatISO, parseISO } from "date-fns";
 import { roundToNearestMinutes } from "date-fns";
 import type {
   AppConfig,
+  Provider,
   ProviderSyncResult,
   SyncResult,
   TransactionInput,
   TransactionStatus,
   TransactionType,
 } from "../types/index.js";
-import { PROVIDERS, isValidCompanyId, getScraperMaxDays } from "../types/index.js";
+import { isValidCompanyId, getScraperMaxDays } from "../types/index.js";
 import { loadConfig } from "../config/loader.js";
 import { getCredentials } from "../security/keychain.js";
 import { initDatabase, getDatabase } from "../db/database.js";
 import { getDbPath, ensureDirectories } from "../config/loader.js";
 import {
-  getProviderByCompanyId,
-  createProvider,
   updateLastSynced,
   listProviders,
 } from "../db/repositories/providers.js";
@@ -115,7 +114,7 @@ export interface SyncOptions {
 // ---------------------------------------------------------------------------
 
 export async function syncProviders(
-  providerIds?: string[],
+  providers?: Provider[],
   options?: SyncOptions,
 ): Promise<SyncResult> {
   const config = options?.config ?? (await loadConfig());
@@ -131,8 +130,8 @@ export async function syncProviders(
   }
 
   // Determine which providers to sync
-  const targetIds = providerIds ?? listProviders().map((p) => p.companyId);
-  if (targetIds.length === 0) {
+  const targets = providers ?? listProviders();
+  if (targets.length === 0) {
     return { results: [], totalAdded: 0, totalUpdated: 0, hasErrors: false };
   }
 
@@ -141,8 +140,8 @@ export async function syncProviders(
     options?.chromePath ?? config.chromePath ?? findChromePath();
   if (!chromePath) {
     return {
-      results: targetIds.map((id) => ({
-        companyId: id,
+      results: targets.map((p) => ({
+        companyId: p.companyId,
         success: false,
         accountsFound: 0,
         transactionsAdded: 0,
@@ -166,10 +165,10 @@ export async function syncProviders(
 
   try {
     const results = await runWithConcurrency(
-      targetIds,
+      targets,
       concurrency,
-      (companyId) =>
-        syncSingleProvider(companyId, config, chromePath, browser, options),
+      (provider) =>
+        syncSingleProvider(provider, config, chromePath, browser, options),
     );
 
     const totalAdded = results.reduce((s, r) => s + r.transactionsAdded, 0);
@@ -187,12 +186,13 @@ export async function syncProviders(
 // ---------------------------------------------------------------------------
 
 async function syncSingleProvider(
-  companyId: string,
+  provider: Provider,
   config: AppConfig,
   chromePath: string,
   browser: any,
   syncOptions?: SyncOptions,
 ): Promise<ProviderSyncResult> {
+  const { companyId, alias } = provider;
   const onProgress = syncOptions?.onProgress;
   const startTime = Date.now();
 
@@ -208,10 +208,10 @@ async function syncSingleProvider(
     };
   }
 
-  onProgress?.(companyId, "loading_credentials");
+  onProgress?.(alias, "loading_credentials");
 
-  // Get credentials
-  const credentials = await getCredentials(companyId);
+  // Get credentials keyed by alias
+  const credentials = await getCredentials(alias);
   if (!credentials) {
     return {
       companyId,
@@ -219,19 +219,12 @@ async function syncSingleProvider(
       accountsFound: 0,
       transactionsAdded: 0,
       transactionsUpdated: 0,
-      error: `No credentials found for ${companyId}. Run 'kolshek providers add' first.`,
+      error: `No credentials found for ${alias}. Run 'kolshek providers add' first.`,
       durationMs: Date.now() - startTime,
     };
   }
 
   try {
-    // Get or create provider record
-    let provider = getProviderByCompanyId(companyId);
-    if (!provider) {
-      const info = PROVIDERS[companyId];
-      provider = createProvider(companyId, info.displayName, info.type);
-    }
-
     // Determine start date, clamped to scraper's max history limit
     const maxDays = getScraperMaxDays(companyId);
     const earliestAllowed = subDays(new Date(), maxDays);
@@ -243,7 +236,7 @@ async function syncSingleProvider(
     // Create sync log entry
     const syncLog = createSyncLog(provider.id, startDateStr);
 
-    onProgress?.(companyId, "scraping");
+    onProgress?.(alias, "scraping");
 
     // Scrape
     let scrapeResult: ScrapeResult;
@@ -255,7 +248,7 @@ async function syncSingleProvider(
         chromePath,
         browser,
         onProgress: onProgress
-          ? (type: string) => onProgress(companyId, type)
+          ? (type: string) => onProgress(alias, type)
           : undefined,
         scraperOptions: {
           timeout: 120000, // 2 minutes max per navigation
@@ -295,7 +288,7 @@ async function syncSingleProvider(
       };
     }
 
-    onProgress?.(companyId, "processing");
+    onProgress?.(alias, "processing");
 
     // Process accounts and transactions inside a DB transaction for atomicity
     const db = getDatabase();
@@ -325,7 +318,7 @@ async function syncSingleProvider(
             acct.accountNumber,
           );
 
-          const input: TransactionInput = {
+          const txInput: TransactionInput = {
             accountId: account.id,
             type: mapTransactionType(tx.type),
             identifier: tx.identifier ?? null,
@@ -346,7 +339,7 @@ async function syncSingleProvider(
             uniqueId,
           };
 
-          const result = upsertTransaction(input);
+          const result = upsertTransaction(txInput);
           if (result.action === "inserted") totalAdded++;
           else if (result.action === "updated") totalUpdated++;
         }

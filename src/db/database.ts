@@ -80,7 +80,7 @@ function runMigrations(db: Database): void {
 
     if (!applied) {
       const sql = readFileSync(join(migrationsDir, file), "utf-8");
-      db.run(sql);
+      db.exec(sql);
       db.prepare("INSERT INTO _migrations (name) VALUES ($name)").run({
         $name: file,
       });

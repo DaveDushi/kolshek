@@ -13,7 +13,7 @@ import {
 import {
   createProvider,
   getProvider,
-  getProviderByCompanyId,
+  getProvidersByCompanyId,
   listProviders,
   deleteProvider,
 } from "../../db/repositories/providers.js";
@@ -59,6 +59,7 @@ export function registerProvidersCommand(program: Command): void {
             all.map((p) => ({
               id: p.id,
               companyId: p.companyId,
+              alias: p.alias,
               displayName: p.displayName,
               type: p.type,
               lastSyncedAt: p.lastSyncedAt,
@@ -75,9 +76,10 @@ export function registerProvidersCommand(program: Command): void {
       }
 
       const table = createTable(
-        ["ID", "Name", "Type", "Company ID", "Last Synced"],
+        ["ID", "Alias", "Name", "Type", "Company ID", "Last Synced"],
         all.map((p) => [
           String(p.id),
+          p.alias,
           p.displayName,
           p.type,
           p.companyId,
@@ -116,14 +118,22 @@ export function registerProvidersCommand(program: Command): void {
         })),
       });
 
-      // Check duplicate
-      const existing = getProviderByCompanyId(companyId);
-      if (existing) {
-        warn(`${PROVIDERS[companyId].displayName} is already configured (ID: ${existing.id}).`);
-        process.exit(ExitCode.Error);
-      }
-
       const providerInfo = PROVIDERS[companyId];
+
+      // If this companyId already has instances, prompt for an alias
+      const existingInstances = getProvidersByCompanyId(companyId);
+      let alias: string = companyId;
+      if (existingInstances.length > 0) {
+        info(`${providerInfo.displayName} already has ${existingInstances.length} instance(s): ${existingInstances.map((p) => p.alias).join(", ")}`);
+        alias = await input({
+          message: "Alias for this instance (e.g. leumi-joint):",
+          validate: (v) => {
+            if (!v.trim()) return "Alias is required";
+            if (!/^[a-zA-Z0-9_-]+$/.test(v)) return "Use only letters, numbers, dashes, underscores";
+            return true;
+          },
+        });
+      }
 
       // Enter credentials
       const credentials: Record<string, string> = {};
@@ -185,7 +195,7 @@ export function registerProvidersCommand(program: Command): void {
       // Save
       const keychainAvailable = await hasKeychainSupport();
       if (keychainAvailable) {
-        await storeCredentials(companyId, credentials);
+        await storeCredentials(alias, credentials);
       } else {
         warn("Keychain unavailable — credentials NOT saved. Use env vars.");
       }
@@ -194,6 +204,7 @@ export function registerProvidersCommand(program: Command): void {
         companyId,
         providerInfo.displayName,
         providerInfo.type,
+        alias,
       );
 
       if (isJsonMode()) {
@@ -229,7 +240,7 @@ export function registerProvidersCommand(program: Command): void {
 
       // Delete credentials and provider
       try {
-        await deleteCredentials(provider.companyId);
+        await deleteCredentials(provider.alias);
       } catch {
         // Credentials may not exist in keychain
       }
@@ -265,10 +276,10 @@ export function registerProvidersCommand(program: Command): void {
         process.exit(ExitCode.Error);
       }
 
-      const credentials = await getCredentials(provider.companyId);
+      const credentials = await getCredentials(provider.alias);
       if (!credentials) {
         printError("NO_CREDENTIALS", "No credentials found for this provider", {
-          provider: provider.companyId,
+          provider: provider.alias,
           suggestions: [
             `Run: kolshek providers remove ${id} && kolshek providers add`,
             "Or set KOLSHEK_CREDENTIALS_JSON environment variable",

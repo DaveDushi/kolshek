@@ -39,6 +39,7 @@ export interface ProviderInfo {
 export interface Provider {
   id: number;
   companyId: CompanyId;
+  alias: string;
   displayName: string;
   type: ProviderType;
   lastSyncedAt: string | null;

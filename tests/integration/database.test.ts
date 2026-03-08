@@ -4,6 +4,9 @@ import {
   createProvider,
   getProvider,
   getProviderByCompanyId,
+  getProviderByAlias,
+  getProvidersByCompanyId,
+  resolveProviders,
   listProviders,
   deleteProvider,
   updateLastSynced,
@@ -37,10 +40,11 @@ afterAll(() => {
 describe("provider CRUD", () => {
   let providerId: number;
 
-  it("creates a provider", () => {
+  it("creates a provider with default alias", () => {
     const provider = createProvider("hapoalim", "Bank Hapoalim", "bank");
     expect(provider.id).toBeDefined();
     expect(provider.companyId).toBe("hapoalim");
+    expect(provider.alias).toBe("hapoalim");
     expect(provider.displayName).toBe("Bank Hapoalim");
     expect(provider.type).toBe("bank");
     expect(provider.lastSyncedAt).toBeNull();
@@ -85,6 +89,46 @@ describe("provider CRUD", () => {
     expect(getProvider(tempProvider.id)).not.toBeNull();
     deleteProvider(tempProvider.id);
     expect(getProvider(tempProvider.id)).toBeNull();
+  });
+
+  it("creates a provider with custom alias", () => {
+    const provider = createProvider("leumi", "Bank Leumi (Personal)", "bank", "leumi-personal");
+    expect(provider.alias).toBe("leumi-personal");
+    expect(provider.companyId).toBe("leumi");
+  });
+
+  it("creates multiple providers with same companyId but different aliases", () => {
+    const joint = createProvider("leumi", "Bank Leumi (Joint)", "bank", "leumi-joint");
+    expect(joint.alias).toBe("leumi-joint");
+
+    const byCompanyId = getProvidersByCompanyId("leumi");
+    expect(byCompanyId.length).toBe(2);
+  });
+
+  it("gets provider by alias", () => {
+    const p = getProviderByAlias("leumi-personal");
+    expect(p).not.toBeNull();
+    expect(p!.companyId).toBe("leumi");
+    expect(p!.alias).toBe("leumi-personal");
+  });
+
+  it("resolves by alias (single match)", () => {
+    const resolved = resolveProviders("leumi-joint");
+    expect(resolved.length).toBe(1);
+    expect(resolved[0].alias).toBe("leumi-joint");
+  });
+
+  it("resolves by companyId (multiple matches)", () => {
+    const resolved = resolveProviders("leumi");
+    expect(resolved.length).toBe(2);
+  });
+
+  it("resolves by numeric ID", () => {
+    const all = listProviders();
+    const first = all[0];
+    const resolved = resolveProviders(String(first.id));
+    expect(resolved.length).toBe(1);
+    expect(resolved[0].id).toBe(first.id);
   });
 });
 

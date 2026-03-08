@@ -17,7 +17,7 @@ import {
 import { initDatabase } from "../../db/database.js";
 import {
   createProvider,
-  getProviderByCompanyId,
+  getProvidersByCompanyId,
 } from "../../db/repositories/providers.js";
 import {
   storeCredentials,
@@ -111,17 +111,46 @@ export function registerInitCommand(program: Command): void {
 
       const providerInfo = PROVIDERS[companyId];
 
-      // Check if already configured
-      const existing = getProviderByCompanyId(companyId);
-      if (existing) {
-        warn(`${providerInfo.displayName} is already configured.`);
-        const proceed = await confirm({
-          message: "Would you like to update its credentials?",
-          default: false,
+      // Check if already configured — allow adding another instance with alias
+      const existingInstances = getProvidersByCompanyId(companyId);
+      let alias: string = companyId;
+      let isUpdate = false;
+      if (existingInstances.length > 0) {
+        warn(`${providerInfo.displayName} already has ${existingInstances.length} instance(s): ${existingInstances.map((p) => p.alias).join(", ")}`);
+        const action = await select<string>({
+          message: "What would you like to do?",
+          choices: [
+            { value: "add", name: "Add another instance (e.g. joint account)" },
+            { value: "update", name: "Update existing credentials" },
+            { value: "cancel", name: "Cancel" },
+          ],
         });
-        if (!proceed) {
+        if (action === "cancel") {
           info("Setup cancelled.");
           return;
+        }
+        if (action === "update") {
+          isUpdate = true;
+          if (existingInstances.length === 1) {
+            alias = existingInstances[0].alias;
+          } else {
+            alias = await select<string>({
+              message: "Which instance?",
+              choices: existingInstances.map((p) => ({
+                value: p.alias,
+                name: `${p.alias} (${p.displayName})`,
+              })),
+            });
+          }
+        } else {
+          alias = await input({
+            message: "Alias for this instance (e.g. leumi-joint):",
+            validate: (v) => {
+              if (!v.trim()) return "Alias is required";
+              if (!/^[a-zA-Z0-9_-]+$/.test(v)) return "Use only letters, numbers, dashes, underscores";
+              return true;
+            },
+          });
         }
       }
 
@@ -218,7 +247,7 @@ export function registerInitCommand(program: Command): void {
           default: true,
         });
         if (saveIt) {
-          await storeCredentials(companyId, credentials);
+          await storeCredentials(alias, credentials);
           success("Credentials saved to OS keychain.");
         }
       } else {
@@ -228,8 +257,8 @@ export function registerInitCommand(program: Command): void {
       }
 
       // Save provider to DB
-      if (!existing) {
-        createProvider(companyId, providerInfo.displayName, providerInfo.type);
+      if (!isUpdate) {
+        createProvider(companyId, providerInfo.displayName, providerInfo.type, alias);
       }
       success(`${providerInfo.displayName} configured successfully!`);
 
