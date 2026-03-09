@@ -148,6 +148,15 @@ export function formatDate(isoDate: string): string {
   }
 }
 
+/** Format ISO date string to DD/MM/YY HH:mm for humans */
+export function formatDateTime(isoDate: string): string {
+  try {
+    return format(parseISO(isoDate), "dd/MM/yy HH:mm");
+  } catch {
+    return isoDate;
+  }
+}
+
 /** Mask account number: ****1234 for humans, full for JSON */
 export function formatAccountNumber(
   accountNumber: string,

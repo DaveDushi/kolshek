@@ -37,7 +37,7 @@ import {
   warn,
   createTable,
   createSpinner,
-  formatDate,
+  formatDateTime,
   formatAccountNumber,
   ExitCode,
 } from "../output.js";
@@ -91,7 +91,7 @@ export function registerProvidersCommand(program: Command): void {
           p.type,
           p.companyId,
           authStatuses[i] ? "Yes" : "No",
-          p.lastSyncedAt ? formatDate(p.lastSyncedAt) : "Never",
+          p.lastSyncedAt ? formatDateTime(p.lastSyncedAt) : "Never",
         ]),
       );
       console.log(table);
