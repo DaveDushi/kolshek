@@ -118,6 +118,15 @@ export function updateLastSynced(id: number, timestamp: string): void {
   ).run({ $id: id, $timestamp: timestamp });
 }
 
+export function getMostRecentSyncTime(): string | null {
+  const db = getDatabase();
+  const row = db
+    .prepare("SELECT MAX(last_synced_at) as max_sync FROM providers")
+    .get() as { max_sync: string | null } | null;
+
+  return row?.max_sync ?? null;
+}
+
 export function deleteProvider(id: number): void {
   const db = getDatabase();
   db.prepare("DELETE FROM providers WHERE id = $id").run({ $id: id });

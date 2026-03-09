@@ -16,6 +16,7 @@ export const appConfigSchema = z.object({
   viewport: viewportSchema.default(DEFAULT_CONFIG.viewport),
   screenshotPath: z.string().optional(),
   dateFormat: z.string().default(DEFAULT_CONFIG.dateFormat),
+  autoFetchAfterHours: z.number().int().nonnegative().default(DEFAULT_CONFIG.autoFetchAfterHours),
 });
 
 export function parseConfig(raw: unknown): AppConfig {

@@ -19,6 +19,8 @@ export interface AppConfig {
   screenshotPath?: string;
   /** Date display format for human output */
   dateFormat: string;
+  /** Auto-fetch if last sync was more than this many hours ago (0 = disabled) */
+  autoFetchAfterHours: number;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -28,6 +30,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   navigationRetryCount: 3,
   viewport: { width: 1920, height: 1080 },
   dateFormat: "dd/MM/yy",
+  autoFetchAfterHours: 24,
 };
 
 /** Sync result for a single provider */

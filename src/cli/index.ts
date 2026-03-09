@@ -8,7 +8,7 @@
 import { Command } from "commander";
 import { existsSync } from "fs";
 import { join } from "path";
-import { setOutputOptions, ExitCode } from "./output.js";
+import { setOutputOptions, ExitCode, createSpinner, isInteractive } from "./output.js";
 import { getAppPaths, ensureDirectories, getDbPath } from "../config/loader.js";
 import { initDatabase, closeDatabase } from "../db/database.js";
 import { registerInitCommand } from "./commands/init.js";
@@ -21,6 +21,10 @@ import { registerQueryCommand } from "./commands/query.js";
 import { registerReportsCommand } from "./commands/reports.js";
 import { registerCategorizeCommand } from "./commands/categorize.js";
 import { registerTranslateCommand } from "./commands/translate.js";
+import { registerScheduleCommand } from "./commands/schedule.js";
+import { getMostRecentSyncTime } from "../db/repositories/providers.js";
+import { loadConfig } from "../config/loader.js";
+import { runFetch } from "./commands/fetch.js";
 import pkg from "../../package.json";
 
 const program = new Command();
@@ -36,6 +40,7 @@ program
   .option("--no-color", "Disable ANSI colors")
   .option("--no-progress", "Disable spinners and progress bars")
   .option("--non-interactive", "Never prompt; fail if input needed", false)
+  .option("--no-auto-fetch", "Skip automatic fetch on stale data")
   .hook("preAction", async (_thisCommand, actionCommand) => {
     // Apply global output options
     const opts = program.opts();
@@ -65,6 +70,34 @@ program
           'Tip: Run "kolshek init" to set up your first bank or credit card provider.\n',
         );
       }
+
+      // Auto-fetch if data is stale
+      const autoFetchTriggers = new Set(["list", "search", "accounts", "reports", "query", "summary"]);
+      if (
+        opts.autoFetch !== false &&
+        autoFetchTriggers.has(commandName) &&
+        isInteractive()
+      ) {
+        const config = await loadConfig();
+        const thresholdHours = config.autoFetchAfterHours;
+        if (thresholdHours > 0) {
+          const lastSync = getMostRecentSyncTime();
+          if (lastSync) {
+            const hoursSince = (Date.now() - new Date(lastSync).getTime()) / (1000 * 60 * 60);
+            if (hoursSince > thresholdHours) {
+              const hoursAgo = Math.round(hoursSince);
+              const spinner = createSpinner(`Auto-fetching (last sync ${hoursAgo}h ago)...`);
+              spinner.start();
+              try {
+                await runFetch({});
+                spinner.succeed("Auto-fetch complete.");
+              } catch {
+                spinner.fail("Auto-fetch failed (continuing with cached data).");
+              }
+            }
+          }
+        }
+      }
     }
   })
   .hook("postAction", () => {
@@ -82,6 +115,7 @@ registerQueryCommand(program);
 registerReportsCommand(program);
 registerCategorizeCommand(program);
 registerTranslateCommand(program);
+registerScheduleCommand(program);
 
 // Parse and run
 program.parseAsync(process.argv).catch((err) => {
