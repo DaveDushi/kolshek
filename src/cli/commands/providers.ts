@@ -21,6 +21,7 @@ import {
   storeCredentials,
   getCredentials,
   deleteCredentials,
+  hasCredentials,
   hasKeychainSupport,
 } from "../../security/keychain.js";
 import { scrapeProvider, findChromePath } from "../../core/scraper.js";
@@ -50,18 +51,24 @@ export function registerProvidersCommand(program: Command): void {
   providers
     .command("list")
     .description("List configured providers")
-    .action(() => {
+    .action(async () => {
       const all = listProviders();
+
+      // Check credentials for each provider in parallel
+      const authStatuses = await Promise.all(
+        all.map((p) => hasCredentials(p.alias)),
+      );
 
       if (isJsonMode()) {
         printJson(
           jsonSuccess(
-            all.map((p) => ({
+            all.map((p, i) => ({
               id: p.id,
               companyId: p.companyId,
               alias: p.alias,
               displayName: p.displayName,
               type: p.type,
+              authenticated: authStatuses[i],
               lastSyncedAt: p.lastSyncedAt,
               createdAt: p.createdAt,
             })),
@@ -76,13 +83,14 @@ export function registerProvidersCommand(program: Command): void {
       }
 
       const table = createTable(
-        ["ID", "Alias", "Name", "Type", "Company ID", "Last Synced"],
-        all.map((p) => [
+        ["ID", "Alias", "Name", "Type", "Company ID", "Auth", "Last Synced"],
+        all.map((p, i) => [
           String(p.id),
           p.alias,
           p.displayName,
           p.type,
           p.companyId,
+          authStatuses[i] ? "Yes" : "No",
           p.lastSyncedAt ? formatDate(p.lastSyncedAt) : "Never",
         ]),
       );
@@ -214,6 +222,122 @@ export function registerProvidersCommand(program: Command): void {
       }
     });
 
+  // --- providers auth ---
+  providers
+    .command("auth <id>")
+    .description("Set or update credentials for an existing provider")
+    .action(async (idStr: string) => {
+      const id = Number(idStr);
+      const provider = getProvider(id);
+
+      if (!provider) {
+        printError("NOT_FOUND", `Provider with ID ${id} not found`);
+        process.exit(ExitCode.BadArgs);
+      }
+
+      if (!isInteractive()) {
+        printError("NON_INTERACTIVE", "providers auth requires interactive mode", {
+          suggestions: ["Use KOLSHEK_CREDENTIALS_JSON env var instead"],
+        });
+        process.exit(ExitCode.Error);
+      }
+
+      const providerInfo = PROVIDERS[provider.companyId as CompanyId];
+      if (!providerInfo) {
+        printError("UNKNOWN_PROVIDER", `Unknown company ID: ${provider.companyId}`);
+        process.exit(ExitCode.Error);
+      }
+
+      const existing = await hasCredentials(provider.alias);
+      if (existing) {
+        info(`${provider.displayName} already has credentials stored.`);
+        const proceed = await confirm({
+          message: "Replace existing credentials?",
+          default: true,
+        });
+        if (!proceed) {
+          info("Cancelled.");
+          return;
+        }
+      }
+
+      info(`${providerInfo.displayName} requires: ${providerInfo.loginFields.join(", ")}\n`);
+
+      const credentials: Record<string, string> = {};
+      for (const field of providerInfo.loginFields) {
+        if (field === "password") {
+          credentials[field] = await password({
+            message: `${field}:`,
+            mask: "*",
+          });
+        } else if (field === "otpLongTermToken") {
+          credentials[field] = await password({
+            message: `${field} (leave empty if not available):`,
+            mask: "*",
+          });
+        } else {
+          credentials[field] = await input({ message: `${field}:` });
+        }
+      }
+
+      // Optional connection test
+      const chromePath = findChromePath();
+      if (chromePath) {
+        const doTest = await confirm({
+          message: "Test connection?",
+          default: true,
+        });
+
+        if (doTest) {
+          if (process.env.DEBUG) {
+            warn("DEBUG env var is set — upstream scrapers may log sensitive data (credentials, account numbers) to stderr.");
+          }
+
+          const spinner = createSpinner("Testing connection...");
+          spinner.start();
+          try {
+            const result = await scrapeProvider({
+              companyId: provider.companyId,
+              credentials,
+              startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+              chromePath,
+            });
+            if (result.success) {
+              spinner.succeed(
+                `Connected! Found ${result.accounts.length} account(s).`,
+              );
+            } else {
+              spinner.fail(`Test failed: ${sanitizeError(result.error ?? "", credentials)}`);
+              const proceed = await confirm({
+                message: "Save anyway?",
+                default: false,
+              });
+              if (!proceed) {
+                process.exit(ExitCode.AuthFailure);
+              }
+            }
+          } catch (err) {
+            spinner.fail(
+              `Test error: ${sanitizeError(err instanceof Error ? err.message : String(err), credentials)}`,
+            );
+          }
+        }
+      }
+
+      // Save credentials
+      const keychainAvailable = await hasKeychainSupport();
+      if (keychainAvailable) {
+        await storeCredentials(provider.alias, credentials);
+        success(`Credentials saved for ${provider.displayName}.`);
+      } else {
+        warn("Keychain unavailable — credentials NOT saved. Use env vars.");
+      }
+
+      if (isJsonMode()) {
+        printJson(jsonSuccess({ id: provider.id, alias: provider.alias, authenticated: true }));
+      }
+    });
+
   // --- providers remove ---
   providers
     .command("remove <id>")
@@ -281,7 +405,7 @@ export function registerProvidersCommand(program: Command): void {
         printError("NO_CREDENTIALS", "No credentials found for this provider", {
           provider: provider.alias,
           suggestions: [
-            `Run: kolshek providers remove ${id} && kolshek providers add`,
+            `Run: kolshek providers auth ${id}`,
             "Or set KOLSHEK_CREDENTIALS_JSON environment variable",
           ],
         });

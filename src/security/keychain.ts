@@ -396,6 +396,23 @@ export async function getCredentials(
 }
 
 /**
+ * Check if credentials exist for a provider (env or keychain).
+ * Lighter than getCredentials — doesn't decode the payload.
+ */
+export async function hasCredentials(companyId: string): Promise<boolean> {
+  const fromEnv = getCredentialsFromEnv(companyId);
+  if (fromEnv) return true;
+
+  const target = targetName(companyId);
+  try {
+    const encoded = await backend().read(target);
+    return encoded != null && encoded.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Delete stored credentials for a provider from the OS keychain.
  */
 export async function deleteCredentials(companyId: string): Promise<void> {
