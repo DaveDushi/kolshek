@@ -11,6 +11,7 @@ interface SyncLogRow {
   transactions_updated: number;
   error_message: string | null;
   scrape_start_date: string;
+  scrape_end_date: string | null;
 }
 
 function rowToSyncLog(row: SyncLogRow): SyncLog {
@@ -24,23 +25,26 @@ function rowToSyncLog(row: SyncLogRow): SyncLog {
     transactionsUpdated: row.transactions_updated,
     errorMessage: row.error_message,
     scrapeStartDate: row.scrape_start_date,
+    scrapeEndDate: row.scrape_end_date,
   };
 }
 
 export function createSyncLog(
   providerId: number,
   scrapeStartDate: string,
+  scrapeEndDate: string,
 ): SyncLog {
   const db = getDatabase();
   const row = db
     .prepare(
-      `INSERT INTO sync_log (provider_id, status, scrape_start_date)
-       VALUES ($providerId, 'running', $scrapeStartDate)
+      `INSERT INTO sync_log (provider_id, status, scrape_start_date, scrape_end_date)
+       VALUES ($providerId, 'running', $scrapeStartDate, $scrapeEndDate)
        RETURNING *`,
     )
     .get({
       $providerId: providerId,
       $scrapeStartDate: scrapeStartDate,
+      $scrapeEndDate: scrapeEndDate,
     }) as SyncLogRow;
 
   return rowToSyncLog(row);

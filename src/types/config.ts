@@ -39,6 +39,10 @@ export interface ProviderSyncResult {
   transactionsUpdated: number;
   error?: string;
   durationMs: number;
+  /** The start date of the scrape range (YYYY-MM-DD) */
+  scrapeStartDate?: string;
+  /** The end date of the scrape range (YYYY-MM-DD) */
+  scrapeEndDate?: string;
 }
 
 /** Overall sync result */
@@ -60,4 +64,5 @@ export interface SyncLog {
   transactionsUpdated: number;
   errorMessage: string | null;
   scrapeStartDate: string;
+  scrapeEndDate: string | null;
 }

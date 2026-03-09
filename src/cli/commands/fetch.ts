@@ -151,17 +151,23 @@ export async function runFetch(opts: FetchOptions = {}): Promise<void> {
   }
 
   // Human output
-  const rows = result.results.map((r) => [
-    r.companyId,
-    r.success ? "✓" : "✗",
-    String(r.transactionsAdded),
-    String(r.transactionsUpdated),
-    r.error ?? "",
-    `${(r.durationMs / 1000).toFixed(1)}s`,
-  ]);
+  const rows = result.results.map((r) => {
+    const range = r.scrapeStartDate && r.scrapeEndDate
+      ? `${r.scrapeStartDate} → ${r.scrapeEndDate}`
+      : "";
+    return [
+      r.companyId,
+      r.success ? "✓" : "✗",
+      range,
+      String(r.transactionsAdded),
+      String(r.transactionsUpdated),
+      r.error ?? "",
+      `${(r.durationMs / 1000).toFixed(1)}s`,
+    ];
+  });
 
   const table = createTable(
-    ["Provider", "Status", "Added", "Updated", "Error", "Duration"],
+    ["Provider", "Status", "Range", "Added", "Updated", "Error", "Duration"],
     rows,
   );
   console.log(table);

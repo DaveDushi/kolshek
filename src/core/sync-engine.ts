@@ -232,9 +232,11 @@ async function syncSingleProvider(
       syncOptions?.fromDate ?? computeStartDate(provider.id, companyId, config);
     const startDate = rawStartDate < earliestAllowed ? earliestAllowed : rawStartDate;
     const startDateStr = formatISO(startDate, { representation: "date" });
+    const endDate = new Date();
+    const endDateStr = formatISO(endDate, { representation: "date" });
 
     // Create sync log entry
-    const syncLog = createSyncLog(provider.id, startDateStr);
+    const syncLog = createSyncLog(provider.id, startDateStr, endDateStr);
 
     onProgress?.(alias, "scraping");
 
@@ -268,6 +270,8 @@ async function syncSingleProvider(
         transactionsUpdated: 0,
         error: errMsg,
         durationMs: Date.now() - startTime,
+        scrapeStartDate: startDateStr,
+        scrapeEndDate: endDateStr,
       };
     }
 
@@ -285,6 +289,8 @@ async function syncSingleProvider(
         transactionsUpdated: 0,
         error: safeError,
         durationMs: Date.now() - startTime,
+        scrapeStartDate: startDateStr,
+        scrapeEndDate: endDateStr,
       };
     }
 
@@ -364,6 +370,8 @@ async function syncSingleProvider(
       transactionsAdded: totalAdded,
       transactionsUpdated: totalUpdated,
       durationMs: Date.now() - startTime,
+      scrapeStartDate: startDateStr,
+      scrapeEndDate: endDateStr,
     };
   } finally {
     // Zero credential values to minimize exposure window
