@@ -72,7 +72,7 @@ export function registerInitCommand(program: Command): void {
 
       info("");
       info("Welcome to kolshek (כל שקל) — Israeli finance tracker");
-      info("Let's set up your first bank or credit card provider.\n");
+      info("Let's set up your bank and credit card providers.\n");
 
       // Disclaimer
       info("⚠  This tool stores your bank credentials in your OS keychain.");
@@ -90,177 +90,201 @@ export function registerInitCommand(program: Command): void {
         process.exit(ExitCode.Error);
       }
 
-      // Step 1: Provider type
-      const providerType = await select<ProviderType>({
-        message: "What would you like to add?",
-        choices: [
-          { value: "bank" as ProviderType, name: "Bank account" },
-          { value: "credit_card" as ProviderType, name: "Credit card" },
-        ],
-      });
+      const configuredProviders: string[] = [];
 
-      // Step 2: Provider selection
-      const providers = getProvidersByType(providerType);
-      const companyId = await select<CompanyId>({
-        message: `Select your ${providerType === "bank" ? "bank" : "credit card company"}:`,
-        choices: providers.map((p) => ({
-          value: p.companyId,
-          name: p.displayName,
-        })),
-      });
-
-      const providerInfo = PROVIDERS[companyId];
-
-      // Check if already configured — allow adding another instance with alias
-      const existingInstances = getProvidersByCompanyId(companyId);
-      let alias: string = companyId;
-      let isUpdate = false;
-      if (existingInstances.length > 0) {
-        warn(`${providerInfo.displayName} already has ${existingInstances.length} instance(s): ${existingInstances.map((p) => p.alias).join(", ")}`);
-        const action = await select<string>({
-          message: "What would you like to do?",
+      // Loop: add providers until the user is done
+      let addMore = true;
+      while (addMore) {
+        // Step 1: Provider type
+        const providerType = await select<ProviderType>({
+          message: "What would you like to add?",
           choices: [
-            { value: "add", name: "Add another instance (e.g. joint account)" },
-            { value: "update", name: "Update existing credentials" },
-            { value: "cancel", name: "Cancel" },
+            { value: "bank" as ProviderType, name: "Bank account" },
+            { value: "credit_card" as ProviderType, name: "Credit card" },
           ],
         });
-        if (action === "cancel") {
-          info("Setup cancelled.");
-          return;
-        }
-        if (action === "update") {
-          isUpdate = true;
-          if (existingInstances.length === 1) {
-            alias = existingInstances[0].alias;
-          } else {
-            alias = await select<string>({
-              message: "Which instance?",
-              choices: existingInstances.map((p) => ({
-                value: p.alias,
-                name: `${p.alias} (${p.displayName})`,
-              })),
+
+        // Step 2: Provider selection
+        const providers = getProvidersByType(providerType);
+        const companyId = await select<CompanyId>({
+          message: `Select your ${providerType === "bank" ? "bank" : "credit card company"}:`,
+          choices: providers.map((p) => ({
+            value: p.companyId,
+            name: p.displayName,
+          })),
+        });
+
+        const providerInfo = PROVIDERS[companyId];
+
+        // Check if already configured — allow adding another instance with alias
+        const existingInstances = getProvidersByCompanyId(companyId);
+        let alias: string = companyId;
+        let isUpdate = false;
+        if (existingInstances.length > 0) {
+          warn(`${providerInfo.displayName} already has ${existingInstances.length} instance(s): ${existingInstances.map((p) => p.alias).join(", ")}`);
+          const action = await select<string>({
+            message: "What would you like to do?",
+            choices: [
+              { value: "add", name: "Add another instance (e.g. joint account)" },
+              { value: "update", name: "Update existing credentials" },
+              { value: "cancel", name: "Cancel" },
+            ],
+          });
+          if (action === "cancel") {
+            info("Skipped.");
+            const another = await confirm({
+              message: "Add another provider?",
+              default: false,
             });
+            if (another) continue;
+            break;
           }
-        } else {
-          alias = await input({
-            message: "Alias for this instance (e.g. leumi-joint):",
-            validate: (v) => {
-              if (!v.trim()) return "Alias is required";
-              if (!/^[a-zA-Z0-9_-]+$/.test(v)) return "Use only letters, numbers, dashes, underscores";
-              return true;
-            },
-          });
-        }
-      }
-
-      // Step 3: Enter credentials
-      info(`\n${providerInfo.displayName} requires: ${providerInfo.loginFields.join(", ")}\n`);
-
-      const credentials: Record<string, string> = {};
-      for (const field of providerInfo.loginFields) {
-        if (field === "password") {
-          credentials[field] = await password({
-            message: `${field}:`,
-            mask: "*",
-          });
-        } else if (field === "otpLongTermToken") {
-          credentials[field] = await password({
-            message: `${field} (leave empty if not available):`,
-            mask: "*",
-          });
-        } else {
-          credentials[field] = await input({
-            message: `${field}:`,
-          });
-        }
-      }
-
-      // Step 4: Test connection
-      const testIt = await confirm({
-        message: "Test the connection now?",
-        default: true,
-      });
-
-      if (testIt) {
-        if (process.env.DEBUG) {
-          warn("DEBUG env var is set — upstream scrapers may log sensitive data (credentials, account numbers) to stderr.");
-        }
-
-        const spinner = createSpinner(
-          `Testing connection to ${providerInfo.displayName}...`,
-        );
-        spinner.start();
-
-        try {
-          const result = await scrapeProvider({
-            companyId,
-            credentials,
-            startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 1 week
-            chromePath,
-          });
-
-          if (result.success) {
-            spinner.succeed(
-              `Connected! Found ${result.accounts.length} account(s).`,
-            );
-            for (const acc of result.accounts) {
-              const bal =
-                acc.balance != null
-                  ? ` — Balance: ₪${acc.balance.toLocaleString("en-IL", { minimumFractionDigits: 2 })}`
-                  : "";
-              info(`  Account: ${formatAccountNumber(acc.accountNumber)}${bal}`);
+          if (action === "update") {
+            isUpdate = true;
+            if (existingInstances.length === 1) {
+              alias = existingInstances[0].alias;
+            } else {
+              alias = await select<string>({
+                message: "Which instance?",
+                choices: existingInstances.map((p) => ({
+                  value: p.alias,
+                  name: `${p.alias} (${p.displayName})`,
+                })),
+              });
             }
           } else {
-            const safeError = sanitizeError(result.error ?? "Unknown error", credentials);
-            spinner.fail(`Connection failed: ${safeError}`);
-            printError("AUTH_FAILURE", safeError, {
-              provider: companyId,
-              retryable: true,
-              suggestions: [
-                "Double-check your credentials",
-                "Make sure your account is not locked",
-                "Some banks require OTP on first login",
-              ],
+            alias = await input({
+              message: "Alias for this instance (e.g. leumi-joint):",
+              validate: (v) => {
+                if (!v.trim()) return "Alias is required";
+                if (!/^[a-zA-Z0-9_-]+$/.test(v)) return "Use only letters, numbers, dashes, underscores";
+                return true;
+              },
             });
-            process.exit(ExitCode.AuthFailure);
           }
-        } catch (err) {
-          spinner.fail("Connection test failed");
-          printError(
-            "SCRAPE_ERROR",
-            sanitizeError(err instanceof Error ? err.message : String(err), credentials),
-            {
-              provider: companyId,
-              retryable: true,
-            },
-          );
-          process.exit(ExitCode.Error);
         }
-      }
 
-      // Step 5: Save credentials
-      const keychainAvailable = await hasKeychainSupport();
-      if (keychainAvailable) {
-        const saveIt = await confirm({
-          message: "Save credentials to OS keychain?",
+        // Step 3: Enter credentials
+        info(`\n${providerInfo.displayName} requires: ${providerInfo.loginFields.join(", ")}\n`);
+
+        const credentials: Record<string, string> = {};
+        for (const field of providerInfo.loginFields) {
+          if (field === "password") {
+            credentials[field] = await password({
+              message: `${field}:`,
+              mask: "*",
+            });
+          } else if (field === "otpLongTermToken") {
+            credentials[field] = await password({
+              message: `${field} (leave empty if not available):`,
+              mask: "*",
+            });
+          } else {
+            credentials[field] = await input({
+              message: `${field}:`,
+            });
+          }
+        }
+
+        // Step 4: Test connection
+        const testIt = await confirm({
+          message: "Test the connection now?",
           default: true,
         });
-        if (saveIt) {
-          await storeCredentials(alias, credentials);
-          success("Credentials saved to OS keychain.");
+
+        if (testIt) {
+          if (process.env.DEBUG) {
+            warn("DEBUG env var is set — upstream scrapers may log sensitive data (credentials, account numbers) to stderr.");
+          }
+
+          const spinner = createSpinner(
+            `Testing connection to ${providerInfo.displayName}...`,
+          );
+          spinner.start();
+
+          try {
+            const result = await scrapeProvider({
+              companyId,
+              credentials,
+              startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 1 week
+              chromePath,
+            });
+
+            if (result.success) {
+              spinner.succeed(
+                `Connected! Found ${result.accounts.length} account(s).`,
+              );
+              for (const acc of result.accounts) {
+                const bal =
+                  acc.balance != null
+                    ? ` — Balance: ₪${acc.balance.toLocaleString("en-IL", { minimumFractionDigits: 2 })}`
+                    : "";
+                info(`  Account: ${formatAccountNumber(acc.accountNumber)}${bal}`);
+              }
+            } else {
+              const safeError = sanitizeError(result.error ?? "Unknown error", credentials);
+              spinner.fail(`Connection failed: ${safeError}`);
+              printError("AUTH_FAILURE", safeError, {
+                provider: companyId,
+                retryable: true,
+                suggestions: [
+                  "Double-check your credentials",
+                  "Make sure your account is not locked",
+                  "Some banks require OTP on first login",
+                ],
+              });
+              process.exit(ExitCode.AuthFailure);
+            }
+          } catch (err) {
+            spinner.fail("Connection test failed");
+            printError(
+              "SCRAPE_ERROR",
+              sanitizeError(err instanceof Error ? err.message : String(err), credentials),
+              {
+                provider: companyId,
+                retryable: true,
+              },
+            );
+            process.exit(ExitCode.Error);
+          }
         }
-      } else {
-        warn(
-          "OS keychain not available. Set KOLSHEK_CREDENTIALS_JSON env var for automation.",
-        );
+
+        // Step 5: Save credentials
+        const keychainAvailable = await hasKeychainSupport();
+        if (keychainAvailable) {
+          const saveIt = await confirm({
+            message: "Save credentials to OS keychain?",
+            default: true,
+          });
+          if (saveIt) {
+            await storeCredentials(alias, credentials);
+            success("Credentials saved to OS keychain.");
+          }
+        } else {
+          warn(
+            "OS keychain not available. Set KOLSHEK_CREDENTIALS_JSON env var for automation.",
+          );
+        }
+
+        // Save provider to DB
+        if (!isUpdate) {
+          createProvider(companyId, providerInfo.displayName, providerInfo.type, alias);
+        }
+        configuredProviders.push(companyId);
+        success(`${providerInfo.displayName} configured successfully!`);
+
+        // Ask if they want to add another
+        info("");
+        addMore = await confirm({
+          message: "Add another provider?",
+          default: true,
+        });
       }
 
-      // Save provider to DB
-      if (!isUpdate) {
-        createProvider(companyId, providerInfo.displayName, providerInfo.type, alias);
+      if (configuredProviders.length === 0) {
+        info("No providers configured. Run 'kolshek init' again when ready.");
+        return;
       }
-      success(`${providerInfo.displayName} configured successfully!`);
 
       // Step 6: Offer initial fetch
       info("");
@@ -273,7 +297,7 @@ export function registerInitCommand(program: Command): void {
         info('Running "kolshek fetch"...\n');
         // Import dynamically to avoid circular deps at startup
         const { runFetch } = await import("./fetch.js");
-        await runFetch({ providers: [companyId] });
+        await runFetch({ providers: configuredProviders });
       }
 
       // Cheat sheet
@@ -286,7 +310,7 @@ export function registerInitCommand(program: Command): void {
       info("");
 
       if (isJsonMode()) {
-        printJson(jsonSuccess({ provider: companyId, status: "configured" }));
+        printJson(jsonSuccess({ providers: configuredProviders, status: "configured" }));
       }
     });
 }
