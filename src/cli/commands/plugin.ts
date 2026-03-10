@@ -17,7 +17,7 @@ import {
   warn,
   ExitCode,
 } from "../output.js";
-import { PLUGIN_FILES } from "../plugin-files.js";
+import { PLUGIN_FILES, type PluginBundle } from "../plugin-files.js";
 
 const SUPPORTED_TOOLS = [
   "claude-code",
@@ -92,26 +92,23 @@ function writeFiles(
   return count;
 }
 
-function installTool(tool: Tool): {
+export function installPlugin(
+  tool: string,
+  pluginFiles?: PluginBundle,
+): {
   success: boolean;
   count: number;
   dir: string;
   description: string;
 } {
-  const files = PLUGIN_FILES[tool];
+  const bundle = pluginFiles ?? PLUGIN_FILES;
+  const files = bundle[tool];
   if (!files || Object.keys(files).length === 0) {
     return { success: false, count: 0, dir: "", description: "" };
   }
 
-  const target = getInstallTarget(tool);
-
-  if (tool === "openclaw") {
-    // OpenClaw: each skill is a subdirectory under ~/.openclaw/skills/
-    // Files are keyed like "kolshek/SKILL.md", "kolshek-setup/SKILL.md"
-    writeFiles(files, target.dir);
-  } else {
-    writeFiles(files, target.dir);
-  }
+  const target = getInstallTarget(tool as Tool);
+  writeFiles(files, target.dir);
 
   const count = Object.keys(files).length;
   return { success: true, count, dir: target.dir, description: target.description };
@@ -146,7 +143,7 @@ export function registerPluginCommand(program: Command): void {
         process.exit(ExitCode.BadArgs);
       }
 
-      const result = installTool(tool as Tool);
+      const result = installPlugin(tool);
 
       if (!result.success) {
         if (isJsonMode()) {

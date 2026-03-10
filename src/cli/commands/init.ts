@@ -296,6 +296,30 @@ export function registerInitCommand(program: Command): void {
         await runFetch({ providers: configuredProviders });
       }
 
+      // Step 7: AI tool integration
+      info("");
+      const aiTool = await select<string>({
+        message: "Do you use an AI coding assistant? Install the KolShek plugin:",
+        choices: [
+          { value: "skip", name: "Skip — I'll do this later" },
+          { value: "openclaw", name: "OpenClaw" },
+          { value: "claude-code", name: "Claude Code" },
+          { value: "cursor", name: "Cursor" },
+          { value: "gemini-cli", name: "Gemini CLI" },
+          { value: "windsurf", name: "Windsurf" },
+          { value: "aider", name: "Aider" },
+        ],
+      });
+
+      if (aiTool !== "skip") {
+        const { installPlugin } = await import("./plugin.js");
+        const result = installPlugin(aiTool);
+        if (result.success) {
+          success(`Installed ${result.count} files for ${result.description}`);
+          info(`  Location: ${result.dir}`);
+        }
+      }
+
       // Cheat sheet
       info("\n--- What's next ---");
       info("  kolshek providers list       — See configured providers");
@@ -303,6 +327,9 @@ export function registerInitCommand(program: Command): void {
       info("  kolshek fetch                — Fetch new transactions");
       info("  kolshek transactions list    — Browse transactions");
       info("  kolshek transactions search  — Search by description");
+      if (aiTool === "skip") {
+        info("  kolshek plugin install <tool> — Install AI assistant plugin");
+      }
       info("");
 
       if (isJsonMode()) {
