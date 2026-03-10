@@ -23,7 +23,7 @@ import {
   deleteCredentials,
   hasCredentials,
 } from "../../security/keychain.js";
-import { scrapeProvider, findChromePath } from "../../core/scraper.js";
+import { scrapeProvider, findChromePath, launchBrowser, closeBrowser } from "../../core/scraper.js";
 import {
   isJsonMode,
   isInteractive,
@@ -100,7 +100,8 @@ export function registerProvidersCommand(program: Command): void {
   providers
     .command("add")
     .description("Add a new bank or credit card provider")
-    .action(async () => {
+    .option("--visible", "Show the browser window (needed for OTP / 2FA)", false)
+    .action(async (opts: { visible?: boolean }) => {
       if (!isInteractive()) {
         printError("NON_INTERACTIVE", "providers add requires interactive mode");
         process.exit(ExitCode.Error);
@@ -170,12 +171,18 @@ export function registerProvidersCommand(program: Command): void {
 
           const spinner = createSpinner("Testing connection...");
           spinner.start();
+          let browser;
           try {
+            if (opts.visible) {
+              spinner.info("Launching visible browser — complete OTP/2FA in the browser window.");
+              browser = await launchBrowser(chromePath, { headless: false });
+            }
             const result = await scrapeProvider({
               companyId,
               credentials,
               startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
               chromePath,
+              browser,
             });
             if (result.success) {
               spinner.succeed(
@@ -195,6 +202,8 @@ export function registerProvidersCommand(program: Command): void {
             spinner.fail(
               `Test error: ${sanitizeError(err instanceof Error ? err.message : String(err), credentials)}`,
             );
+          } finally {
+            if (browser) await closeBrowser(browser).catch(() => {});
           }
         }
       }
@@ -223,7 +232,8 @@ export function registerProvidersCommand(program: Command): void {
   providers
     .command("auth <id>")
     .description("Set or update credentials for an existing provider")
-    .action(async (idStr: string) => {
+    .option("--visible", "Show the browser window (needed for OTP / 2FA)", false)
+    .action(async (idStr: string, opts: { visible?: boolean }) => {
       const id = Number(idStr);
       const provider = getProvider(id);
 
@@ -292,12 +302,18 @@ export function registerProvidersCommand(program: Command): void {
 
           const spinner = createSpinner("Testing connection...");
           spinner.start();
+          let browser;
           try {
+            if (opts.visible) {
+              spinner.info("Launching visible browser — complete OTP/2FA in the browser window.");
+              browser = await launchBrowser(chromePath, { headless: false });
+            }
             const result = await scrapeProvider({
               companyId: provider.companyId,
               credentials,
               startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
               chromePath,
+              browser,
             });
             if (result.success) {
               spinner.succeed(
@@ -317,6 +333,8 @@ export function registerProvidersCommand(program: Command): void {
             spinner.fail(
               `Test error: ${sanitizeError(err instanceof Error ? err.message : String(err), credentials)}`,
             );
+          } finally {
+            if (browser) await closeBrowser(browser).catch(() => {});
           }
         }
       }
@@ -377,7 +395,8 @@ export function registerProvidersCommand(program: Command): void {
   providers
     .command("test <id>")
     .description("Test provider credentials")
-    .action(async (idStr: string) => {
+    .option("--visible", "Show the browser window (needed for OTP / 2FA)", false)
+    .action(async (idStr: string, opts: { visible?: boolean }) => {
       const id = Number(idStr);
       const provider = getProvider(id);
 
@@ -417,12 +436,18 @@ export function registerProvidersCommand(program: Command): void {
       );
       spinner.start();
 
+      let browser;
       try {
+        if (opts.visible) {
+          spinner.info("Launching visible browser — complete OTP/2FA in the browser window.");
+          browser = await launchBrowser(chromePath, { headless: false });
+        }
         const result = await scrapeProvider({
           companyId: provider.companyId,
           credentials,
           startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
           chromePath,
+          browser,
         });
 
         if (result.success) {
@@ -462,6 +487,8 @@ export function registerProvidersCommand(program: Command): void {
           retryable: true,
         });
         process.exit(ExitCode.Error);
+      } finally {
+        if (browser) await closeBrowser(browser).catch(() => {});
       }
     });
 }
