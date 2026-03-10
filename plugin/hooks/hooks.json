@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/check-config.sh",
+        "timeout": 10000,
+        "blocking": false
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "type": "prompt",
+        "prompt": "The user is about to interact with KolShek financial data. Check their message for potentially destructive operations:\n\n1. If they ask to DELETE transactions, remove providers, or drop/clear data — respond with a warning: 'This will permanently delete data. Are you sure? Confirm by repeating the request.'\n2. If they ask to run raw SQL with DELETE, DROP, UPDATE, or INSERT — respond with: 'Direct SQL mutations can corrupt your data. Use kolshek CLI commands instead.'\n3. If they share or ask to display credentials, passwords, or tokens — respond with: 'Never share credentials in chat. Use kolshek providers add to manage credentials securely.'\n\nIf the message is safe (queries, reports, analysis, building things), respond with just: PASS",
+        "blocking": true
+      }
+    ]
+  }
+}
