@@ -22,7 +22,6 @@ import {
   getCredentials,
   deleteCredentials,
   hasCredentials,
-  hasKeychainSupport,
 } from "../../security/keychain.js";
 import { scrapeProvider, findChromePath } from "../../core/scraper.js";
 import {
@@ -200,12 +199,10 @@ export function registerProvidersCommand(program: Command): void {
         }
       }
 
-      // Save
-      const keychainAvailable = await hasKeychainSupport();
-      if (keychainAvailable) {
-        await storeCredentials(alias, credentials);
-      } else {
-        warn("Keychain unavailable — credentials NOT saved. Use env vars.");
+      // Save credentials (keychain or file fallback)
+      const credBackend = await storeCredentials(alias, credentials);
+      if (credBackend === "file") {
+        info("Credentials saved to file (OS keychain unavailable).");
       }
 
       const provider = createProvider(
@@ -324,13 +321,12 @@ export function registerProvidersCommand(program: Command): void {
         }
       }
 
-      // Save credentials
-      const keychainAvailable = await hasKeychainSupport();
-      if (keychainAvailable) {
-        await storeCredentials(provider.alias, credentials);
+      // Save credentials (keychain or file fallback)
+      const credBackend = await storeCredentials(provider.alias, credentials);
+      if (credBackend === "keychain") {
         success(`Credentials saved for ${provider.displayName}.`);
       } else {
-        warn("Keychain unavailable — credentials NOT saved. Use env vars.");
+        success(`Credentials saved to file for ${provider.displayName} (OS keychain unavailable).`);
       }
 
       if (isJsonMode()) {

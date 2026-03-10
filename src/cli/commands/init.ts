@@ -21,7 +21,6 @@ import {
 } from "../../db/repositories/providers.js";
 import {
   storeCredentials,
-  hasKeychainSupport,
 } from "../../security/keychain.js";
 import { scrapeProvider, findChromePath } from "../../core/scraper.js";
 import {
@@ -250,20 +249,17 @@ export function registerInitCommand(program: Command): void {
         }
 
         // Step 5: Save credentials
-        const keychainAvailable = await hasKeychainSupport();
-        if (keychainAvailable) {
-          const saveIt = await confirm({
-            message: "Save credentials to OS keychain?",
-            default: true,
-          });
-          if (saveIt) {
-            await storeCredentials(alias, credentials);
+        const saveIt = await confirm({
+          message: "Save credentials securely?",
+          default: true,
+        });
+        if (saveIt) {
+          const backend = await storeCredentials(alias, credentials);
+          if (backend === "keychain") {
             success("Credentials saved to OS keychain.");
+          } else {
+            success("Credentials saved to local encrypted file (OS keychain unavailable).");
           }
-        } else {
-          warn(
-            "OS keychain not available. Set KOLSHEK_CREDENTIALS_JSON env var for automation.",
-          );
         }
 
         // Save provider to DB

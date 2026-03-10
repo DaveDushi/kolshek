@@ -24,3 +24,5 @@ Thumbs.db
 
 # Bun
 bun.lock
+
+!.env.schema

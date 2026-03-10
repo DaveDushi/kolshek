@@ -1,14 +1,20 @@
-/**
- * Credential storage layer.
- *
- * Two backends:
- *   1. OS keychain (Windows Credential Manager / macOS Keychain / Linux secret-tool)
- *   2. Environment variables (for CI/automation)
- *
- * Credentials are stored as base64-encoded JSON in the keychain.
- */
+// Credential storage layer.
+//
+// Three backends (checked in order):
+//   1. Environment variables (for CI/automation)
+//   2. OS keychain (Windows Credential Manager / macOS Keychain / Linux secret-tool)
+//   3. Encrypted file (AES-256-GCM fallback when keychain unavailable, e.g. WSL)
+//
+// Credentials are stored as base64-encoded JSON in keychain,
+// or AES-256-GCM encrypted in a local file.
+
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "fs";
+import { join } from "path";
+import { randomBytes, createCipheriv, createDecipheriv } from "crypto";
+import envPaths from "env-paths";
 
 const SERVICE = "kolshek";
+const paths = envPaths("kolshek");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -23,9 +29,19 @@ function encodePayload(data: Record<string, string>): string {
   return Buffer.from(JSON.stringify(data), "utf-8").toString("base64");
 }
 
-/** Decode a base64-encoded JSON payload back to an object. */
+// Decode a base64-encoded JSON payload back to an object.
+// Validates the parsed result is a flat Record<string, string>.
 function decodePayload(encoded: string): Record<string, string> {
-  return JSON.parse(Buffer.from(encoded, "base64").toString("utf-8"));
+  const parsed: unknown = JSON.parse(Buffer.from(encoded, "base64").toString("utf-8"));
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("Invalid credential payload structure");
+  }
+  for (const [key, val] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof val !== "string") {
+      throw new Error(`Invalid credential field "${key}": expected string`);
+    }
+  }
+  return parsed as Record<string, string>;
 }
 
 /** Strip any credential values from an error message to prevent leaks. */
@@ -250,6 +266,96 @@ async function linuxHasKeychain(): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
+// Encrypted file backend (AES-256-GCM, fallback when keychain unavailable)
+// ---------------------------------------------------------------------------
+// Two files in the data directory, both owner-only (0o600):
+//   credentials.enc  — IV (12 bytes) + auth tag (16 bytes) + ciphertext
+//   credentials.key  — random 256-bit key
+// An attacker needs both files to recover credentials.
+
+const ALGO = "aes-256-gcm";
+const IV_LEN = 12;
+const TAG_LEN = 16;
+
+function credentialsEncPath(): string {
+  return join(paths.data, "credentials.enc");
+}
+
+function credentialsKeyPath(): string {
+  return join(paths.data, "credentials.key");
+}
+
+function ensureDataDir(): void {
+  mkdirSync(paths.data, { recursive: true, mode: process.platform !== "win32" ? 0o700 : undefined });
+}
+
+function getOrCreateKey(): Buffer {
+  const keyPath = credentialsKeyPath();
+  if (existsSync(keyPath)) {
+    return readFileSync(keyPath);
+  }
+  ensureDataDir();
+  const key = randomBytes(32);
+  writeFileSync(keyPath, key, { mode: 0o600 });
+  return key;
+}
+
+function encryptData(plaintext: string, key: Buffer): Buffer {
+  const iv = randomBytes(IV_LEN);
+  const cipher = createCipheriv(ALGO, key, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, "utf-8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  // Layout: IV (12) + tag (16) + ciphertext
+  return Buffer.concat([iv, tag, encrypted]);
+}
+
+function decryptData(blob: Buffer, key: Buffer): string {
+  if (blob.length < IV_LEN + TAG_LEN) {
+    throw new Error("Credential file is corrupted");
+  }
+  const iv = blob.subarray(0, IV_LEN);
+  const tag = blob.subarray(IV_LEN, IV_LEN + TAG_LEN);
+  const ciphertext = blob.subarray(IV_LEN + TAG_LEN);
+  const decipher = createDecipheriv(ALGO, key, iv);
+  decipher.setAuthTag(tag);
+  return decipher.update(ciphertext, undefined, "utf-8") + decipher.final("utf-8");
+}
+
+function loadCredentialsFile(): Record<string, Record<string, string>> {
+  const encPath = credentialsEncPath();
+  const keyPath = credentialsKeyPath();
+  if (!existsSync(encPath) || !existsSync(keyPath)) return {};
+  try {
+    const key = readFileSync(keyPath);
+    const blob = readFileSync(encPath);
+    const json = decryptData(blob, key);
+    const parsed: unknown = JSON.parse(json);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
+    return parsed as Record<string, Record<string, string>>;
+  } catch {
+    // Decryption failed — file is corrupted or tampered with
+    console.error(
+      "Warning: Credential file appears corrupted or tampered with. " +
+      "Stored credentials are unavailable. Re-add providers to save new credentials.",
+    );
+    return {};
+  }
+}
+
+function saveCredentialsFile(data: Record<string, Record<string, string>>): void {
+  ensureDataDir();
+  const key = getOrCreateKey();
+  const json = JSON.stringify(data);
+  const blob = encryptData(json, key);
+  writeFileSync(credentialsEncPath(), blob, { mode: 0o600 });
+}
+
+function deleteCredentialsFile(): void {
+  try { unlinkSync(credentialsEncPath()); } catch { /* already gone */ }
+  try { unlinkSync(credentialsKeyPath()); } catch { /* already gone */ }
+}
+
+// ---------------------------------------------------------------------------
 // Platform dispatch
 // ---------------------------------------------------------------------------
 
@@ -327,7 +433,7 @@ const NON_CREDENTIAL_VARS = new Set([
   "KOLSHEK_NO_SANDBOX",
 ]);
 
-export function getCredentialSource(): "keychain" | "env" {
+export function getCredentialSource(): "keychain" | "env" | "file" {
   if (process.env.KOLSHEK_CREDENTIALS_JSON) return "env";
 
   // Check for per-provider env vars (e.g. KOLSHEK_HAPOALIM_USERNAME)
@@ -341,6 +447,9 @@ export function getCredentialSource(): "keychain" | "env" {
       if (parts.length >= 3) return "env";
     }
   }
+
+  // Check if encrypted credentials file exists (fallback)
+  if (existsSync(credentialsEncPath())) return "file";
 
   return "keychain";
 }
@@ -356,27 +465,48 @@ export async function hasKeychainSupport(): Promise<boolean> {
   }
 }
 
-/**
- * Store credentials for a provider.
- */
+// Store credentials for a provider.
+// Uses keychain if available, otherwise falls back to encrypted file.
 export async function storeCredentials(
   companyId: string,
   credentials: Record<string, string>,
-): Promise<void> {
-  const target = targetName(companyId);
-  const encoded = encodePayload(credentials);
-  try {
-    await backend().store(target, encoded);
-  } catch (err) {
-    throw sanitizeError(err, [encoded, ...Object.values(credentials)]);
+): Promise<"keychain" | "file"> {
+  const keychainOk = await hasKeychainSupport();
+  if (keychainOk) {
+    const target = targetName(companyId);
+    const encoded = encodePayload(credentials);
+    try {
+      await backend().store(target, encoded);
+    } catch (err) {
+      throw sanitizeError(err, [encoded, ...Object.values(credentials)]);
+    }
+    // Clean up stale file creds for this provider if they exist
+    const fileData = loadCredentialsFile();
+    if (companyId in fileData) {
+      delete fileData[companyId];
+      if (Object.keys(fileData).length === 0) {
+        deleteCredentialsFile();
+      } else {
+        saveCredentialsFile(fileData);
+      }
+    }
+    return "keychain";
   }
+
+  // Fallback: store in AES-256-GCM encrypted file
+  const all = loadCredentialsFile();
+  all[companyId] = credentials;
+  try {
+    saveCredentialsFile(all);
+  } catch (err) {
+    throw sanitizeError(err, Object.values(credentials));
+  }
+  return "file";
 }
 
-/**
- * Retrieve credentials for a provider.
- * Checks env vars first, then falls back to OS keychain.
- * Returns null if no credentials are found.
- */
+// Retrieve credentials for a provider.
+// Checks: env vars → OS keychain → credentials file.
+// Returns null if no credentials are found.
 export async function getCredentials(
   companyId: string,
 ): Promise<Record<string, string> | null> {
@@ -388,17 +518,19 @@ export async function getCredentials(
   const target = targetName(companyId);
   try {
     const encoded = await backend().read(target);
-    if (!encoded) return null;
-    return decodePayload(encoded);
-  } catch (err) {
-    throw sanitizeError(err, []);
+    if (encoded) return decodePayload(encoded);
+  } catch {
+    // Keychain failed — fall through to file
   }
+
+  // Credentials file (varlock fallback)
+  const fromFile = loadCredentialsFile();
+  if (fromFile[companyId]) return fromFile[companyId];
+
+  return null;
 }
 
-/**
- * Check if credentials exist for a provider (env or keychain).
- * Lighter than getCredentials — doesn't decode the payload.
- */
+// Check if credentials exist for a provider (env, keychain, or file).
 export async function hasCredentials(companyId: string): Promise<boolean> {
   const fromEnv = getCredentialsFromEnv(companyId);
   if (fromEnv) return true;
@@ -406,20 +538,33 @@ export async function hasCredentials(companyId: string): Promise<boolean> {
   const target = targetName(companyId);
   try {
     const encoded = await backend().read(target);
-    return encoded != null && encoded.length > 0;
+    if (encoded != null && encoded.length > 0) return true;
   } catch {
-    return false;
+    // Keychain failed — check file
   }
+
+  const fromFile = loadCredentialsFile();
+  return companyId in fromFile;
 }
 
-/**
- * Delete stored credentials for a provider from the OS keychain.
- */
+// Delete stored credentials for a provider from keychain and/or file.
 export async function deleteCredentials(companyId: string): Promise<void> {
+  // Try keychain
   const target = targetName(companyId);
   try {
     await backend().delete(target);
-  } catch (err) {
-    throw sanitizeError(err, []);
+  } catch {
+    // May not exist in keychain
+  }
+
+  // Also remove from encrypted file if present
+  const all = loadCredentialsFile();
+  if (companyId in all) {
+    delete all[companyId];
+    if (Object.keys(all).length === 0) {
+      deleteCredentialsFile();
+    } else {
+      saveCredentialsFile(all);
+    }
   }
 }
