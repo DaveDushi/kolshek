@@ -1,6 +1,5 @@
 import { Database } from "bun:sqlite";
-import { readFileSync, readdirSync, chmodSync, existsSync } from "fs";
-import { join } from "path";
+import { chmodSync, existsSync } from "fs";
 
 let _db: Database | null = null;
 
@@ -56,10 +55,138 @@ export function closeDatabase(): void {
   }
 }
 
-/**
- * Run all pending SQL migrations from the migrations directory.
- * Tracks applied migrations in a _migrations table.
- */
+// Migrations embedded as strings so they survive bun build --compile
+// (the compiled binary cannot read .sql files from disk).
+const MIGRATIONS: [string, string][] = [
+  ["001_initial.sql", `-- KolShek initial schema
+-- Providers: banks and credit card companies
+CREATE TABLE IF NOT EXISTS providers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('bank', 'credit_card')),
+    last_synced_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Accounts: specific accounts under a provider
+CREATE TABLE IF NOT EXISTS accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider_id INTEGER NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+    account_number TEXT NOT NULL,
+    display_name TEXT,
+    balance REAL,
+    currency TEXT NOT NULL DEFAULT 'ILS',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (provider_id, account_number)
+);
+
+-- Transactions: maps 1:1 with israeli-bank-scrapers Transaction fields
+CREATE TABLE IF NOT EXISTS transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    type TEXT NOT NULL CHECK (type IN ('normal', 'installments')),
+    identifier TEXT,
+    date TEXT NOT NULL,
+    processed_date TEXT NOT NULL,
+    original_amount REAL NOT NULL,
+    original_currency TEXT NOT NULL,
+    charged_amount REAL NOT NULL,
+    charged_currency TEXT,
+    description TEXT NOT NULL,
+    memo TEXT,
+    status TEXT NOT NULL CHECK (status IN ('completed', 'pending')),
+    installment_number INTEGER,
+    installment_total INTEGER,
+    category TEXT,
+    hash TEXT NOT NULL,
+    unique_id TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Dedup index: primary deduplication on hash per account
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_account_hash
+    ON transactions (account_id, hash);
+
+-- Query indexes
+CREATE INDEX IF NOT EXISTS idx_transactions_date
+    ON transactions (date);
+
+CREATE INDEX IF NOT EXISTS idx_transactions_account_date
+    ON transactions (account_id, date);
+
+CREATE INDEX IF NOT EXISTS idx_transactions_status
+    ON transactions (status);
+
+-- Sync log: tracks scrape operations per provider
+CREATE TABLE IF NOT EXISTS sync_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider_id INTEGER NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+    started_at TEXT NOT NULL DEFAULT (datetime('now')),
+    completed_at TEXT,
+    status TEXT NOT NULL CHECK (status IN ('running', 'success', 'error')),
+    transactions_added INTEGER NOT NULL DEFAULT 0,
+    transactions_updated INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT,
+    scrape_start_date TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_log_provider
+    ON sync_log (provider_id, started_at);`],
+
+  ["002_add_description_en.sql", `ALTER TABLE transactions ADD COLUMN description_en TEXT;`],
+
+  ["003_category_rules.sql", `CREATE TABLE IF NOT EXISTS category_rules (
+  id INTEGER PRIMARY KEY,
+  category TEXT NOT NULL,
+  match_pattern TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);`],
+
+  ["004_translation_rules.sql", `CREATE TABLE IF NOT EXISTS translation_rules (
+  id INTEGER PRIMARY KEY,
+  english_name TEXT NOT NULL,
+  match_pattern TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);`],
+
+  ["005_provider_alias.sql", `-- Add alias column to providers for multi-instance support
+PRAGMA foreign_keys=OFF;
+
+ALTER TABLE providers ADD COLUMN alias TEXT;
+UPDATE providers SET alias = company_id WHERE alias IS NULL;
+
+CREATE TABLE providers_new (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id TEXT NOT NULL,
+    alias TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('bank', 'credit_card')),
+    last_synced_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (alias)
+);
+
+INSERT INTO providers_new (id, company_id, alias, display_name, type, last_synced_at, created_at)
+    SELECT id, company_id, alias, display_name, type, last_synced_at, created_at
+    FROM providers;
+
+DROP TABLE providers;
+ALTER TABLE providers_new RENAME TO providers;
+
+PRAGMA foreign_keys=ON;`],
+
+  ["006_sync_log_end_date.sql", `ALTER TABLE sync_log ADD COLUMN scrape_end_date TEXT;
+
+UPDATE sync_log SET scrape_end_date = COALESCE(
+    DATE(completed_at),
+    DATE(started_at)
+) WHERE scrape_end_date IS NULL;`],
+];
+
+// Run all pending SQL migrations.
+// Tracks applied migrations in a _migrations table.
 function runMigrations(db: Database): void {
   db.run(`
     CREATE TABLE IF NOT EXISTS _migrations (
@@ -68,21 +195,15 @@ function runMigrations(db: Database): void {
     )
   `);
 
-  const migrationsDir = join(import.meta.dir, "migrations");
-  const files = readdirSync(migrationsDir)
-    .filter((f) => f.endsWith(".sql"))
-    .sort();
-
-  for (const file of files) {
+  for (const [name, sql] of MIGRATIONS) {
     const applied = db
       .prepare("SELECT 1 FROM _migrations WHERE name = $name")
-      .get({ $name: file });
+      .get({ $name: name });
 
     if (!applied) {
-      const sql = readFileSync(join(migrationsDir, file), "utf-8");
       db.exec(sql);
       db.prepare("INSERT INTO _migrations (name) VALUES ($name)").run({
-        $name: file,
+        $name: name,
       });
     }
   }
