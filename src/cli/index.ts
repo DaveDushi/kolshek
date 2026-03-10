@@ -22,6 +22,7 @@ import { registerReportsCommand } from "./commands/reports.js";
 import { registerCategorizeCommand } from "./commands/categorize.js";
 import { registerTranslateCommand } from "./commands/translate.js";
 import { registerScheduleCommand } from "./commands/schedule.js";
+import { registerPluginCommand } from "./commands/plugin.js";
 import { getMostRecentSyncTime } from "../db/repositories/providers.js";
 import { loadConfig } from "../config/loader.js";
 import { runFetch } from "./commands/fetch.js";
@@ -116,6 +117,7 @@ registerReportsCommand(program);
 registerCategorizeCommand(program);
 registerTranslateCommand(program);
 registerScheduleCommand(program);
+registerPluginCommand(program);
 
 // Parse and run
 program.parseAsync(process.argv).catch((err) => {

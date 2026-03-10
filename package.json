@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "prebuild": "bun scripts/generate-plugin-embed.ts",
     "build": "bun build ./src/cli/index.ts --compile --outfile dist/kolshek",
     "build:windows-x64": "bun build ./src/cli/index.ts --compile --target=bun-windows-x64 --outfile dist/kolshek-windows-x64.exe",
     "build:linux-x64": "bun build ./src/cli/index.ts --compile --target=bun-linux-x64 --outfile dist/kolshek-linux-x64",

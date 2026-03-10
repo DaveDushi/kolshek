@@ -40,6 +40,9 @@ jobs:
 
       - run: bun install
 
+      - name: Generate embedded plugin files
+        run: bun scripts/generate-plugin-embed.ts
+
       - run: bun build ./src/cli/index.ts --compile --target=${{ matrix.target }} --outfile dist/${{ matrix.artifact }}
 
       - uses: actions/upload-artifact@v4

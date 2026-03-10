@@ -22,6 +22,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Auto-generated
+src/cli/plugin-files.ts
+
 # Bun
 bun.lock
 

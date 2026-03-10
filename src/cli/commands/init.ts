@@ -285,7 +285,7 @@ export function registerInitCommand(program: Command): void {
       // Step 6: Offer initial fetch
       info("");
       const fetchNow = await confirm({
-        message: "Fetch transactions now? (last 3 months)",
+        message: "Fetch transactions now? (goes back as far as each provider allows)",
         default: true,
       });
 
