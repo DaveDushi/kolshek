@@ -230,9 +230,19 @@ export function registerInitCommand(program: Command): void {
                   "Double-check your credentials",
                   "Make sure your account is not locked",
                   "Some banks require OTP on first login",
+                  "You can retry later with 'kolshek providers add'",
                 ],
               });
-              process.exit(ExitCode.AuthFailure);
+              const retryOrSkip = await confirm({
+                message: "Save this provider anyway and continue setup?",
+                default: true,
+              });
+              if (!retryOrSkip) {
+                info("Skipped. You can add this provider later with 'kolshek providers add'.");
+                const another = await confirm({ message: "Add another provider?", default: false });
+                if (another) continue;
+                break;
+              }
             }
           } catch (err) {
             spinner.fail("Connection test failed");
@@ -244,7 +254,16 @@ export function registerInitCommand(program: Command): void {
                 retryable: true,
               },
             );
-            process.exit(ExitCode.Error);
+            const retryOrSkip = await confirm({
+              message: "Save this provider anyway and continue setup?",
+              default: true,
+            });
+            if (!retryOrSkip) {
+              info("Skipped. You can add this provider later with 'kolshek providers add'.");
+              const another = await confirm({ message: "Add another provider?", default: false });
+              if (another) continue;
+              break;
+            }
           }
         }
 
