@@ -23,9 +23,9 @@ import { registerCategorizeCommand } from "./commands/categorize.js";
 import { registerTranslateCommand } from "./commands/translate.js";
 import { registerScheduleCommand } from "./commands/schedule.js";
 import { registerPluginCommand } from "./commands/plugin.js";
-import { getMostRecentSyncTime } from "../db/repositories/providers.js";
+import { getMostRecentSyncTime, listProviders } from "../db/repositories/providers.js";
 import { loadConfig } from "../config/loader.js";
-import { runFetch } from "./commands/fetch.js";
+import { syncProviders } from "../core/sync-engine.js";
 import pkg from "../../package.json";
 
 const program = new Command();
@@ -90,8 +90,18 @@ program
               const spinner = createSpinner(`Auto-fetching (last sync ${hoursAgo}h ago)...`);
               spinner.start();
               try {
-                await runFetch({});
-                spinner.succeed("Auto-fetch complete.");
+                // Run sync directly instead of runFetch() which calls process.exit()
+                const providers = listProviders();
+                if (providers.length > 0) {
+                  const result = await syncProviders(providers, { config });
+                  if (result.hasErrors) {
+                    spinner.fail("Auto-fetch had errors (continuing with cached data).");
+                  } else {
+                    spinner.succeed(`Auto-fetch complete (${result.totalAdded} added, ${result.totalUpdated} updated).`);
+                  }
+                } else {
+                  spinner.stop();
+                }
               } catch {
                 spinner.fail("Auto-fetch failed (continuing with cached data).");
               }
