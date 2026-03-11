@@ -53,7 +53,7 @@ export const PROVIDERS: Record<CompanyId, ProviderInfo> = {
     companyId: "hapoalim",
     displayName: "Bank Hapoalim",
     type: "bank",
-    loginFields: ["username", "password"],
+    loginFields: ["userCode", "password"],
   },
   leumi: {
     companyId: "leumi",
@@ -107,7 +107,7 @@ export const PROVIDERS: Record<CompanyId, ProviderInfo> = {
     companyId: "yahav",
     displayName: "Bank Yahav",
     type: "bank",
-    loginFields: ["username", "password"],
+    loginFields: ["username", "nationalID", "password"],
   },
   oneZero: {
     companyId: "oneZero",
