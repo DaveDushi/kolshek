@@ -25,12 +25,17 @@ import {
 } from "../../src/db/repositories/sync-log.js";
 import {
   addCategoryRule,
+  applyCategoryRules,
   renameCategory,
   renameCategoryDryRun,
   bulkMigrateCategories,
   bulkMigrateCategoriesDryRun,
   bulkImportCategoryRules,
   listCategoriesWithSource,
+  reassignCategory,
+  reassignCategoryDryRun,
+  bulkReassignCategories,
+  bulkReassignCategoriesDryRun,
 } from "../../src/db/repositories/categories.js";
 import {
   bulkImportTranslationRules,
@@ -667,5 +672,170 @@ describe("listCategoriesWithSource", () => {
     if (transport && transport.transactionCount === 0) {
       expect(transport.source).toBe("rules");
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Recategorization (applyCategoryRules with scope, reassign)
+// ---------------------------------------------------------------------------
+
+describe("applyCategoryRules with scope options", () => {
+  // Seed fresh data for these tests
+  beforeAll(() => {
+    const db = getDatabase();
+    const accounts = getAccountsByProvider(
+      getProviderByCompanyId("hapoalim")!.id,
+    );
+    const accountId = accounts[0].id;
+
+    // Insert transactions with pre-set categories
+    upsertTransaction({
+      accountId,
+      type: "normal",
+      identifier: null,
+      date: "2026-01-01T00:00:00.000Z",
+      processedDate: "2026-01-02T00:00:00.000Z",
+      originalAmount: -100,
+      originalCurrency: "ILS",
+      chargedAmount: -100,
+      description: "OneFamily Donation",
+      memo: null,
+      status: "completed",
+      hash: "recat_hash_001",
+      uniqueId: "recat_uid_001",
+    });
+    upsertTransaction({
+      accountId,
+      type: "normal",
+      identifier: null,
+      date: "2026-01-03T00:00:00.000Z",
+      processedDate: "2026-01-04T00:00:00.000Z",
+      originalAmount: -50,
+      originalCurrency: "ILS",
+      chargedAmount: -50,
+      description: "Ezer Mizion Online",
+      memo: null,
+      status: "completed",
+      hash: "recat_hash_002",
+      uniqueId: "recat_uid_002",
+    });
+
+    // Pre-categorize them as Miscellaneous (simulates old incorrect categorization)
+    db.prepare("UPDATE transactions SET category = 'Miscellaneous' WHERE hash IN ('recat_hash_001', 'recat_hash_002')").run();
+
+    // Add rules that should recategorize them
+    addCategoryRule("Charity", "OneFamily");
+    addCategoryRule("Charity", "Ezer Mizion");
+  });
+
+  it("default scope only touches uncategorized transactions", () => {
+    const result = applyCategoryRules();
+    expect(result.scope).toBe("uncategorized");
+    expect(result.dryRun).toBe(false);
+
+    // OneFamily and Ezer Mizion should still be Miscellaneous (they were already categorized)
+    const db = getDatabase();
+    const row = db.prepare("SELECT COUNT(*) AS count FROM transactions WHERE hash IN ('recat_hash_001', 'recat_hash_002') AND category = 'Miscellaneous'").get() as { count: number };
+    expect(row.count).toBe(2);
+  });
+
+  it("dry-run returns counts without modifying data", () => {
+    const result = applyCategoryRules({ scope: "from-category", fromCategory: "Miscellaneous", dryRun: true });
+    expect(result.dryRun).toBe(true);
+    expect(result.scope).toBe("from-category");
+    expect(result.fromCategory).toBe("Miscellaneous");
+    expect(result.applied).toBeGreaterThanOrEqual(2);
+
+    // Verify no data was changed
+    const db = getDatabase();
+    const row = db.prepare("SELECT COUNT(*) AS count FROM transactions WHERE hash IN ('recat_hash_001', 'recat_hash_002') AND category = 'Miscellaneous'").get() as { count: number };
+    expect(row.count).toBe(2);
+  });
+
+  it("from-category scope re-applies rules to targeted category only", () => {
+    const result = applyCategoryRules({ scope: "from-category", fromCategory: "Miscellaneous" });
+    expect(result.scope).toBe("from-category");
+    expect(result.applied).toBeGreaterThanOrEqual(2);
+    expect(result.uncategorized).toBe(0); // from-category skips the NULL cleanup
+
+    // Verify they were recategorized
+    const db = getDatabase();
+    const charityCount = db.prepare("SELECT COUNT(*) AS count FROM transactions WHERE hash IN ('recat_hash_001', 'recat_hash_002') AND category = 'Charity'").get() as { count: number };
+    expect(charityCount.count).toBe(2);
+  });
+
+  it("all scope re-applies rules to every transaction", () => {
+    // Reset one back to Miscellaneous to test --all
+    const db = getDatabase();
+    db.prepare("UPDATE transactions SET category = 'WrongCategory' WHERE hash = 'recat_hash_001'").run();
+
+    const result = applyCategoryRules({ scope: "all" });
+    expect(result.scope).toBe("all");
+    expect(result.applied).toBeGreaterThanOrEqual(1);
+
+    // Verify it was recategorized
+    const row = db.prepare("SELECT category FROM transactions WHERE hash = 'recat_hash_001'").get() as { category: string };
+    expect(row.category).toBe("Charity");
+  });
+});
+
+describe("reassignCategory", () => {
+  it("dry-run returns correct count without modifying data", () => {
+    const preview = reassignCategoryDryRun("OneFamily", "NewCategory");
+    expect(preview.affected).toBeGreaterThanOrEqual(1);
+
+    // Verify no data was changed
+    const db = getDatabase();
+    const row = db.prepare("SELECT category FROM transactions WHERE hash = 'recat_hash_001'").get() as { category: string };
+    expect(row.category).toBe("Charity"); // unchanged from previous test
+  });
+
+  it("reassigns transactions matching a pattern regardless of current category", () => {
+    const result = reassignCategory("OneFamily", "Donations");
+    expect(result.updated).toBeGreaterThanOrEqual(1);
+
+    const db = getDatabase();
+    const row = db.prepare("SELECT category FROM transactions WHERE hash = 'recat_hash_001'").get() as { category: string };
+    expect(row.category).toBe("Donations");
+  });
+
+  it("returns zero for non-matching pattern", () => {
+    const result = reassignCategory("XYZNONEXISTENT999", "Whatever");
+    expect(result.updated).toBe(0);
+  });
+});
+
+describe("bulkReassignCategories", () => {
+  it("dry-run previews all entries without modifying data", () => {
+    const preview = bulkReassignCategoriesDryRun([
+      { matchPattern: "OneFamily", toCategory: "Charity" },
+      { matchPattern: "Ezer Mizion", toCategory: "Charity" },
+    ]);
+
+    expect(preview).toHaveLength(2);
+    expect(preview[0].matchPattern).toBe("OneFamily");
+    expect(preview[0].affected).toBeGreaterThanOrEqual(1);
+    expect(preview[1].matchPattern).toBe("Ezer Mizion");
+    expect(preview[1].affected).toBeGreaterThanOrEqual(1);
+
+    // Verify no data was changed — OneFamily should still be Donations from previous test
+    const db = getDatabase();
+    const row = db.prepare("SELECT category FROM transactions WHERE hash = 'recat_hash_001'").get() as { category: string };
+    expect(row.category).toBe("Donations");
+  });
+
+  it("bulk reassigns multiple patterns atomically", () => {
+    const result = bulkReassignCategories([
+      { matchPattern: "OneFamily", toCategory: "Charity" },
+      { matchPattern: "Ezer Mizion", toCategory: "Charity" },
+    ]);
+
+    expect(result.entriesProcessed).toBe(2);
+    expect(result.totalUpdated).toBeGreaterThanOrEqual(2);
+
+    // Verify both were reassigned
+    const db = getDatabase();
+    const count = db.prepare("SELECT COUNT(*) AS count FROM transactions WHERE hash IN ('recat_hash_001', 'recat_hash_002') AND category = 'Charity'").get() as { count: number };
+    expect(count.count).toBe(2);
   });
 });
