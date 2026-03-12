@@ -44,6 +44,11 @@ function serializeConditions(conditions: RuleConditions): string {
   return JSON.stringify(sorted);
 }
 
+// Escape SQL LIKE wildcards so they are treated as literals.
+function escapeLike(s: string): string {
+  return s.replace(/[%_\\]/g, "\\$&");
+}
+
 // ---------------------------------------------------------------------------
 // CRUD
 // ---------------------------------------------------------------------------
@@ -87,10 +92,10 @@ export function removeCategoryRule(id: number): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Apply rules to uncategorized transactions (in-memory evaluation)
+// Apply rules to transactions (in-memory evaluation with scope/dry-run)
 // ---------------------------------------------------------------------------
 
-interface UncategorizedTxRow {
+interface TxRow {
   id: number;
   description: string;
   description_en: string | null;
@@ -100,8 +105,25 @@ interface UncategorizedTxRow {
   account_number: string;
 }
 
-export function applyCategoryRules(): { applied: number; uncategorized: number } {
+export interface ApplyRulesOptions {
+  scope?: "uncategorized" | "all" | "from-category";
+  fromCategory?: string;
+  dryRun?: boolean;
+}
+
+export interface ApplyRulesResult {
+  applied: number;
+  uncategorized: number;
+  dryRun: boolean;
+  scope: string;
+  fromCategory?: string;
+}
+
+export function applyCategoryRules(options?: ApplyRulesOptions): ApplyRulesResult {
   const db = getDatabase();
+  const scope = options?.scope ?? "uncategorized";
+  const dryRun = options?.dryRun ?? false;
+  const fromCategory = options?.fromCategory;
 
   // 1. Fetch rules in evaluation order
   const ruleRows = db
@@ -109,7 +131,20 @@ export function applyCategoryRules(): { applied: number; uncategorized: number }
     .all() as CategoryRuleRow[];
   const rules = ruleRows.map(rowToRule);
 
-  // 2. Fetch uncategorized transactions with account/provider context
+  // 2. Build category filter based on scope
+  let categoryFilter: string;
+  const params: Record<string, string> = {};
+
+  if (scope === "all") {
+    categoryFilter = "";
+  } else if (scope === "from-category") {
+    categoryFilter = "AND t.category = $fromCategory";
+    params.$fromCategory = fromCategory!;
+  } else {
+    categoryFilter = "AND (t.category IS NULL OR t.category = 'Uncategorized')";
+  }
+
+  // 3. Fetch transactions with account/provider context
   const txRows = db
     .prepare(
       `SELECT
@@ -119,9 +154,9 @@ export function applyCategoryRules(): { applied: number; uncategorized: number }
        FROM transactions t
        JOIN accounts a ON t.account_id = a.id
        JOIN providers p ON a.provider_id = p.id
-       WHERE t.category IS NULL OR t.category = 'Uncategorized'`,
+       WHERE 1=1 ${categoryFilter}`,
     )
-    .all() as UncategorizedTxRow[];
+    .all(params) as TxRow[];
 
   const transactions: TransactionForMatching[] = txRows.map((r) => ({
     id: r.id,
@@ -133,36 +168,55 @@ export function applyCategoryRules(): { applied: number; uncategorized: number }
     accountNumber: r.account_number,
   }));
 
-  // 3. Evaluate rules in-memory
+  // 4. Evaluate rules in-memory
   const assignments = applyRulesEngine(rules, transactions);
 
-  // 4. Batch-update matched transactions
+  // 5. Apply or count
   let applied = 0;
   if (assignments.size > 0) {
-    const updateStmt = db.prepare(
-      "UPDATE transactions SET category = $category, updated_at = datetime('now') WHERE id = $id",
-    );
-    db.run("BEGIN");
-    try {
-      for (const [txId, category] of assignments) {
-        updateStmt.run({ $id: txId, $category: category });
-        applied++;
+    if (dryRun) {
+      applied = assignments.size;
+    } else {
+      const updateStmt = db.prepare(
+        "UPDATE transactions SET category = $category, updated_at = datetime('now') WHERE id = $id",
+      );
+      db.run("BEGIN");
+      try {
+        for (const [txId, category] of assignments) {
+          updateStmt.run({ $id: txId, $category: category });
+          applied++;
+        }
+        db.run("COMMIT");
+      } catch (err) {
+        db.run("ROLLBACK");
+        throw err;
       }
-      db.run("COMMIT");
-    } catch (err) {
-      db.run("ROLLBACK");
-      throw err;
     }
   }
 
-  // 5. Set remaining NULLs to 'Uncategorized'
-  const uncatResult = db
-    .prepare(
-      "UPDATE transactions SET category = 'Uncategorized', updated_at = datetime('now') WHERE category IS NULL",
-    )
-    .run();
+  // 6. Set remaining NULLs to 'Uncategorized' (skip for from-category scope)
+  let uncategorized = 0;
+  if (scope !== "from-category") {
+    if (dryRun) {
+      const row = db
+        .prepare("SELECT COUNT(*) AS count FROM transactions WHERE category IS NULL")
+        .get() as { count: number };
+      uncategorized = row.count;
+    } else {
+      const uncatResult = db
+        .prepare(
+          "UPDATE transactions SET category = 'Uncategorized', updated_at = datetime('now') WHERE category IS NULL",
+        )
+        .run();
+      uncategorized = uncatResult.changes;
+    }
+  }
 
-  return { applied, uncategorized: uncatResult.changes };
+  const result: ApplyRulesResult = { applied, uncategorized, dryRun, scope };
+  if (scope === "from-category") {
+    result.fromCategory = fromCategory;
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -433,4 +487,105 @@ export function listCategoriesWithSource(): CategoryWithSource[] {
     ruleCount: r.rule_count,
     source: r.source as "transactions" | "rules" | "both",
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Reassign categories by description pattern
+// ---------------------------------------------------------------------------
+
+export interface ReassignEntry {
+  matchPattern: string;
+  toCategory: string;
+}
+
+export function reassignCategory(
+  matchPattern: string,
+  toCategory: string,
+): { updated: number } {
+  const db = getDatabase();
+  const pattern = `%${escapeLike(matchPattern)}%`;
+  const result = db
+    .prepare(
+      `UPDATE transactions
+       SET category = $toCategory, updated_at = datetime('now')
+       WHERE (description LIKE $pattern ESCAPE '\\' OR description_en LIKE $pattern ESCAPE '\\')`,
+    )
+    .run({ $toCategory: toCategory, $pattern: pattern });
+
+  return { updated: result.changes };
+}
+
+export function reassignCategoryDryRun(
+  matchPattern: string,
+  _toCategory: string,
+): { affected: number } {
+  const db = getDatabase();
+  const pattern = `%${escapeLike(matchPattern)}%`;
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM transactions
+       WHERE (description LIKE $pattern ESCAPE '\\' OR description_en LIKE $pattern ESCAPE '\\')`,
+    )
+    .get({ $pattern: pattern }) as { count: number };
+
+  return { affected: row.count };
+}
+
+export interface BulkReassignResult {
+  totalUpdated: number;
+  entriesProcessed: number;
+}
+
+export function bulkReassignCategories(
+  entries: ReassignEntry[],
+): BulkReassignResult {
+  const db = getDatabase();
+  const stmt = db.prepare(
+    `UPDATE transactions
+     SET category = $toCategory, updated_at = datetime('now')
+     WHERE (description LIKE $pattern ESCAPE '\\' OR description_en LIKE $pattern ESCAPE '\\')`,
+  );
+
+  let totalUpdated = 0;
+
+  db.run("BEGIN");
+  try {
+    for (const entry of entries) {
+      const pattern = `%${escapeLike(entry.matchPattern)}%`;
+      const result = stmt.run({ $toCategory: entry.toCategory, $pattern: pattern });
+      totalUpdated += result.changes;
+    }
+    db.run("COMMIT");
+  } catch (err) {
+    db.run("ROLLBACK");
+    throw err;
+  }
+
+  return { totalUpdated, entriesProcessed: entries.length };
+}
+
+export interface BulkReassignDryRunEntry {
+  matchPattern: string;
+  toCategory: string;
+  affected: number;
+}
+
+export function bulkReassignCategoriesDryRun(
+  entries: ReassignEntry[],
+): BulkReassignDryRunEntry[] {
+  const db = getDatabase();
+  const stmt = db.prepare(
+    `SELECT COUNT(*) AS count FROM transactions
+     WHERE (description LIKE $pattern ESCAPE '\\' OR description_en LIKE $pattern ESCAPE '\\')`,
+  );
+
+  return entries.map((entry) => {
+    const pattern = `%${escapeLike(entry.matchPattern)}%`;
+    const row = stmt.get({ $pattern: pattern }) as { count: number };
+    return {
+      matchPattern: entry.matchPattern,
+      toCategory: entry.toCategory,
+      affected: row.count,
+    };
+  });
 }
