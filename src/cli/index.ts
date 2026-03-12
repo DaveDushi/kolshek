@@ -63,6 +63,7 @@ program
       // First-run detection: check for config file, not just directory
       const paths = getAppPaths();
       if (
+        listProviders().length === 0 &&
         !existsSync(join(paths.config, "config.toml")) &&
         !opts.json &&
         !opts.quiet
@@ -130,7 +131,9 @@ registerScheduleCommand(program);
 registerPluginCommand(program);
 
 // Parse and run
-program.parseAsync(process.argv).catch((err) => {
+program.parseAsync(process.argv).then(() => {
+  process.exit(0);
+}).catch((err) => {
   const msg = err instanceof Error ? err.message : String(err);
   console.error("Fatal:", msg.length > 500 ? msg.slice(0, 500) + "..." : msg);
   process.exit(ExitCode.Error);
