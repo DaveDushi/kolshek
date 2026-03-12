@@ -125,25 +125,4 @@ export function bulkImportTranslationRules(
   return { imported, skipped };
 }
 
-export function seedTranslationRules(
-  entries: Record<string, string>,
-): { seeded: number } {
-  const db = getDatabase();
-  let seeded = 0;
-
-  const insertStmt = db.prepare(
-    `INSERT INTO translation_rules (english_name, match_pattern)
-     SELECT $englishName, $pattern
-     WHERE NOT EXISTS (
-       SELECT 1 FROM translation_rules WHERE match_pattern = $pattern
-     )`,
-  );
-
-  for (const [pattern, englishName] of Object.entries(entries)) {
-    const result = insertStmt.run({ $englishName: englishName, $pattern: pattern });
-    seeded += result.changes;
-  }
-
-  return { seeded };
-}
 

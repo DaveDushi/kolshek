@@ -30,7 +30,7 @@ An open-source CLI that pulls transactions from Israeli banks and credit cards i
 - **Search & filter** — find transactions by text, amount, date, provider, or status
 - **Auto-categorize** — create rules to tag transactions by merchant
 - **Category migration** — rename, merge, or bulk-migrate categories via CLI — no direct DB access needed
-- **Hebrew translation** — map Hebrew merchant names to English, with a built-in seed list
+- **Hebrew translation** — map Hebrew merchant names to English with your own rules
 - **Bulk rule import** — import category or translation rules from JSON files
 - **Scheduled sync** — automatic fetching via Task Scheduler, launchd, or cron
 
@@ -123,9 +123,6 @@ kolshek tr rule add "Shufersal" --match "שופרסל"
 # Bulk-import translation rules from JSON (safe for names with apostrophes)
 echo '[{"englishName":"Ouri'\''s Market","matchPattern":"אורי מרקט"}]' | kolshek tr rule import
 kolshek tr rule import rules.json
-
-# Seed common Israeli merchant translations
-kolshek tr seed
 
 # Schedule automatic sync every 12 hours
 kolshek schedule set 12h

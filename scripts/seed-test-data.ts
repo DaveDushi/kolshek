@@ -17,8 +17,6 @@ import { createProvider } from "../src/db/repositories/providers.js";
 import { upsertAccount } from "../src/db/repositories/accounts.js";
 import { upsertTransaction } from "../src/db/repositories/transactions.js";
 import { createSyncLog, completeSyncLog } from "../src/db/repositories/sync-log.js";
-import { addCategoryRule } from "../src/db/repositories/categories.js";
-import { addTranslationRule } from "../src/db/repositories/translations.js";
 import { formatISO, subDays } from "date-fns";
 
 // ---------------------------------------------------------------------------
@@ -95,8 +93,6 @@ if (clearFirst) {
   db.run("DELETE FROM accounts");
   db.run("DELETE FROM sync_log");
   db.run("DELETE FROM providers");
-  db.run("DELETE FROM category_rules");
-  db.run("DELETE FROM translation_rules");
   console.log("Cleared existing data.");
 }
 
@@ -354,33 +350,6 @@ db.prepare("UPDATE providers SET last_synced_at = $now WHERE id = $id")
   .run({ $id: cc.id, $now: new Date().toISOString() });
 
 console.log("Created sync log entries.");
-
-// --- Category rules ---
-addCategoryRule("Groceries", "%שופרסל%");
-addCategoryRule("Groceries", "%רמי לוי%");
-addCategoryRule("Groceries", "%יינות ביתן%");
-addCategoryRule("Dining", "%קפה%");
-addCategoryRule("Dining", "%ארומה%");
-addCategoryRule("Dining", "%וולט%");
-addCategoryRule("Transportation", "%פז%");
-addCategoryRule("Transportation", "%סונול%");
-addCategoryRule("Entertainment", "%נטפליקס%");
-addCategoryRule("Entertainment", "%ספוטיפיי%");
-addCategoryRule("Income", "%משכורת%");
-addCategoryRule("Housing", "%שכר דירה%");
-addCategoryRule("Housing", "%ארנונה%");
-addCategoryRule("Utilities", "%חשמל%");
-console.log("Created category rules.");
-
-// --- Translation rules ---
-addTranslationRule("Shufersal", "%שופרסל%");
-addTranslationRule("Rami Levy", "%רמי לוי%");
-addTranslationRule("Netflix", "%נטפליקס%");
-addTranslationRule("Spotify", "%ספוטיפיי%");
-addTranslationRule("Aroma", "%ארומה%");
-addTranslationRule("Electric Company", "%חברת חשמל%");
-addTranslationRule("Partner Communications", "%פרטנר%");
-console.log("Created translation rules.");
 
 console.log("\nDone! Test data ready. Try:");
 console.log("  bun run dev -- providers list");
