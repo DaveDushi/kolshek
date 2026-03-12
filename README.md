@@ -119,8 +119,9 @@ kolshek cat list
 # Translate a Hebrew merchant name
 kolshek tr rule add "Shufersal" --match "שופרסל"
 
-# Bulk import translation rules from a JSON file
-kolshek tr rule import --file translations.json
+# Bulk-import translation rules from JSON (safe for names with apostrophes)
+echo '[{"englishName":"Ouri'\''s Market","matchPattern":"אורי מרקט"}]' | kolshek tr rule import
+kolshek tr rule import rules.json
 
 # Seed common Israeli merchant translations
 kolshek tr seed

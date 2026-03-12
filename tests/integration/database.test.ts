@@ -33,7 +33,7 @@ import {
   listCategoriesWithSource,
 } from "../../src/db/repositories/categories.js";
 import {
-  importTranslationRules,
+  bulkImportTranslationRules,
 } from "../../src/db/repositories/translations.js";
 import type { TransactionInput } from "../../src/types/index.js";
 
@@ -625,17 +625,17 @@ describe("category rule import", () => {
 
 describe("translation rule import", () => {
   it("imports new rules and skips duplicates", () => {
-    const result = importTranslationRules([
-      { english: "Shufersal", match: "שופרסל" },
-      { english: "Rami Levy", match: "רמי לוי" },
+    const result = bulkImportTranslationRules([
+      { englishName: "Shufersal", matchPattern: "שופרסל" },
+      { englishName: "Rami Levy", matchPattern: "רמי לוי" },
     ]);
 
     expect(result.imported).toBe(2);
     expect(result.skipped).toBe(0);
 
     // Import again — all should be skipped
-    const result2 = importTranslationRules([
-      { english: "Shufersal", match: "שופרסל" },
+    const result2 = bulkImportTranslationRules([
+      { englishName: "Shufersal", matchPattern: "שופרסל" },
     ]);
     expect(result2.imported).toBe(0);
     expect(result2.skipped).toBe(1);

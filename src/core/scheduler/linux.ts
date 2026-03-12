@@ -8,6 +8,7 @@ import { mkdir, unlink } from "node:fs/promises";
 import type { ScheduleConfig } from "../../types/index.js";
 import type { SchedulerBackend } from "./index.js";
 import { run } from "./index.js";
+import { shellQuote, systemdEscape } from "./escape.js";
 
 const UNIT_NAME = "kolshek-fetch";
 const SYSTEMD_DIR = join(homedir(), ".config", "systemd", "user");
@@ -21,7 +22,7 @@ Description=KolShek automatic fetch
 
 [Service]
 Type=oneshot
-ExecStart=${config.binaryPath} fetch --non-interactive
+ExecStart=${systemdEscape(config.binaryPath)} fetch --non-interactive
 `;
 }
 
@@ -97,7 +98,7 @@ async function cronRegister(config: ScheduleConfig): Promise<void> {
   // Remove existing kolshek entry if any
   const lines = existing.split("\n").filter((l) => !l.includes(CRON_MARKER));
   const cronExpr = `0 */${config.intervalHours} * * *`;
-  lines.push(`${cronExpr} ${config.binaryPath} fetch --non-interactive ${CRON_MARKER}`);
+  lines.push(`${cronExpr} ${shellQuote(config.binaryPath)} fetch --non-interactive ${CRON_MARKER}`);
   const newCrontab = lines.filter((l) => l.trim()).join("\n") + "\n";
   await run(["crontab", "-"], newCrontab);
 }

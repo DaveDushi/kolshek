@@ -9,6 +9,7 @@ import { mkdir, unlink } from "node:fs/promises";
 import type { ScheduleConfig } from "../../types/index.js";
 import type { SchedulerBackend } from "./index.js";
 import { run } from "./index.js";
+import { escapeXml } from "./escape.js";
 
 const LABEL = "com.kolshek.fetch";
 const PLIST_DIR = join(homedir(), "Library", "LaunchAgents");
@@ -25,7 +26,7 @@ function buildPlist(config: ScheduleConfig): string {
     <string>${LABEL}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>${config.binaryPath}</string>
+        <string>${escapeXml(config.binaryPath)}</string>
         <string>fetch</string>
         <string>--non-interactive</string>
     </array>
@@ -34,9 +35,9 @@ function buildPlist(config: ScheduleConfig): string {
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>${LOG_PATH}</string>
+    <string>${escapeXml(LOG_PATH)}</string>
     <key>StandardErrorPath</key>
-    <string>${LOG_PATH}</string>
+    <string>${escapeXml(LOG_PATH)}</string>
 </dict>
 </plist>`;
 }
