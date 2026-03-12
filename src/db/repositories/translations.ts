@@ -111,3 +111,29 @@ export function seedTranslationRules(
 
   return { seeded };
 }
+
+// ---------------------------------------------------------------------------
+// Bulk rule import from array
+// ---------------------------------------------------------------------------
+
+export function importTranslationRules(
+  rules: Array<{ english: string; match: string }>,
+): { imported: number; skipped: number } {
+  const db = getDatabase();
+
+  const stmt = db.prepare(
+    `INSERT INTO translation_rules (english_name, match_pattern)
+     SELECT $englishName, $pattern
+     WHERE NOT EXISTS (
+       SELECT 1 FROM translation_rules WHERE match_pattern = $pattern
+     )`,
+  );
+
+  let imported = 0;
+  for (const rule of rules) {
+    const result = stmt.run({ $englishName: rule.english, $pattern: rule.match });
+    imported += result.changes;
+  }
+
+  return { imported, skipped: rules.length - imported };
+}
