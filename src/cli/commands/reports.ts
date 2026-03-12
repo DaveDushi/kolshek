@@ -71,10 +71,12 @@ export function registerReportsCommand(program: Command): void {
       const totals = months.reduce(
         (acc, m) => ({
           income: acc.income + m.income,
-          expenses: acc.expenses + m.expenses,
+          bankExpenses: acc.bankExpenses + m.bankExpenses,
+          ccExpenses: acc.ccExpenses + m.ccExpenses,
+          ccCharge: acc.ccCharge + m.ccCharge,
           net: acc.net + m.net,
         }),
-        { income: 0, expenses: 0, net: 0 },
+        { income: 0, bankExpenses: 0, ccExpenses: 0, ccCharge: 0, net: 0 },
       );
 
       if (isJsonMode()) {
@@ -88,18 +90,20 @@ export function registerReportsCommand(program: Command): void {
       }
 
       const table = createTable(
-        ["Month", "Income", "Expenses", "Net", "Transactions"],
+        ["Month", "Income", "Bank Exp.", "CC Exp.", "CC Charge", "Net", "Txns"],
         months.map((m) => [
           m.month,
           formatCurrency(m.income),
-          formatCurrency(-m.expenses),
+          formatCurrency(-m.bankExpenses),
+          formatCurrency(-m.ccExpenses),
+          formatCurrency(-m.ccCharge),
           formatCurrency(m.net),
           String(m.transactionCount),
         ]),
       );
       console.log(table);
       info(
-        `\nTotals — Income: ${formatCurrency(totals.income)}, Expenses: ${formatCurrency(-totals.expenses)}, Net: ${formatCurrency(totals.net)}`,
+        `\nTotals — Income: ${formatCurrency(totals.income)}, Bank Exp: ${formatCurrency(-totals.bankExpenses)}, CC Exp: ${formatCurrency(-totals.ccExpenses)}, CC Charge: ${formatCurrency(-totals.ccCharge)}, Net: ${formatCurrency(totals.net)}`,
       );
     });
 

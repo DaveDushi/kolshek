@@ -10,7 +10,7 @@ import {
   countTransactions,
   deleteTransaction,
 } from "../../db/repositories/transactions.js";
-import type { TransactionWithContext } from "../../types/index.js";
+import { CC_BILLING_CATEGORY, type TransactionWithContext } from "../../types/index.js";
 import {
   isJsonMode,
   printJson,
@@ -33,9 +33,10 @@ function txRow(tx: TransactionWithContext, masked: boolean): string[] {
     tx.installmentTotal,
   );
   const displayDesc = tx.descriptionEn ?? tx.description;
+  const ccTag = tx.category === CC_BILLING_CATEGORY ? " [CC]" : "";
   const desc = installment
-    ? `${displayDesc} ${installment}`
-    : displayDesc;
+    ? `${displayDesc} ${installment}${ccTag}`
+    : `${displayDesc}${ccTag}`;
 
   return [
     formatDate(tx.date),

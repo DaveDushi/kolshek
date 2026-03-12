@@ -2,6 +2,8 @@
  * Transaction types — maps closely to israeli-bank-scrapers Transaction.
  */
 
+export const CC_BILLING_CATEGORY = "CC Billing";
+
 export type TransactionType = "normal" | "installments";
 export type TransactionStatus = "completed" | "pending";
 
