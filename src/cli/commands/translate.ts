@@ -1,6 +1,4 @@
-/**
- * kolshek translate — Manage translation rules and apply them to transactions.
- */
+// kolshek translate — Manage translation rules and apply them to transactions.
 
 import type { Command } from "commander";
 import {

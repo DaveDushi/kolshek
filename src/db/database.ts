@@ -228,6 +228,14 @@ DELETE FROM accounts WHERE id IN (SELECT loser_id FROM _account_merges);
 DROP TABLE _account_merges;
 
 PRAGMA foreign_keys=ON;`],
+
+  ["008_cc_billing_category_rules.sql", `-- Seed CC billing category rules to prevent double-counting
+-- when both bank and CC providers are synced.
+-- Users can add more patterns via: kolshek categories add "CC Billing" "<pattern>"
+INSERT OR IGNORE INTO category_rules (category, match_pattern) VALUES
+  ('CC Billing', 'ויזה כאל'),
+  ('CC Billing', 'כאל'),
+  ('CC Billing', 'visa cal');`],
 ];
 
 // Run all pending SQL migrations.

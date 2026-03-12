@@ -29,7 +29,9 @@ An open-source CLI that pulls transactions from Israeli banks and credit cards i
 - **Reports** — monthly summaries, category breakdowns, balance history
 - **Search & filter** — find transactions by text, amount, date, provider, or status
 - **Auto-categorize** — create rules to tag transactions by merchant
+- **Category migration** — rename, merge, or bulk-migrate categories via CLI — no direct DB access needed
 - **Hebrew translation** — map Hebrew merchant names to English, with a built-in seed list
+- **Bulk rule import** — import category or translation rules from JSON files
 - **Scheduled sync** — automatic fetching via Task Scheduler, launchd, or cron
 
 ## Supported Institutions
@@ -98,6 +100,21 @@ kolshek report categories
 
 # Add a categorization rule
 kolshek cat rule add "Groceries" --match "שופרסל"
+
+# Bulk import rules from a JSON file
+kolshek cat rule import --file rules.json
+
+# Rename or merge a category (updates transactions + rules)
+kolshek cat rename "מזון וצריכה" "Groceries"
+
+# Preview a rename without modifying data
+kolshek cat rename "מזון וצריכה" "Groceries" --dry-run
+
+# Bulk migrate categories from a mapping file
+kolshek cat migrate --file category-map.json --dry-run
+
+# List categories with source info (transactions, rules, or both)
+kolshek cat list
 
 # Translate a Hebrew merchant name
 kolshek tr rule add "Shufersal" --match "שופרסל"
