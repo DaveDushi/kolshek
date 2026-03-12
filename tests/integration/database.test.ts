@@ -29,7 +29,7 @@ import {
   renameCategoryDryRun,
   bulkMigrateCategories,
   bulkMigrateCategoriesDryRun,
-  importCategoryRules,
+  bulkImportCategoryRules,
   listCategoriesWithSource,
 } from "../../src/db/repositories/categories.js";
 import {
@@ -604,19 +604,19 @@ describe("category rename and migration", () => {
 
 describe("category rule import", () => {
   it("imports new rules and skips duplicates", () => {
-    const result = importCategoryRules([
-      { category: "Transport", match: "דן" },
-      { category: "Transport", match: "אגד" },
-      { category: "Entertainment", match: "Netflix" },
+    const result = bulkImportCategoryRules([
+      { category: "Transport", matchPattern: "דן" },
+      { category: "Transport", matchPattern: "אגד" },
+      { category: "Entertainment", matchPattern: "Netflix" },
     ]);
 
     expect(result.imported).toBe(3);
     expect(result.skipped).toBe(0);
 
     // Import again — all should be skipped
-    const result2 = importCategoryRules([
-      { category: "Transport", match: "דן" },
-      { category: "Transport", match: "אגד" },
+    const result2 = bulkImportCategoryRules([
+      { category: "Transport", matchPattern: "דן" },
+      { category: "Transport", matchPattern: "אגד" },
     ]);
     expect(result2.imported).toBe(0);
     expect(result2.skipped).toBe(2);

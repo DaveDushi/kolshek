@@ -101,8 +101,9 @@ kolshek report categories
 # Add a categorization rule
 kolshek cat rule add "Groceries" --match "שופרסל"
 
-# Bulk import rules from a JSON file
-kolshek cat rule import --file rules.json
+# Bulk-import category rules from JSON (file or stdin)
+echo '[{"category":"Groceries","matchPattern":"שופרסל"}]' | kolshek cat rule import
+kolshek cat rule import rules.json
 
 # Rename or merge a category (updates transactions + rules)
 kolshek cat rename "מזון וצריכה" "Groceries"

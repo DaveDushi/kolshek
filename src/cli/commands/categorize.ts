@@ -12,7 +12,7 @@ import {
   renameCategoryDryRun,
   bulkMigrateCategories,
   bulkMigrateCategoriesDryRun,
-  importCategoryRules,
+  bulkImportCategoryRules,
 } from "../../db/repositories/categories.js";
 import {
   isJsonMode,
@@ -141,43 +141,77 @@ export function registerCategorizeCommand(program: Command): void {
     });
 
   // --- categorize rule import ---
-  const categoryRuleImportSchema = z.array(
-    z.object({
-      category: z.string().min(1, "category must be non-empty"),
-      match: z.string().min(1, "match must be non-empty"),
-    }),
-  );
-
   ruleCmd
-    .command("import")
-    .description("Import category rules from a JSON file")
-    .requiredOption("--file <path>", "JSON file with rule definitions")
-    .action(async (opts) => {
-      try {
-        const raw = await readJsonFile(opts.file);
-        const parsed = categoryRuleImportSchema.safeParse(raw);
-        if (!parsed.success) {
-          printError("BAD_ARGS", `Invalid file format: ${parsed.error.issues[0].message}`, {
-            suggestions: [
-              'Expected format: [{ "category": "Groceries", "match": "שופרסל" }, ...]',
-            ],
-          });
+    .command("import [file]")
+    .description(
+      "Bulk-import category rules from a JSON file or stdin. " +
+      'Format: [{"category": "...", "matchPattern": "..."}]',
+    )
+    .action(async (filePath?: string) => {
+      let rawJson: string;
+
+      if (filePath) {
+        const file = Bun.file(filePath);
+        if (!(await file.exists())) {
+          printError("NOT_FOUND", `File not found: ${filePath}`);
           process.exit(ExitCode.BadArgs);
         }
-
-        const result = importCategoryRules(parsed.data);
-
-        if (isJsonMode()) {
-          printJson(jsonSuccess(result));
-          return;
+        rawJson = await file.text();
+      } else {
+        if (process.stdin.isTTY) {
+          printError(
+            "BAD_ARGS",
+            "No file specified and stdin is a terminal. " +
+            "Pipe JSON or provide a file path.\n" +
+            '  Example: echo \'[{"category":"Groceries","matchPattern":"שופרסל"}]\' | kolshek cat rule import',
+          );
+          process.exit(ExitCode.BadArgs);
         }
-
-        success(`Imported ${result.imported} rule(s), skipped ${result.skipped} duplicate(s).`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        printError("FILE_ERROR", msg);
-        process.exit(ExitCode.Error);
+        rawJson = await new Response(Bun.stdin.stream()).text();
       }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawJson);
+      } catch {
+        printError("BAD_ARGS", "Invalid JSON input");
+        process.exit(ExitCode.BadArgs);
+      }
+
+      if (!Array.isArray(parsed)) {
+        printError("BAD_ARGS", "JSON must be an array of rule objects");
+        process.exit(ExitCode.BadArgs);
+      }
+
+      const rules: Array<{ category: string; matchPattern: string }> = [];
+      for (const [i, entry] of parsed.entries()) {
+        if (
+          typeof entry !== "object" || entry === null ||
+          typeof (entry as Record<string, unknown>).category !== "string" ||
+          typeof (entry as Record<string, unknown>).matchPattern !== "string"
+        ) {
+          printError(
+            "BAD_ARGS",
+            `Invalid rule at index ${i}: each entry needs "category" and "matchPattern" strings`,
+          );
+          process.exit(ExitCode.BadArgs);
+        }
+        const e = entry as { category: string; matchPattern: string };
+        if (!e.matchPattern.trim() || !e.category.trim()) {
+          printError("BAD_ARGS", `Empty category or pattern at index ${i}`);
+          process.exit(ExitCode.BadArgs);
+        }
+        rules.push({ category: e.category, matchPattern: e.matchPattern });
+      }
+
+      const result = bulkImportCategoryRules(rules);
+
+      if (isJsonMode()) {
+        printJson(jsonSuccess(result));
+        return;
+      }
+
+      success(`Imported ${result.imported} rule(s), skipped ${result.skipped} duplicate(s).`);
     });
 
   // --- categorize apply ---

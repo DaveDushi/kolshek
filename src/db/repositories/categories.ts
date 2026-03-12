@@ -270,12 +270,19 @@ export function bulkMigrateCategoriesDryRun(
 // Bulk rule import
 // ---------------------------------------------------------------------------
 
-export function importCategoryRules(
-  rules: Array<{ category: string; match: string }>,
+export interface CategoryRuleInput {
+  category: string;
+  matchPattern: string;
+}
+
+export function bulkImportCategoryRules(
+  rules: CategoryRuleInput[],
 ): { imported: number; skipped: number } {
   const db = getDatabase();
+  let imported = 0;
+  let skipped = 0;
 
-  const stmt = db.prepare(
+  const insertStmt = db.prepare(
     `INSERT INTO category_rules (category, match_pattern)
      SELECT $category, $pattern
      WHERE NOT EXISTS (
@@ -283,13 +290,19 @@ export function importCategoryRules(
      )`,
   );
 
-  let imported = 0;
   for (const rule of rules) {
-    const result = stmt.run({ $category: rule.category, $pattern: rule.match });
-    imported += result.changes;
+    const result = insertStmt.run({
+      $category: rule.category,
+      $pattern: rule.matchPattern,
+    });
+    if (result.changes > 0) {
+      imported++;
+    } else {
+      skipped++;
+    }
   }
 
-  return { imported, skipped: rules.length - imported };
+  return { imported, skipped };
 }
 
 // ---------------------------------------------------------------------------
