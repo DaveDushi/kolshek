@@ -13,6 +13,10 @@ import {
   bulkMigrateCategories,
   bulkMigrateCategoriesDryRun,
   bulkImportCategoryRules,
+  reassignCategory,
+  reassignCategoryDryRun,
+  bulkReassignCategories,
+  bulkReassignCategoriesDryRun,
 } from "../../db/repositories/categories.js";
 import {
   isJsonMode,
@@ -217,17 +221,47 @@ export function registerCategorizeCommand(program: Command): void {
   // --- categorize apply ---
   catCmd
     .command("apply")
-    .description("Run category rules on uncategorized transactions")
-    .action(() => {
-      const result = applyCategoryRules();
+    .description("Run category rules on transactions")
+    .option("--all", "Re-apply rules to all transactions, not just uncategorized")
+    .option("--from-category <name>", "Re-apply rules only to transactions in this category")
+    .option("--dry-run", "Preview changes without modifying data")
+    .action((opts) => {
+      if (opts.all && opts.fromCategory) {
+        printError("BAD_ARGS", "--all and --from-category are mutually exclusive");
+        process.exit(ExitCode.BadArgs);
+      }
+
+      const scope = opts.all
+        ? "all" as const
+        : opts.fromCategory
+          ? "from-category" as const
+          : "uncategorized" as const;
+
+      if (scope === "from-category" && !opts.fromCategory.trim()) {
+        printError("BAD_ARGS", "--from-category value cannot be empty");
+        process.exit(ExitCode.BadArgs);
+      }
+
+      const result = applyCategoryRules({
+        scope,
+        fromCategory: opts.fromCategory,
+        dryRun: opts.dryRun,
+      });
 
       if (isJsonMode()) {
         printJson(jsonSuccess(result));
         return;
       }
 
+      const prefix = result.dryRun ? "Dry run: " : "";
+      const scopeLabel = scope === "all"
+        ? " (all transactions)"
+        : scope === "from-category"
+          ? ` (from "${opts.fromCategory}")`
+          : "";
+
       success(
-        `Applied rules: ${result.applied} categorized, ${result.uncategorized} set to Uncategorized.`,
+        `${prefix}Applied rules${scopeLabel}: ${result.applied} categorized, ${result.uncategorized} set to Uncategorized.`,
       );
     });
 
@@ -349,6 +383,115 @@ export function registerCategorizeCommand(program: Command): void {
 
         success(
           `Migrated ${result.categoriesProcessed} category(s): ${result.totalTransactionsUpdated} transaction(s), ${result.totalRulesUpdated} rule(s) updated.`,
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        printError("FILE_ERROR", msg);
+        process.exit(ExitCode.Error);
+      }
+    });
+
+  // --- categorize reassign ---
+  const reassignSchema = z.array(
+    z.object({
+      matchPattern: z.string().min(1),
+      toCategory: z.string().min(1),
+    }),
+  );
+
+  catCmd
+    .command("reassign")
+    .description("Force-reassign transactions matching a pattern to a new category")
+    .option("--match <pattern>", "Substring to match against transaction description")
+    .option("--to <category>", "Target category")
+    .option(
+      "--file <path>",
+      'JSON file with [{ "matchPattern": "...", "toCategory": "..." }]',
+    )
+    .option("--dry-run", "Preview changes without modifying data")
+    .action(async (opts) => {
+      const hasMatch = opts.match !== undefined;
+      const hasFile = opts.file !== undefined;
+
+      if (!hasMatch && !hasFile) {
+        printError("BAD_ARGS", "Provide --match/--to or --file");
+        process.exit(ExitCode.BadArgs);
+      }
+      if (hasMatch && hasFile) {
+        printError("BAD_ARGS", "--match and --file are mutually exclusive");
+        process.exit(ExitCode.BadArgs);
+      }
+      if (hasMatch && !opts.to) {
+        printError("BAD_ARGS", "--to is required when using --match");
+        process.exit(ExitCode.BadArgs);
+      }
+
+      try {
+        // --- Single reassign mode ---
+        if (hasMatch) {
+          const matchPattern = String(opts.match).trim();
+          const toCategory = String(opts.to).trim();
+          if (!matchPattern || !toCategory) {
+            printError("BAD_ARGS", "--match and --to cannot be empty");
+            process.exit(ExitCode.BadArgs);
+          }
+
+          if (opts.dryRun) {
+            const preview = reassignCategoryDryRun(matchPattern, toCategory);
+            if (isJsonMode()) {
+              printJson(jsonSuccess({ dryRun: true, matchPattern, toCategory, ...preview }));
+              return;
+            }
+            info(`Dry run: "${matchPattern}" → ${toCategory} — ${preview.affected} transaction(s) would be updated.`);
+            return;
+          }
+
+          const result = reassignCategory(matchPattern, toCategory);
+          if (isJsonMode()) {
+            printJson(jsonSuccess({ matchPattern, toCategory, ...result }));
+            return;
+          }
+          success(`Reassigned "${matchPattern}" → ${toCategory}: ${result.updated} transaction(s) updated.`);
+          return;
+        }
+
+        // --- Bulk reassign from file ---
+        const raw = await readJsonFile(opts.file);
+        const parsed = reassignSchema.safeParse(raw);
+        if (!parsed.success) {
+          printError("BAD_ARGS", `Invalid file format: ${parsed.error.issues[0].message}`, {
+            suggestions: [
+              'Expected format: [{ "matchPattern": "...", "toCategory": "..." }]',
+            ],
+          });
+          process.exit(ExitCode.BadArgs);
+        }
+
+        const entries = parsed.data;
+
+        if (opts.dryRun) {
+          const preview = bulkReassignCategoriesDryRun(entries);
+          if (isJsonMode()) {
+            printJson(jsonSuccess({ dryRun: true, entries: preview }));
+            return;
+          }
+
+          const table = createTable(
+            ["Match Pattern", "Target Category", "Transactions"],
+            preview.map((p) => [p.matchPattern, p.toCategory, String(p.affected)]),
+          );
+          console.log(table);
+          info("\nDry run — no changes made.");
+          return;
+        }
+
+        const result = bulkReassignCategories(entries);
+        if (isJsonMode()) {
+          printJson(jsonSuccess(result));
+          return;
+        }
+        success(
+          `Reassigned ${result.entriesProcessed} pattern(s): ${result.totalUpdated} transaction(s) updated.`,
         );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
