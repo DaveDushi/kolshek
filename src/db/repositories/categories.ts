@@ -1,20 +1,24 @@
-/**
- * Category rule CRUD and application logic.
- */
+// Category rule CRUD and application logic.
+// Rules use a JSON conditions column for multi-field matching.
 
 import { getDatabase } from "../database.js";
+import type {
+  RuleConditions,
+  CategoryRule,
+  CategoryRuleInput,
+  TransactionForMatching,
+} from "../../types/index.js";
+import { applyRules as applyRulesEngine } from "../../core/rules.js";
 
-export interface CategoryRule {
-  id: number;
-  category: string;
-  matchPattern: string;
-  createdAt: string;
-}
+// ---------------------------------------------------------------------------
+// DB row type and mapper
+// ---------------------------------------------------------------------------
 
 interface CategoryRuleRow {
   id: number;
   category: string;
-  match_pattern: string;
+  conditions: string; // JSON string
+  priority: number;
   created_at: string;
 }
 
@@ -22,23 +26,40 @@ function rowToRule(row: CategoryRuleRow): CategoryRule {
   return {
     id: row.id,
     category: row.category,
-    matchPattern: row.match_pattern,
+    conditions: JSON.parse(row.conditions) as RuleConditions,
+    priority: row.priority,
     createdAt: row.created_at,
   };
 }
 
-/** Escape SQL LIKE wildcards so they are treated as literals. */
-function escapeLike(s: string): string {
-  return s.replace(/[%_\\]/g, "\\$&");
+// Deterministic JSON serialization for dedup comparisons.
+function serializeConditions(conditions: RuleConditions): string {
+  const sorted: Record<string, unknown> = {};
+  // Fixed key order
+  if (conditions.description) sorted.description = conditions.description;
+  if (conditions.memo) sorted.memo = conditions.memo;
+  if (conditions.account) sorted.account = conditions.account;
+  if (conditions.amount) sorted.amount = conditions.amount;
+  if (conditions.direction) sorted.direction = conditions.direction;
+  return JSON.stringify(sorted);
 }
 
-export function addCategoryRule(category: string, pattern: string): CategoryRule {
+// ---------------------------------------------------------------------------
+// CRUD
+// ---------------------------------------------------------------------------
+
+export function addCategoryRule(
+  category: string,
+  conditions: RuleConditions,
+  priority: number = 0,
+): CategoryRule {
   const db = getDatabase();
+  const conditionsJson = serializeConditions(conditions);
   const result = db
     .prepare(
-      "INSERT INTO category_rules (category, match_pattern) VALUES ($category, $pattern)",
+      "INSERT INTO category_rules (category, conditions, priority) VALUES ($category, $conditions, $priority)",
     )
-    .run({ $category: category, $pattern: pattern });
+    .run({ $category: category, $conditions: conditionsJson, $priority: priority });
 
   const row = db
     .prepare("SELECT * FROM category_rules WHERE id = $id")
@@ -50,7 +71,7 @@ export function addCategoryRule(category: string, pattern: string): CategoryRule
 export function listCategoryRules(): CategoryRule[] {
   const db = getDatabase();
   const rows = db
-    .prepare("SELECT * FROM category_rules ORDER BY id")
+    .prepare("SELECT * FROM category_rules ORDER BY priority DESC, id ASC")
     .all() as CategoryRuleRow[];
 
   return rows.map(rowToRule);
@@ -65,29 +86,76 @@ export function removeCategoryRule(id: number): boolean {
   return result.changes > 0;
 }
 
+// ---------------------------------------------------------------------------
+// Apply rules to uncategorized transactions (in-memory evaluation)
+// ---------------------------------------------------------------------------
+
+interface UncategorizedTxRow {
+  id: number;
+  description: string;
+  description_en: string | null;
+  memo: string | null;
+  charged_amount: number;
+  provider_alias: string;
+  account_number: string;
+}
+
 export function applyCategoryRules(): { applied: number; uncategorized: number } {
   const db = getDatabase();
-  const rules = db
-    .prepare("SELECT * FROM category_rules ORDER BY id")
+
+  // 1. Fetch rules in evaluation order
+  const ruleRows = db
+    .prepare("SELECT * FROM category_rules ORDER BY priority DESC, id ASC")
     .all() as CategoryRuleRow[];
+  const rules = ruleRows.map(rowToRule);
 
+  // 2. Fetch uncategorized transactions with account/provider context
+  const txRows = db
+    .prepare(
+      `SELECT
+         t.id, t.description, t.description_en, t.memo, t.charged_amount,
+         p.alias AS provider_alias,
+         a.account_number
+       FROM transactions t
+       JOIN accounts a ON t.account_id = a.id
+       JOIN providers p ON a.provider_id = p.id
+       WHERE t.category IS NULL OR t.category = 'Uncategorized'`,
+    )
+    .all() as UncategorizedTxRow[];
+
+  const transactions: TransactionForMatching[] = txRows.map((r) => ({
+    id: r.id,
+    description: r.description,
+    descriptionEn: r.description_en,
+    memo: r.memo,
+    chargedAmount: r.charged_amount,
+    providerAlias: r.provider_alias,
+    accountNumber: r.account_number,
+  }));
+
+  // 3. Evaluate rules in-memory
+  const assignments = applyRulesEngine(rules, transactions);
+
+  // 4. Batch-update matched transactions
   let applied = 0;
-
-  for (const rule of rules) {
-    const pattern = `%${escapeLike(rule.match_pattern)}%`;
-    const result = db
-      .prepare(
-        `UPDATE transactions
-         SET category = $category, updated_at = datetime('now')
-         WHERE (category IS NULL OR category = 'Uncategorized')
-           AND (description LIKE $pattern ESCAPE '\\' OR description_en LIKE $pattern ESCAPE '\\')`,
-      )
-      .run({ $category: rule.category, $pattern: pattern });
-
-    applied += result.changes;
+  if (assignments.size > 0) {
+    const updateStmt = db.prepare(
+      "UPDATE transactions SET category = $category, updated_at = datetime('now') WHERE id = $id",
+    );
+    db.run("BEGIN");
+    try {
+      for (const [txId, category] of assignments) {
+        updateStmt.run({ $id: txId, $category: category });
+        applied++;
+      }
+      db.run("COMMIT");
+    } catch (err) {
+      db.run("ROLLBACK");
+      throw err;
+    }
   }
 
-  // Set remaining NULLs to 'Uncategorized'
+  // 5. Set remaining NULLs to 'Uncategorized'
   const uncatResult = db
     .prepare(
       "UPDATE transactions SET category = 'Uncategorized', updated_at = datetime('now') WHERE category IS NULL",
@@ -96,6 +164,10 @@ export function applyCategoryRules(): { applied: number; uncategorized: number }
 
   return { applied, uncategorized: uncatResult.changes };
 }
+
+// ---------------------------------------------------------------------------
+// Category summary
+// ---------------------------------------------------------------------------
 
 export interface CategorySummary {
   category: string;
@@ -167,7 +239,6 @@ export function renameCategoryDryRun(
   newName: string,
 ): { transactionsAffected: number; rulesAffected: number } {
   const db = getDatabase();
-  // newName is accepted for API consistency but unused in dry-run counts
   void newName;
 
   const txRow = db
@@ -270,11 +341,6 @@ export function bulkMigrateCategoriesDryRun(
 // Bulk rule import
 // ---------------------------------------------------------------------------
 
-export interface CategoryRuleInput {
-  category: string;
-  matchPattern: string;
-}
-
 export function bulkImportCategoryRules(
   rules: CategoryRuleInput[],
 ): { imported: number; skipped: number } {
@@ -283,17 +349,19 @@ export function bulkImportCategoryRules(
   let skipped = 0;
 
   const insertStmt = db.prepare(
-    `INSERT INTO category_rules (category, match_pattern)
-     SELECT $category, $pattern
+    `INSERT INTO category_rules (category, conditions, priority)
+     SELECT $category, $conditions, $priority
      WHERE NOT EXISTS (
-       SELECT 1 FROM category_rules WHERE match_pattern = $pattern
+       SELECT 1 FROM category_rules WHERE conditions = $conditions
      )`,
   );
 
   for (const rule of rules) {
+    const conditionsJson = serializeConditions(rule.conditions);
     const result = insertStmt.run({
       $category: rule.category,
-      $pattern: rule.matchPattern,
+      $conditions: conditionsJson,
+      $priority: rule.priority ?? 0,
     });
     if (result.changes > 0) {
       imported++;

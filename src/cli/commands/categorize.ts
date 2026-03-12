@@ -2,6 +2,7 @@
 
 import type { Command } from "commander";
 import { z } from "zod";
+import type { RuleConditions, CategoryRuleInput } from "../../types/index.js";
 import {
   addCategoryRule,
   listCategoryRules,
@@ -14,6 +15,7 @@ import {
   bulkMigrateCategoriesDryRun,
   bulkImportCategoryRules,
 } from "../../db/repositories/categories.js";
+import { formatConditions } from "../../core/rules.js";
 import {
   isJsonMode,
   printJson,
@@ -25,6 +27,39 @@ import {
   formatCurrency,
   ExitCode,
 } from "../output.js";
+
+// ---------------------------------------------------------------------------
+// Zod schemas for conditions validation
+// ---------------------------------------------------------------------------
+
+const textMatchSchema = z.object({
+  pattern: z.string().min(1),
+  mode: z.enum(["substring", "exact", "regex"]).default("substring"),
+});
+
+const amountMatchSchema = z.object({
+  exact: z.number().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+}).refine(
+  (a) => a.exact !== undefined || a.min !== undefined || a.max !== undefined,
+  { message: "Amount must have at least one of exact, min, or max" },
+);
+
+const ruleConditionsSchema = z.object({
+  description: textMatchSchema.optional(),
+  memo: textMatchSchema.optional(),
+  account: z.string().min(1).optional(),
+  amount: amountMatchSchema.optional(),
+  direction: z.enum(["debit", "credit"]).optional(),
+}).refine(
+  (c) => c.description || c.memo || c.account || c.amount || c.direction,
+  { message: "At least one condition is required" },
+);
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 async function readJsonFile(filePath: string): Promise<unknown> {
   const file = Bun.file(filePath);
@@ -39,6 +74,50 @@ async function readJsonFile(filePath: string): Promise<unknown> {
     throw new Error(`Invalid JSON in ${filePath}`);
   }
 }
+
+// Build RuleConditions from CLI flags
+function buildConditionsFromOpts(opts: Record<string, unknown>): RuleConditions | null {
+  const conditions: RuleConditions = {};
+
+  if (opts.match) {
+    conditions.description = { pattern: String(opts.match), mode: "substring" };
+  } else if (opts.matchExact) {
+    conditions.description = { pattern: String(opts.matchExact), mode: "exact" };
+  } else if (opts.matchRegex) {
+    conditions.description = { pattern: String(opts.matchRegex), mode: "regex" };
+  }
+
+  if (opts.memo) {
+    conditions.memo = { pattern: String(opts.memo), mode: "substring" };
+  }
+
+  if (opts.account) {
+    conditions.account = String(opts.account);
+  }
+
+  // Amount: --amount for exact, --amount-min / --amount-max for range
+  if (opts.amount !== undefined) {
+    conditions.amount = { exact: Number(opts.amount) };
+  } else if (opts.amountMin !== undefined || opts.amountMax !== undefined) {
+    const amount: { min?: number; max?: number } = {};
+    if (opts.amountMin !== undefined) amount.min = Number(opts.amountMin);
+    if (opts.amountMax !== undefined) amount.max = Number(opts.amountMax);
+    conditions.amount = amount;
+  }
+
+  if (opts.direction) {
+    conditions.direction = String(opts.direction) as "debit" | "credit";
+  }
+
+  // Return null if no conditions were provided
+  const hasAny = conditions.description || conditions.memo || conditions.account
+    || conditions.amount || conditions.direction;
+  return hasAny ? conditions : null;
+}
+
+// ---------------------------------------------------------------------------
+// Command registration
+// ---------------------------------------------------------------------------
 
 export function registerCategorizeCommand(program: Command): void {
   const catCmd = program
@@ -55,28 +134,50 @@ export function registerCategorizeCommand(program: Command): void {
   ruleCmd
     .command("add <category>")
     .description("Create a category rule")
-    .requiredOption("--match <pattern>", "Substring pattern to match against description")
+    .option("--match <pattern>", "Substring match on description")
+    .option("--match-exact <pattern>", "Exact match on description")
+    .option("--match-regex <pattern>", "Regex match on description")
+    .option("--memo <pattern>", "Substring match on memo")
+    .option("--account <account>", "Account filter (e.g. 'leumi:12345' or '12345')")
+    .option("--amount <number>", "Exact amount match", parseFloat)
+    .option("--amount-min <number>", "Minimum amount (inclusive)", parseFloat)
+    .option("--amount-max <number>", "Maximum amount (inclusive)", parseFloat)
+    .option("--direction <dir>", "Direction filter: debit or credit")
+    .option("--priority <number>", "Rule priority (higher = evaluated first)", parseInt, 0)
     .action((category: string, opts) => {
-      const pattern = String(opts.match);
-      if (!pattern.trim()) {
-        printError("BAD_ARGS", "Match pattern cannot be empty");
+      const conditions = buildConditionsFromOpts(opts);
+
+      if (!conditions) {
+        printError("BAD_ARGS", "At least one condition is required (--match, --account, --amount, --direction, etc.)");
         process.exit(ExitCode.BadArgs);
       }
 
-      const rule = addCategoryRule(category, pattern);
+      // Validate conditions with Zod
+      const parsed = ruleConditionsSchema.safeParse(conditions);
+      if (!parsed.success) {
+        printError("BAD_ARGS", parsed.error.issues[0].message);
+        process.exit(ExitCode.BadArgs);
+      }
+
+      const priority = Number(opts.priority) || 0;
+      const rule = addCategoryRule(category, parsed.data, priority);
 
       if (isJsonMode()) {
         printJson(
           jsonSuccess({
             id: rule.id,
             category: rule.category,
-            matchPattern: rule.matchPattern,
+            conditions: rule.conditions,
+            priority: rule.priority,
           }),
         );
         return;
       }
 
-      success(`Rule #${rule.id} created: "${pattern}" → ${category}`);
+      success(`Rule #${rule.id} created: ${formatConditions(rule.conditions)} → ${category}`);
+      if (rule.priority !== 0) {
+        info(`  Priority: ${rule.priority}`);
+      }
     });
 
   // --- categorize rule list ---
@@ -97,11 +198,12 @@ export function registerCategorizeCommand(program: Command): void {
       }
 
       const table = createTable(
-        ["ID", "Category", "Match Pattern", "Created"],
+        ["ID", "Pri", "Category", "Conditions", "Created"],
         rules.map((r) => [
           String(r.id),
+          String(r.priority),
           r.category,
-          r.matchPattern,
+          formatConditions(r.conditions),
           r.createdAt,
         ]),
       );
@@ -145,7 +247,7 @@ export function registerCategorizeCommand(program: Command): void {
     .command("import [file]")
     .description(
       "Bulk-import category rules from a JSON file or stdin. " +
-      'Format: [{"category": "...", "matchPattern": "..."}]',
+      "Accepts both legacy format [{category, matchPattern}] and new format [{category, conditions, priority?}]",
     )
     .action(async (filePath?: string) => {
       let rawJson: string;
@@ -163,7 +265,7 @@ export function registerCategorizeCommand(program: Command): void {
             "BAD_ARGS",
             "No file specified and stdin is a terminal. " +
             "Pipe JSON or provide a file path.\n" +
-            '  Example: echo \'[{"category":"Groceries","matchPattern":"שופרסל"}]\' | kolshek cat rule import',
+            '  Example: echo \'[{"category":"Groceries","conditions":{"description":{"pattern":"שופרסל","mode":"substring"}}}]\' | kolshek cat rule import',
           );
           process.exit(ExitCode.BadArgs);
         }
@@ -183,25 +285,47 @@ export function registerCategorizeCommand(program: Command): void {
         process.exit(ExitCode.BadArgs);
       }
 
-      const rules: Array<{ category: string; matchPattern: string }> = [];
+      const rules: CategoryRuleInput[] = [];
       for (const [i, entry] of parsed.entries()) {
-        if (
-          typeof entry !== "object" || entry === null ||
-          typeof (entry as Record<string, unknown>).category !== "string" ||
-          typeof (entry as Record<string, unknown>).matchPattern !== "string"
-        ) {
+        if (typeof entry !== "object" || entry === null) {
+          printError("BAD_ARGS", `Invalid rule at index ${i}: must be an object`);
+          process.exit(ExitCode.BadArgs);
+        }
+
+        const e = entry as Record<string, unknown>;
+
+        if (!e.category || typeof e.category !== "string" || !e.category.trim()) {
+          printError("BAD_ARGS", `Missing or empty "category" at index ${i}`);
+          process.exit(ExitCode.BadArgs);
+        }
+
+        // Detect format: legacy (matchPattern) vs new (conditions)
+        if (e.conditions) {
+          // New format: validate conditions with Zod
+          const condParsed = ruleConditionsSchema.safeParse(e.conditions);
+          if (!condParsed.success) {
+            printError("BAD_ARGS", `Invalid conditions at index ${i}: ${condParsed.error.issues[0].message}`);
+            process.exit(ExitCode.BadArgs);
+          }
+          rules.push({
+            category: e.category as string,
+            conditions: condParsed.data,
+            priority: typeof e.priority === "number" ? e.priority : 0,
+          });
+        } else if (e.matchPattern && typeof e.matchPattern === "string" && e.matchPattern.trim()) {
+          // Legacy format: convert to conditions
+          rules.push({
+            category: e.category as string,
+            conditions: { description: { pattern: e.matchPattern as string, mode: "substring" } },
+            priority: typeof e.priority === "number" ? e.priority : 0,
+          });
+        } else {
           printError(
             "BAD_ARGS",
-            `Invalid rule at index ${i}: each entry needs "category" and "matchPattern" strings`,
+            `Rule at index ${i} needs either "conditions" or "matchPattern"`,
           );
           process.exit(ExitCode.BadArgs);
         }
-        const e = entry as { category: string; matchPattern: string };
-        if (!e.matchPattern.trim() || !e.category.trim()) {
-          printError("BAD_ARGS", `Empty category or pattern at index ${i}`);
-          process.exit(ExitCode.BadArgs);
-        }
-        rules.push({ category: e.category, matchPattern: e.matchPattern });
       }
 
       const result = bulkImportCategoryRules(rules);

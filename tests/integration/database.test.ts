@@ -517,8 +517,8 @@ describe("category rename and migration", () => {
     db.prepare("UPDATE transactions SET category = 'Delivery' WHERE description = 'Wolt'").run();
 
     // Add a category rule for Food
-    addCategoryRule("Food", "שופרסל");
-    addCategoryRule("Telecom", "HOT");
+    addCategoryRule("Food", { description: { pattern: "שופרסל", mode: "substring" } });
+    addCategoryRule("Telecom", { description: { pattern: "HOT", mode: "substring" } });
   });
 
   it("dry-run returns correct counts without modifying data", () => {
@@ -546,7 +546,7 @@ describe("category rename and migration", () => {
     expect(groceryCount.count).toBe(2);
 
     // Verify rule was updated
-    const ruleRow = db.prepare("SELECT category FROM category_rules WHERE match_pattern = 'שופרסל'").get() as { category: string };
+    const ruleRow = db.prepare("SELECT category FROM category_rules WHERE conditions LIKE '%שופרסל%'").get() as { category: string };
     expect(ruleRow.category).toBe("Groceries");
   });
 
@@ -605,9 +605,9 @@ describe("category rename and migration", () => {
 describe("category rule import", () => {
   it("imports new rules and skips duplicates", () => {
     const result = bulkImportCategoryRules([
-      { category: "Transport", matchPattern: "דן" },
-      { category: "Transport", matchPattern: "אגד" },
-      { category: "Entertainment", matchPattern: "Netflix" },
+      { category: "Transport", conditions: { description: { pattern: "דן", mode: "substring" } } },
+      { category: "Transport", conditions: { description: { pattern: "אגד", mode: "substring" } } },
+      { category: "Entertainment", conditions: { description: { pattern: "Netflix", mode: "substring" } } },
     ]);
 
     expect(result.imported).toBe(3);
@@ -615,8 +615,8 @@ describe("category rule import", () => {
 
     // Import again — all should be skipped
     const result2 = bulkImportCategoryRules([
-      { category: "Transport", matchPattern: "דן" },
-      { category: "Transport", matchPattern: "אגד" },
+      { category: "Transport", conditions: { description: { pattern: "דן", mode: "substring" } } },
+      { category: "Transport", conditions: { description: { pattern: "אגד", mode: "substring" } } },
     ]);
     expect(result2.imported).toBe(0);
     expect(result2.skipped).toBe(2);

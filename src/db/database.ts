@@ -230,6 +230,29 @@ DROP TABLE _account_merges;
 PRAGMA foreign_keys=ON;`],
 
   ["008_cc_billing_category_rules.sql", `SELECT 1; -- removed: seed rules no longer auto-inserted`],
+
+  ["009_multi_field_rules.sql", `-- Upgrade category_rules to multi-field JSON conditions + priority.
+PRAGMA foreign_keys=OFF;
+
+CREATE TABLE category_rules_v2 (
+  id INTEGER PRIMARY KEY,
+  category TEXT NOT NULL,
+  conditions TEXT NOT NULL,
+  priority INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+INSERT INTO category_rules_v2 (id, category, conditions, priority, created_at)
+  SELECT id, category,
+    json_object('description', json_object('pattern', match_pattern, 'mode', 'substring')),
+    0,
+    created_at
+  FROM category_rules;
+
+DROP TABLE category_rules;
+ALTER TABLE category_rules_v2 RENAME TO category_rules;
+
+PRAGMA foreign_keys=ON;`],
 ];
 
 // Run all pending SQL migrations.
