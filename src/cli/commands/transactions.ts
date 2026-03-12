@@ -42,7 +42,7 @@ function txRow(tx: TransactionWithContext, masked: boolean): string[] {
     desc.length > 40 ? desc.slice(0, 37) + "..." : desc,
     formatCurrency(tx.chargedAmount, tx.chargedCurrency ?? "ILS"),
     tx.status === "pending" ? "pending" : "",
-    tx.providerDisplayName,
+    tx.providerAlias,
     formatAccountNumber(tx.accountNumber, masked),
   ];
 }
@@ -67,6 +67,7 @@ function txToJson(tx: TransactionWithContext): Record<string, unknown> {
     installmentNumber: tx.installmentNumber,
     installmentTotal: tx.installmentTotal,
     provider: tx.providerCompanyId,
+    providerAlias: tx.providerAlias,
     providerName: tx.providerDisplayName,
     accountNumber: tx.accountNumber,
   };
@@ -231,6 +232,7 @@ export function registerTransactionsCommand(program: Command): void {
           "installment_number",
           "installment_total",
           "provider",
+          "provider_alias",
           "account_number",
         ];
         const rows = txns.map((tx) =>
@@ -251,6 +253,7 @@ export function registerTransactionsCommand(program: Command): void {
             tx.installmentNumber != null ? String(tx.installmentNumber) : "",
             tx.installmentTotal != null ? String(tx.installmentTotal) : "",
             csvEscape(tx.providerCompanyId),
+            csvEscape(tx.providerAlias),
             csvEscape(tx.accountNumber),
           ].join(","),
         );

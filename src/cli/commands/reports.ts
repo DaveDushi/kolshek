@@ -210,7 +210,7 @@ export function registerReportsCommand(program: Command): void {
           "30d Income",
         ],
         accounts.map((a) => [
-          a.provider,
+          a.providerAlias,
           a.providerType,
           a.accountNumber,
           a.balance != null ? formatCurrency(a.balance, a.currency) : "N/A",

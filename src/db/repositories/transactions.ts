@@ -34,6 +34,7 @@ interface TransactionWithContextRow {
   updated_at: string;
   provider_display_name: string;
   provider_company_id: string;
+  provider_alias: string;
   account_number: string;
 }
 
@@ -64,6 +65,7 @@ function rowToTransactionWithContext(
     updatedAt: row.updated_at,
     providerDisplayName: row.provider_display_name,
     providerCompanyId: row.provider_company_id,
+    providerAlias: row.provider_alias,
     accountNumber: row.account_number,
   };
 }
@@ -224,6 +226,7 @@ function buildContextQuery(
       t.*,
       p.display_name AS provider_display_name,
       p.company_id AS provider_company_id,
+      p.alias AS provider_alias,
       a.account_number
     FROM transactions t
     JOIN accounts a ON t.account_id = a.id
