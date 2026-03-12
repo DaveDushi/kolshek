@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { initDatabase, closeDatabase } from "../../src/db/database.js";
+import { initDatabase, closeDatabase, getDatabase } from "../../src/db/database.js";
 import {
   createProvider,
   getProvider,
@@ -23,6 +23,18 @@ import {
   completeSyncLog,
   getLastSuccessfulSync,
 } from "../../src/db/repositories/sync-log.js";
+import {
+  addCategoryRule,
+  renameCategory,
+  renameCategoryDryRun,
+  bulkMigrateCategories,
+  bulkMigrateCategoriesDryRun,
+  importCategoryRules,
+  listCategoriesWithSource,
+} from "../../src/db/repositories/categories.js";
+import {
+  importTranslationRules,
+} from "../../src/db/repositories/translations.js";
 import type { TransactionInput } from "../../src/types/index.js";
 
 beforeAll(() => {
@@ -482,5 +494,178 @@ describe("sync log", () => {
     const maxProvider = getProviderByCompanyId("max");
     const last = getLastSuccessfulSync(maxProvider!.id);
     expect(last).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category rename, migration, and bulk import
+// ---------------------------------------------------------------------------
+
+describe("category rename and migration", () => {
+  // Seed categorized transactions for these tests
+  beforeAll(() => {
+    const db = getDatabase();
+    const accounts = getAccountsByProvider(
+      getProviderByCompanyId("hapoalim")!.id,
+    );
+    const accountId = accounts[0].id;
+
+    // Set categories on existing transactions
+    db.prepare("UPDATE transactions SET category = 'Food' WHERE description = 'Shufersal Deal'").run();
+    db.prepare("UPDATE transactions SET category = 'Food' WHERE description = 'Rami Levy'").run();
+    db.prepare("UPDATE transactions SET category = 'Telecom' WHERE description = 'HOT Mobile'").run();
+    db.prepare("UPDATE transactions SET category = 'Delivery' WHERE description = 'Wolt'").run();
+
+    // Add a category rule for Food
+    addCategoryRule("Food", "שופרסל");
+    addCategoryRule("Telecom", "HOT");
+  });
+
+  it("dry-run returns correct counts without modifying data", () => {
+    const preview = renameCategoryDryRun("Food", "Groceries");
+    expect(preview.transactionsAffected).toBe(2);
+    expect(preview.rulesAffected).toBe(1);
+
+    // Verify no data was changed
+    const db = getDatabase();
+    const row = db.prepare("SELECT COUNT(*) AS count FROM transactions WHERE category = 'Food'").get() as { count: number };
+    expect(row.count).toBe(2);
+  });
+
+  it("renames a category across transactions and rules", () => {
+    const result = renameCategory("Food", "Groceries");
+    expect(result.transactionsUpdated).toBe(2);
+    expect(result.rulesUpdated).toBe(1);
+
+    // Verify transactions were updated
+    const db = getDatabase();
+    const foodCount = db.prepare("SELECT COUNT(*) AS count FROM transactions WHERE category = 'Food'").get() as { count: number };
+    expect(foodCount.count).toBe(0);
+
+    const groceryCount = db.prepare("SELECT COUNT(*) AS count FROM transactions WHERE category = 'Groceries'").get() as { count: number };
+    expect(groceryCount.count).toBe(2);
+
+    // Verify rule was updated
+    const ruleRow = db.prepare("SELECT category FROM category_rules WHERE match_pattern = 'שופרסל'").get() as { category: string };
+    expect(ruleRow.category).toBe("Groceries");
+  });
+
+  it("handles rename when target already exists (merge)", () => {
+    // Delivery category has 1 tx, let's merge it into Groceries (which has 2)
+    const result = renameCategory("Delivery", "Groceries");
+    expect(result.transactionsUpdated).toBe(1);
+
+    const db = getDatabase();
+    const groceryCount = db.prepare("SELECT COUNT(*) AS count FROM transactions WHERE category = 'Groceries'").get() as { count: number };
+    expect(groceryCount.count).toBe(3);
+  });
+
+  it("handles rename of nonexistent category (returns zero counts)", () => {
+    const result = renameCategory("NonExistent", "Something");
+    expect(result.transactionsUpdated).toBe(0);
+    expect(result.rulesUpdated).toBe(0);
+  });
+
+  it("bulk migrate dry-run previews all changes", () => {
+    const preview = bulkMigrateCategoriesDryRun({
+      "Telecom": "Communications",
+      "Groceries": "Supermarkets",
+    });
+
+    expect(preview).toHaveLength(2);
+
+    const telecomEntry = preview.find((p) => p.oldName === "Telecom");
+    expect(telecomEntry).toBeDefined();
+    expect(telecomEntry!.transactionsAffected).toBe(1);
+    expect(telecomEntry!.rulesAffected).toBe(1);
+
+    // Verify no data was changed
+    const db = getDatabase();
+    const telecomCount = db.prepare("SELECT COUNT(*) AS count FROM transactions WHERE category = 'Telecom'").get() as { count: number };
+    expect(telecomCount.count).toBe(1);
+  });
+
+  it("bulk migrates from mapping atomically", () => {
+    const result = bulkMigrateCategories({
+      "Telecom": "Communications",
+      "Groceries": "Supermarkets",
+    });
+
+    expect(result.categoriesProcessed).toBe(2);
+    expect(result.totalTransactionsUpdated).toBe(4); // 1 Telecom + 3 Groceries
+    expect(result.totalRulesUpdated).toBe(2); // 1 Telecom rule + 1 Groceries rule
+
+    // Verify old categories are gone
+    const db = getDatabase();
+    const oldCount = db.prepare("SELECT COUNT(*) AS count FROM transactions WHERE category IN ('Telecom', 'Groceries')").get() as { count: number };
+    expect(oldCount.count).toBe(0);
+  });
+});
+
+describe("category rule import", () => {
+  it("imports new rules and skips duplicates", () => {
+    const result = importCategoryRules([
+      { category: "Transport", match: "דן" },
+      { category: "Transport", match: "אגד" },
+      { category: "Entertainment", match: "Netflix" },
+    ]);
+
+    expect(result.imported).toBe(3);
+    expect(result.skipped).toBe(0);
+
+    // Import again — all should be skipped
+    const result2 = importCategoryRules([
+      { category: "Transport", match: "דן" },
+      { category: "Transport", match: "אגד" },
+    ]);
+    expect(result2.imported).toBe(0);
+    expect(result2.skipped).toBe(2);
+  });
+});
+
+describe("translation rule import", () => {
+  it("imports new rules and skips duplicates", () => {
+    const result = importTranslationRules([
+      { english: "Shufersal", match: "שופרסל" },
+      { english: "Rami Levy", match: "רמי לוי" },
+    ]);
+
+    expect(result.imported).toBe(2);
+    expect(result.skipped).toBe(0);
+
+    // Import again — all should be skipped
+    const result2 = importTranslationRules([
+      { english: "Shufersal", match: "שופרסל" },
+    ]);
+    expect(result2.imported).toBe(0);
+    expect(result2.skipped).toBe(1);
+  });
+});
+
+describe("listCategoriesWithSource", () => {
+  it("shows correct source for categories", () => {
+    const categories = listCategoriesWithSource();
+    expect(categories.length).toBeGreaterThan(0);
+
+    // Every entry should have required fields
+    for (const cat of categories) {
+      expect(cat.category).toBeDefined();
+      expect(typeof cat.transactionCount).toBe("number");
+      expect(typeof cat.totalAmount).toBe("number");
+      expect(typeof cat.ruleCount).toBe("number");
+      expect(["transactions", "rules", "both"]).toContain(cat.source);
+    }
+
+    // Entertainment was added as a rule (match: Netflix) and Netflix has a transaction
+    const entertainment = categories.find((c) => c.category === "Entertainment");
+    if (entertainment) {
+      expect(entertainment.ruleCount).toBeGreaterThanOrEqual(1);
+    }
+
+    // Transport was added as rules only (no transactions categorized as Transport)
+    const transport = categories.find((c) => c.category === "Transport");
+    if (transport && transport.transactionCount === 0) {
+      expect(transport.source).toBe("rules");
+    }
   });
 });

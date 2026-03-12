@@ -127,3 +127,229 @@ export function listCategories(): CategorySummary[] {
     totalAmount: r.total_amount,
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Category rename / merge
+// ---------------------------------------------------------------------------
+
+export interface RenameResult {
+  transactionsUpdated: number;
+  rulesUpdated: number;
+}
+
+export function renameCategory(oldName: string, newName: string): RenameResult {
+  const db = getDatabase();
+  db.run("BEGIN");
+  try {
+    const txResult = db
+      .prepare(
+        "UPDATE transactions SET category = $new, updated_at = datetime('now') WHERE category = $old",
+      )
+      .run({ $old: oldName, $new: newName });
+
+    const ruleResult = db
+      .prepare("UPDATE category_rules SET category = $new WHERE category = $old")
+      .run({ $old: oldName, $new: newName });
+
+    db.run("COMMIT");
+    return {
+      transactionsUpdated: txResult.changes,
+      rulesUpdated: ruleResult.changes,
+    };
+  } catch (err) {
+    db.run("ROLLBACK");
+    throw err;
+  }
+}
+
+export function renameCategoryDryRun(
+  oldName: string,
+  newName: string,
+): { transactionsAffected: number; rulesAffected: number } {
+  const db = getDatabase();
+  // newName is accepted for API consistency but unused in dry-run counts
+  void newName;
+
+  const txRow = db
+    .prepare("SELECT COUNT(*) AS count FROM transactions WHERE category = $old")
+    .get({ $old: oldName }) as { count: number };
+
+  const ruleRow = db
+    .prepare("SELECT COUNT(*) AS count FROM category_rules WHERE category = $old")
+    .get({ $old: oldName }) as { count: number };
+
+  return {
+    transactionsAffected: txRow.count,
+    rulesAffected: ruleRow.count,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Bulk category migration
+// ---------------------------------------------------------------------------
+
+export interface BulkMigrateResult {
+  totalTransactionsUpdated: number;
+  totalRulesUpdated: number;
+  categoriesProcessed: number;
+}
+
+export function bulkMigrateCategories(
+  mapping: Record<string, string>,
+): BulkMigrateResult {
+  const db = getDatabase();
+  const entries = Object.entries(mapping);
+
+  const txStmt = db.prepare(
+    "UPDATE transactions SET category = $new, updated_at = datetime('now') WHERE category = $old",
+  );
+  const ruleStmt = db.prepare(
+    "UPDATE category_rules SET category = $new WHERE category = $old",
+  );
+
+  let totalTx = 0;
+  let totalRules = 0;
+
+  db.run("BEGIN");
+  try {
+    for (const [oldName, newName] of entries) {
+      const txResult = txStmt.run({ $old: oldName, $new: newName });
+      const ruleResult = ruleStmt.run({ $old: oldName, $new: newName });
+      totalTx += txResult.changes;
+      totalRules += ruleResult.changes;
+    }
+    db.run("COMMIT");
+  } catch (err) {
+    db.run("ROLLBACK");
+    throw err;
+  }
+
+  return {
+    totalTransactionsUpdated: totalTx,
+    totalRulesUpdated: totalRules,
+    categoriesProcessed: entries.length,
+  };
+}
+
+export interface BulkMigrateDryRunEntry {
+  oldName: string;
+  newName: string;
+  transactionsAffected: number;
+  rulesAffected: number;
+}
+
+export function bulkMigrateCategoriesDryRun(
+  mapping: Record<string, string>,
+): BulkMigrateDryRunEntry[] {
+  const db = getDatabase();
+
+  const txStmt = db.prepare(
+    "SELECT COUNT(*) AS count FROM transactions WHERE category = $old",
+  );
+  const ruleStmt = db.prepare(
+    "SELECT COUNT(*) AS count FROM category_rules WHERE category = $old",
+  );
+
+  const results: BulkMigrateDryRunEntry[] = [];
+
+  for (const [oldName, newName] of Object.entries(mapping)) {
+    const txRow = txStmt.get({ $old: oldName }) as { count: number };
+    const ruleRow = ruleStmt.get({ $old: oldName }) as { count: number };
+    results.push({
+      oldName,
+      newName,
+      transactionsAffected: txRow.count,
+      rulesAffected: ruleRow.count,
+    });
+  }
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Bulk rule import
+// ---------------------------------------------------------------------------
+
+export function importCategoryRules(
+  rules: Array<{ category: string; match: string }>,
+): { imported: number; skipped: number } {
+  const db = getDatabase();
+
+  const stmt = db.prepare(
+    `INSERT INTO category_rules (category, match_pattern)
+     SELECT $category, $pattern
+     WHERE NOT EXISTS (
+       SELECT 1 FROM category_rules WHERE match_pattern = $pattern
+     )`,
+  );
+
+  let imported = 0;
+  for (const rule of rules) {
+    const result = stmt.run({ $category: rule.category, $pattern: rule.match });
+    imported += result.changes;
+  }
+
+  return { imported, skipped: rules.length - imported };
+}
+
+// ---------------------------------------------------------------------------
+// Enhanced category list with source info
+// ---------------------------------------------------------------------------
+
+export interface CategoryWithSource {
+  category: string;
+  transactionCount: number;
+  totalAmount: number;
+  ruleCount: number;
+  source: "transactions" | "rules" | "both";
+}
+
+export function listCategoriesWithSource(): CategoryWithSource[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT
+         cat.category,
+         COALESCE(tc.transaction_count, 0) AS transaction_count,
+         COALESCE(tc.total_amount, 0) AS total_amount,
+         COALESCE(rc.rule_count, 0) AS rule_count,
+         CASE
+           WHEN COALESCE(tc.transaction_count, 0) > 0 AND COALESCE(rc.rule_count, 0) > 0 THEN 'both'
+           WHEN COALESCE(rc.rule_count, 0) > 0 THEN 'rules'
+           ELSE 'transactions'
+         END AS source
+       FROM (
+         SELECT COALESCE(category, 'Uncategorized') AS category FROM transactions
+         UNION
+         SELECT category FROM category_rules
+       ) cat
+       LEFT JOIN (
+         SELECT COALESCE(category, 'Uncategorized') AS category,
+                COUNT(*) AS transaction_count,
+                SUM(ABS(charged_amount)) AS total_amount
+         FROM transactions
+         GROUP BY category
+       ) tc ON cat.category = tc.category
+       LEFT JOIN (
+         SELECT category, COUNT(*) AS rule_count
+         FROM category_rules
+         GROUP BY category
+       ) rc ON cat.category = rc.category
+       ORDER BY COALESCE(tc.total_amount, 0) DESC`,
+    )
+    .all() as Array<{
+    category: string;
+    transaction_count: number;
+    total_amount: number;
+    rule_count: number;
+    source: string;
+  }>;
+
+  return rows.map((r) => ({
+    category: r.category,
+    transactionCount: r.transaction_count,
+    totalAmount: r.total_amount,
+    ruleCount: r.rule_count,
+    source: r.source as "transactions" | "rules" | "both",
+  }));
+}
