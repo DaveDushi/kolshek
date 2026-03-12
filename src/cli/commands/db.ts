@@ -53,7 +53,7 @@ export function registerDbCommand(program: Command): void {
     .command("schema <table>")
     .description("Show column details for a table")
     .action((tableName: string) => {
-      if (!ALLOWED_TABLES.includes(tableName)) {
+      if (!ALLOWED_TABLES.includes(tableName) || !/^[a-z_]+$/.test(tableName)) {
         printError("BAD_ARGS", `Unknown table: ${tableName}`, {
           suggestions: [`Available tables: ${ALLOWED_TABLES.join(", ")}`],
         });

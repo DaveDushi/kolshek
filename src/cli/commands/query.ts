@@ -17,6 +17,9 @@ import {
 /** Read-only SQL keywords that may start a query */
 const READONLY_PREFIXES = /^\s*(SELECT|WITH|EXPLAIN|PRAGMA|VALUES)\b/i;
 
+// PRAGMAs that are safe to read (return data, don't mutate state)
+const SAFE_PRAGMAS = /^\s*PRAGMA\s+(table_info|table_list|index_list|index_info|database_list|compile_options|journal_mode|wal_checkpoint|page_count|page_size|freelist_count|integrity_check|quick_check|foreign_key_list|foreign_key_check|collation_list)\b/i;
+
 /** Validate and sanitize user SQL */
 function validateSql(sql: string): string | null {
   // Strip trailing semicolons and whitespace
@@ -38,6 +41,11 @@ function validateSql(sql: string): string | null {
   // Must start with a read-only keyword
   if (!READONLY_PREFIXES.test(cleaned)) {
     return "Only read-only queries (SELECT, WITH, EXPLAIN) are allowed";
+  }
+
+  // Block mutating PRAGMAs — only allow known safe read-only ones
+  if (/^\s*PRAGMA\b/i.test(cleaned) && !SAFE_PRAGMAS.test(cleaned)) {
+    return "Only read-only PRAGMAs are allowed (table_info, index_list, etc.)";
   }
 
   return null;

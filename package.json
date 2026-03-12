@@ -35,7 +35,7 @@
     "commander": "^13.0.0",
     "date-fns": "^4.0.0",
     "env-paths": "^3.0.0",
-    "israeli-bank-scrapers-core": "^6.7.0",
+    "israeli-bank-scrapers-core": "6.7.1",
     "ora": "^8.0.0",
     "puppeteer-core": "^24.0.0",
     "puppeteer-extra": "^3.3.6",

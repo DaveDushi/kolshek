@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
-import { chmodSync, existsSync } from "fs";
+import { existsSync } from "fs";
+import { restrictPathToOwner } from "../security/permissions.js";
 
 let _db: Database | null = null;
 
@@ -11,10 +12,8 @@ export function initDatabase(dbPath: string): Database {
 
   const db = new Database(dbPath, { create: true });
 
-  // Restrict DB file permissions on Unix (owner-only read/write)
-  if (process.platform !== "win32") {
-    chmodSync(dbPath, 0o600);
-  }
+  // Restrict DB file permissions (Unix: chmod, Windows: icacls)
+  restrictPathToOwner(dbPath);
 
   db.run("PRAGMA journal_mode=WAL");
   db.run("PRAGMA foreign_keys=ON");
@@ -23,13 +22,11 @@ export function initDatabase(dbPath: string): Database {
 
   runMigrations(db);
 
-  // Chmod WAL/SHM files created by WAL mode
-  if (process.platform !== "win32") {
-    const walPath = dbPath + "-wal";
-    const shmPath = dbPath + "-shm";
-    if (existsSync(walPath)) chmodSync(walPath, 0o600);
-    if (existsSync(shmPath)) chmodSync(shmPath, 0o600);
-  }
+  // Restrict WAL/SHM files created by WAL mode
+  const walPath = dbPath + "-wal";
+  const shmPath = dbPath + "-shm";
+  if (existsSync(walPath)) restrictPathToOwner(walPath);
+  if (existsSync(shmPath)) restrictPathToOwner(shmPath);
 
   _db = db;
   return db;

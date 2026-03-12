@@ -5,6 +5,7 @@ import { parse } from "smol-toml";
 import type { AppConfig } from "../types/index.js";
 import { DEFAULT_CONFIG } from "../types/index.js";
 import { parseConfig } from "./schema.js";
+import { restrictPathToOwner } from "../security/permissions.js";
 
 const paths = envPaths("kolshek");
 
@@ -27,6 +28,9 @@ export async function ensureDirectories(): Promise<void> {
     mkdir(paths.config, { recursive: true, mode }),
     mkdir(paths.data, { recursive: true, mode }),
   ]);
+  // On Windows, chmod is a no-op — use icacls to restrict directory access
+  restrictPathToOwner(paths.config);
+  restrictPathToOwner(paths.data);
 }
 
 async function loadTomlConfig(): Promise<Record<string, unknown>> {

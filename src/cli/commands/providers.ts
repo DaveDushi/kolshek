@@ -41,6 +41,15 @@ import {
   ExitCode,
 } from "../output.js";
 
+// Best-effort zeroing of credential values in memory.
+// JS strings are immutable so originals may persist until GC,
+// but this prevents casual access via the object reference.
+function zeroCredentials(creds: Record<string, string>): void {
+  for (const key of Object.keys(creds)) {
+    creds[key] = "";
+  }
+}
+
 export function registerProvidersCommand(program: Command): void {
   const providers = program
     .command("providers")
@@ -214,6 +223,9 @@ export function registerProvidersCommand(program: Command): void {
         info("Credentials saved to file (OS keychain unavailable).");
       }
 
+      // Zero credentials from memory
+      zeroCredentials(credentials);
+
       const provider = createProvider(
         companyId,
         providerInfo.displayName,
@@ -341,6 +353,9 @@ export function registerProvidersCommand(program: Command): void {
 
       // Save credentials (keychain or file fallback)
       const credBackend = await storeCredentials(provider.alias, credentials);
+      // Zero credentials from memory
+      zeroCredentials(credentials);
+
       if (credBackend === "keychain") {
         success(`Credentials saved for ${provider.displayName}.`);
       } else {
@@ -489,6 +504,7 @@ export function registerProvidersCommand(program: Command): void {
         process.exit(ExitCode.Error);
       } finally {
         if (browser) await closeBrowser(browser).catch(() => {});
+        zeroCredentials(credentials);
       }
     });
 }

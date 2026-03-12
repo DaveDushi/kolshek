@@ -39,6 +39,12 @@ import {
   ExitCode,
 } from "../output.js";
 
+function zeroCredentials(creds: Record<string, string>): void {
+  for (const key of Object.keys(creds)) {
+    creds[key] = "";
+  }
+}
+
 export function registerInitCommand(program: Command): void {
   program
     .command("init")
@@ -280,6 +286,8 @@ export function registerInitCommand(program: Command): void {
             success("Credentials saved to local encrypted file (OS keychain unavailable).");
           }
         }
+        // Zero credentials from memory
+        zeroCredentials(credentials);
 
         // Save provider to DB
         if (!isUpdate) {
