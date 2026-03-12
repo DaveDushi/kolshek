@@ -301,6 +301,15 @@ export function registerInitCommand(program: Command): void {
         return;
       }
 
+      // Tip: double-counting when both bank and CC are synced
+      const hasBank = configuredProviders.some((id) => PROVIDERS[id as keyof typeof PROVIDERS]?.type === "bank");
+      const hasCC = configuredProviders.some((id) => PROVIDERS[id as keyof typeof PROVIDERS]?.type === "credit_card");
+      if (hasBank && hasCC) {
+        info("");
+        info("Tip: Your bank statement may include credit card billing lines.");
+        info("     Use 'kolshek categorize rule add' to tag them and avoid double-counting expenses.");
+      }
+
       // Step 6: Offer initial fetch
       info("");
       const fetchNow = await confirm({
@@ -346,6 +355,8 @@ export function registerInitCommand(program: Command): void {
       info("  kolshek fetch                — Fetch new transactions");
       info("  kolshek transactions list    — Browse transactions");
       info("  kolshek transactions search  — Search by description");
+      info("  kolshek translate rule add   — Add a translation rule");
+      info("  kolshek categorize rule add  — Add a category rule");
       if (aiTool === "skip") {
         info("  kolshek plugin install <tool> — Install AI assistant plugin");
       }

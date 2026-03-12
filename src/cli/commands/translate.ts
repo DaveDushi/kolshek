@@ -6,10 +6,8 @@ import {
   listTranslationRules,
   removeTranslationRule,
   applyTranslationRules,
-  seedTranslationRules,
   bulkImportTranslationRules,
 } from "../../db/repositories/translations.js";
-import { MERCHANT_NAMES } from "../../core/merchant-names.js";
 import {
   isJsonMode,
   printJson,
@@ -73,7 +71,7 @@ export function registerTranslateCommand(program: Command): void {
       }
 
       if (rules.length === 0) {
-        info("No translation rules defined. Use 'kolshek translate rule add' or 'kolshek translate seed' to create rules.");
+        info("No translation rules defined. Use 'kolshek translate rule add' or 'kolshek translate rule import' to create rules.");
         return;
       }
 
@@ -210,18 +208,4 @@ export function registerTranslateCommand(program: Command): void {
       success(`Applied rules: ${result.applied} transaction(s) translated.`);
     });
 
-  // --- translate seed ---
-  transCmd
-    .command("seed")
-    .description("Import the hardcoded merchant-names dictionary as translation rules")
-    .action(() => {
-      const result = seedTranslationRules(MERCHANT_NAMES);
-
-      if (isJsonMode()) {
-        printJson(jsonSuccess(result));
-        return;
-      }
-
-      success(`Seeded ${result.seeded} translation rule(s) from merchant-names dictionary.`);
-    });
 }
