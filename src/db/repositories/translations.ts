@@ -90,6 +90,41 @@ export function applyTranslationRules(): { applied: number } {
   return { applied };
 }
 
+export interface TranslationRuleInput {
+  englishName: string;
+  matchPattern: string;
+}
+
+export function bulkImportTranslationRules(
+  rules: TranslationRuleInput[],
+): { imported: number; skipped: number } {
+  const db = getDatabase();
+  let imported = 0;
+  let skipped = 0;
+
+  const insertStmt = db.prepare(
+    `INSERT INTO translation_rules (english_name, match_pattern)
+     SELECT $englishName, $pattern
+     WHERE NOT EXISTS (
+       SELECT 1 FROM translation_rules WHERE match_pattern = $pattern
+     )`,
+  );
+
+  for (const rule of rules) {
+    const result = insertStmt.run({
+      $englishName: rule.englishName,
+      $pattern: rule.matchPattern,
+    });
+    if (result.changes > 0) {
+      imported++;
+    } else {
+      skipped++;
+    }
+  }
+
+  return { imported, skipped };
+}
+
 export function seedTranslationRules(
   entries: Record<string, string>,
 ): { seeded: number } {

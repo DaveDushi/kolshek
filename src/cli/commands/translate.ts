@@ -9,6 +9,7 @@ import {
   removeTranslationRule,
   applyTranslationRules,
   seedTranslationRules,
+  bulkImportTranslationRules,
 } from "../../db/repositories/translations.js";
 import { MERCHANT_NAMES } from "../../core/merchant-names.js";
 import {
@@ -120,6 +121,80 @@ export function registerTranslateCommand(program: Command): void {
         printError("NOT_FOUND", `Rule #${id} not found`);
         process.exit(ExitCode.BadArgs);
       }
+    });
+
+  // --- translate rule import ---
+  ruleCmd
+    .command("import [file]")
+    .description(
+      "Bulk-import translation rules from a JSON file or stdin. " +
+      'Format: [{"englishName": "...", "matchPattern": "..."}]',
+    )
+    .action(async (filePath?: string) => {
+      let rawJson: string;
+
+      if (filePath) {
+        const file = Bun.file(filePath);
+        if (!(await file.exists())) {
+          printError("NOT_FOUND", `File not found: ${filePath}`);
+          process.exit(ExitCode.BadArgs);
+        }
+        rawJson = await file.text();
+      } else {
+        if (process.stdin.isTTY) {
+          printError(
+            "BAD_ARGS",
+            "No file specified and stdin is a terminal. " +
+            "Pipe JSON or provide a file path.\n" +
+            '  Example: echo \'[{"englishName":"Store","matchPattern":"חנות"}]\' | kolshek tr rule import',
+          );
+          process.exit(ExitCode.BadArgs);
+        }
+        rawJson = await new Response(Bun.stdin.stream()).text();
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawJson);
+      } catch {
+        printError("BAD_ARGS", "Invalid JSON input");
+        process.exit(ExitCode.BadArgs);
+      }
+
+      if (!Array.isArray(parsed)) {
+        printError("BAD_ARGS", "JSON must be an array of rule objects");
+        process.exit(ExitCode.BadArgs);
+      }
+
+      const rules: Array<{ englishName: string; matchPattern: string }> = [];
+      for (const [i, entry] of parsed.entries()) {
+        if (
+          typeof entry !== "object" || entry === null ||
+          typeof (entry as Record<string, unknown>).englishName !== "string" ||
+          typeof (entry as Record<string, unknown>).matchPattern !== "string"
+        ) {
+          printError(
+            "BAD_ARGS",
+            `Invalid rule at index ${i}: each entry needs "englishName" and "matchPattern" strings`,
+          );
+          process.exit(ExitCode.BadArgs);
+        }
+        const e = entry as { englishName: string; matchPattern: string };
+        if (!e.matchPattern.trim() || !e.englishName.trim()) {
+          printError("BAD_ARGS", `Empty name or pattern at index ${i}`);
+          process.exit(ExitCode.BadArgs);
+        }
+        rules.push({ englishName: e.englishName, matchPattern: e.matchPattern });
+      }
+
+      const result = bulkImportTranslationRules(rules);
+
+      if (isJsonMode()) {
+        printJson(jsonSuccess(result));
+        return;
+      }
+
+      success(`Imported ${result.imported} rule(s), skipped ${result.skipped} duplicate(s).`);
     });
 
   // --- translate apply ---

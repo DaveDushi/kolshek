@@ -9,13 +9,13 @@ import { unlink } from "node:fs/promises";
 import type { ScheduleConfig } from "../../types/index.js";
 import type { SchedulerBackend } from "./index.js";
 import { run } from "./index.js";
+import { escapeXml } from "./escape.js";
 
 const TASK_NAME = "KolShek Fetch";
 
 function buildTaskXml(config: ScheduleConfig): string {
   const interval = `PT${config.intervalHours}H`;
-  // Escape XML entities in binary path
-  const cmd = config.binaryPath.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const cmd = escapeXml(config.binaryPath);
 
   return `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
