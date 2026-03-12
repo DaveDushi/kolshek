@@ -307,6 +307,7 @@ async function syncSingleProvider(
         const account = upsertAccount(
           provider.id,
           acct.accountNumber,
+          companyId,
           acct.balance,
         );
 

@@ -26,10 +26,46 @@ function rowToAccount(row: AccountRow): Account {
 export function upsertAccount(
   providerId: number,
   accountNumber: string,
+  companyId: string,
   balance?: number,
   currency?: string,
 ): Account {
   const db = getDatabase();
+
+  // Check if another provider with the same company_id already owns this account.
+  // This prevents duplicates when multiple provider configs (e.g. two Max logins)
+  // discover the same credit card.
+  const existing = db
+    .prepare(
+      `SELECT a.* FROM accounts a
+       JOIN providers p ON a.provider_id = p.id
+       WHERE p.company_id = $companyId
+         AND a.account_number = $accountNumber
+       LIMIT 1`,
+    )
+    .get({
+      $companyId: companyId,
+      $accountNumber: accountNumber,
+    }) as AccountRow | null;
+
+  if (existing) {
+    // Reuse the existing account — just refresh balance/currency
+    db.prepare(
+      `UPDATE accounts SET
+         balance = COALESCE($balance, balance),
+         currency = COALESCE($currency, currency)
+       WHERE id = $id`,
+    ).run({
+      $balance: balance ?? null,
+      $currency: currency ?? null,
+      $id: existing.id,
+    });
+    if (balance !== undefined) existing.balance = balance;
+    if (currency !== undefined) existing.currency = currency;
+    return rowToAccount(existing);
+  }
+
+  // No existing account for this company_id — insert under this provider
   const row = db
     .prepare(
       `INSERT INTO accounts (provider_id, account_number, balance, currency)

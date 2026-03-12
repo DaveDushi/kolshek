@@ -1,0 +1,23 @@
+---
+description: Bump version, update release notes, and push a tagged release
+user_arg: version bump type (patch, minor, or major) — defaults to patch
+---
+
+Create a new release for KolShek. Steps:
+
+1. Read the current version from `package.json`
+2. Bump the version based on the argument: "$ARGUMENTS" (default to "patch" if empty)
+   - patch: 0.1.4 → 0.1.5
+   - minor: 0.1.4 → 0.2.0
+   - major: 0.1.4 → 1.0.0
+3. Run `git log --oneline` from the last tag to HEAD to see what changed
+4. Update `RELEASE_NOTES.md` with a summary of the changes since the last release. Group by:
+   - **Features** (new functionality)
+   - **Bug Fixes** (corrections)
+   - **Other** (refactors, docs, etc.) — omit if empty
+   Write concise, user-facing descriptions (not raw commit messages). Skip version bump commits.
+5. Update the `"version"` field in `package.json`
+6. Commit both files with message: `Bump version to vX.Y.Z`
+7. Show me the release notes and new version and ask for confirmation before pushing
+8. After confirmation: push the commit, create tag `vX.Y.Z`, push the tag
+9. Show the GitHub Actions URL so I can monitor the release workflow

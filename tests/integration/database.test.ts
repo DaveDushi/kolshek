@@ -145,7 +145,7 @@ describe("account upsert", () => {
   });
 
   it("creates a new account", () => {
-    const account = upsertAccount(providerId, "12-345-678901", 23450.75);
+    const account = upsertAccount(providerId, "12-345-678901", "hapoalim", 23450.75);
     expect(account.id).toBeDefined();
     expect(account.providerId).toBe(providerId);
     expect(account.accountNumber).toBe("12-345-678901");
@@ -154,17 +154,44 @@ describe("account upsert", () => {
   });
 
   it("updates existing account balance on conflict", () => {
-    const updated = upsertAccount(providerId, "12-345-678901", 30000.0);
+    const updated = upsertAccount(providerId, "12-345-678901", "hapoalim", 30000.0);
     expect(updated.accountNumber).toBe("12-345-678901");
     expect(updated.balance).toBe(30000.0);
   });
 
   it("creates a second account under the same provider", () => {
-    const savings = upsertAccount(providerId, "12-345-900001", 56012.35);
+    const savings = upsertAccount(providerId, "12-345-900001", "hapoalim", 56012.35);
     expect(savings.accountNumber).toBe("12-345-900001");
 
     const accounts = getAccountsByProvider(providerId);
     expect(accounts.length).toBe(2);
+  });
+
+  it("reuses account when another provider has same company_id and account_number", () => {
+    // Create a second max provider (simulates two Max logins)
+    const max2 = createProvider("max", "Max 2", "credit_card", "max-2");
+    const maxProvider = getProviderByCompanyId("max")!;
+
+    // First provider creates the account
+    const first = upsertAccount(maxProvider.id, "5544", "max", 1000);
+    // Second provider discovers the same card
+    const second = upsertAccount(max2.id, "5544", "max", 2000);
+
+    // Should reuse the same account row, not create a duplicate
+    expect(second.id).toBe(first.id);
+    // Balance updated to the latest value
+    expect(second.balance).toBe(2000);
+  });
+
+  it("creates separate accounts for different company_ids", () => {
+    const hapoalim = getProviderByCompanyId("hapoalim")!;
+    const max = getProviderByCompanyId("max")!;
+
+    const bankAcct = upsertAccount(hapoalim.id, "9999", "hapoalim", 5000);
+    const ccAcct = upsertAccount(max.id, "9999", "max", 3000);
+
+    // Same account_number but different companies — must be separate
+    expect(ccAcct.id).not.toBe(bankAcct.id);
   });
 });
 
@@ -260,7 +287,7 @@ describe("listTransactions with filters", () => {
   beforeAll(() => {
     const maxProvider = getProviderByCompanyId("max");
     if (!maxProvider) return;
-    const maxAccount = upsertAccount(maxProvider.id, "4580-XXXX-XXXX-9012");
+    const maxAccount = upsertAccount(maxProvider.id, "4580-XXXX-XXXX-9012", "max");
 
     const txns: Partial<TransactionInput>[] = [
       {

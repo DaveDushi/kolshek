@@ -183,6 +183,51 @@ UPDATE sync_log SET scrape_end_date = COALESCE(
     DATE(completed_at),
     DATE(started_at)
 ) WHERE scrape_end_date IS NULL;`],
+
+  ["007_merge_duplicate_accounts.sql", `-- Merge duplicate accounts that share (company_id, account_number) across providers.
+-- Keeps the lowest-id account as the winner per group.
+PRAGMA foreign_keys=OFF;
+
+-- Step 1: temp table mapping loser account ids to winner account ids
+CREATE TEMP TABLE _account_merges AS
+SELECT
+  loser.id AS loser_id,
+  winner.winner_id
+FROM accounts loser
+JOIN providers loser_p ON loser.provider_id = loser_p.id
+JOIN (
+  SELECT MIN(a.id) AS winner_id, p.company_id, a.account_number
+  FROM accounts a
+  JOIN providers p ON a.provider_id = p.id
+  GROUP BY p.company_id, a.account_number
+) winner ON loser_p.company_id = winner.company_id
+        AND loser.account_number = winner.account_number
+        AND loser.id != winner.winner_id;
+
+-- Step 2: delete duplicate transactions (same hash already exists in winner account)
+DELETE FROM transactions
+WHERE id IN (
+  SELECT t_loser.id
+  FROM transactions t_loser
+  JOIN _account_merges am ON t_loser.account_id = am.loser_id
+  JOIN transactions t_winner ON t_winner.account_id = am.winner_id
+                            AND t_winner.hash = t_loser.hash
+);
+
+-- Step 3: reassign remaining transactions from loser to winner
+UPDATE transactions
+SET account_id = (
+  SELECT am.winner_id FROM _account_merges am
+  WHERE am.loser_id = transactions.account_id
+)
+WHERE account_id IN (SELECT loser_id FROM _account_merges);
+
+-- Step 4: delete the now-empty loser accounts
+DELETE FROM accounts WHERE id IN (SELECT loser_id FROM _account_merges);
+
+DROP TABLE _account_merges;
+
+PRAGMA foreign_keys=ON;`],
 ];
 
 // Run all pending SQL migrations.
