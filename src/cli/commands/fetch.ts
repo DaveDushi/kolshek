@@ -156,7 +156,7 @@ export async function runFetch(opts: FetchOptions = {}): Promise<void> {
       ? `${r.scrapeStartDate} → ${r.scrapeEndDate}`
       : "";
     return [
-      r.companyId,
+      r.alias,
       r.success ? "✓" : "✗",
       range,
       String(r.transactionsAdded),

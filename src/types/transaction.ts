@@ -56,6 +56,7 @@ export interface TransactionInput {
 export interface TransactionWithContext extends Transaction {
   providerDisplayName: string;
   providerCompanyId: string;
+  providerAlias: string;
   accountNumber: string;
 }
 

@@ -201,6 +201,7 @@ export function getMerchantReport(
 
 export interface BalanceRow {
   provider: string;
+  providerAlias: string;
   providerType: string;
   accountNumber: string;
   balance: number | null;
@@ -216,6 +217,7 @@ export function getBalanceReport(): BalanceRow[] {
   const sql = `
     SELECT
       p.display_name AS provider,
+      p.alias AS provider_alias,
       p.type AS provider_type,
       a.account_number,
       a.balance,
@@ -244,6 +246,7 @@ export function getBalanceReport(): BalanceRow[] {
 
   const rows = db.prepare(sql).all() as Array<{
     provider: string;
+    provider_alias: string;
     provider_type: string;
     account_number: string;
     balance: number | null;
@@ -255,6 +258,7 @@ export function getBalanceReport(): BalanceRow[] {
 
   return rows.map((r) => ({
     provider: r.provider,
+    providerAlias: r.provider_alias,
     providerType: r.provider_type,
     accountNumber: r.account_number,
     balance: r.balance,

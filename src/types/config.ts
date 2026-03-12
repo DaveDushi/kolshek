@@ -36,6 +36,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 /** Sync result for a single provider */
 export interface ProviderSyncResult {
   companyId: string;
+  alias: string;
   success: boolean;
   accountsFound: number;
   transactionsAdded: number;

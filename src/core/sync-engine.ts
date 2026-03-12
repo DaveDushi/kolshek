@@ -142,6 +142,7 @@ export async function syncProviders(
     return {
       results: targets.map((p) => ({
         companyId: p.companyId,
+        alias: p.alias,
         success: false,
         accountsFound: 0,
         transactionsAdded: 0,
@@ -199,6 +200,7 @@ async function syncSingleProvider(
   if (!isValidCompanyId(companyId)) {
     return {
       companyId,
+      alias,
       success: false,
       accountsFound: 0,
       transactionsAdded: 0,
@@ -215,6 +217,7 @@ async function syncSingleProvider(
   if (!credentials) {
     return {
       companyId,
+      alias,
       success: false,
       accountsFound: 0,
       transactionsAdded: 0,
@@ -264,6 +267,7 @@ async function syncSingleProvider(
       completeSyncLog(syncLog.id, "error", 0, 0, errMsg);
       return {
         companyId,
+        alias,
         success: false,
         accountsFound: 0,
         transactionsAdded: 0,
@@ -283,6 +287,7 @@ async function syncSingleProvider(
       completeSyncLog(syncLog.id, "error", 0, 0, safeError);
       return {
         companyId,
+        alias,
         success: false,
         accountsFound: scrapeResult.accounts.length,
         transactionsAdded: 0,
@@ -366,6 +371,7 @@ async function syncSingleProvider(
 
     return {
       companyId,
+      alias,
       success: true,
       accountsFound: scrapeResult.accounts.length,
       transactionsAdded: totalAdded,

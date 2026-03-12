@@ -24,6 +24,7 @@ interface AccountWithProviderRow {
   created_at: string;
   provider_display_name: string;
   provider_company_id: string;
+  provider_alias: string;
   provider_type: string;
   last_synced_at: string | null;
 }
@@ -41,6 +42,7 @@ function listAccountsWithProviders(): AccountWithProviderRow[] {
         a.created_at,
         p.display_name AS provider_display_name,
         p.company_id AS provider_company_id,
+        p.alias AS provider_alias,
         p.type AS provider_type,
         p.last_synced_at
       FROM accounts a
@@ -79,6 +81,7 @@ export function registerAccountsCommand(program: Command): void {
               balance: a.balance,
               currency: a.currency,
               provider: a.provider_company_id,
+              providerAlias: a.provider_alias,
               providerName: a.provider_display_name,
               providerType: a.provider_type,
               lastSyncedAt: a.last_synced_at,
@@ -102,7 +105,7 @@ export function registerAccountsCommand(program: Command): void {
       const table = createTable(
         ["Provider", "Account", "Balance", "Currency", "Last Synced"],
         accounts.map((a) => [
-          a.provider_display_name,
+          a.provider_alias,
           formatAccountNumber(a.account_number, true),
           a.balance != null
             ? formatCurrency(a.balance, a.currency)
