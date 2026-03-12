@@ -37,6 +37,12 @@ kolshek query "SELECT description, COUNT(*) as count, SUM(charged_amount) as tot
 kolshek query "SELECT description, COUNT(*) as count, SUM(charged_amount) as total FROM transactions WHERE charged_amount > 0 AND (category IS NULL OR category = '') GROUP BY description ORDER BY count DESC" --json
 ```
 
+### CC Billing Detection
+
+If the user has both bank and credit card providers, look for uncategorized bank transactions whose descriptions match credit card company names (e.g., "ויזה כאל", "כאל", "ישראכרט", "מקס", "אמריקן אקספרס", "visa cal"). These are **CC billing charges** — the monthly bank debit that pays the CC bill. They are internal transfers, not real expenses, and cause double-counting since the CC provider already tracks individual purchases.
+
+Suggest categorizing these as `"CC Billing"` (exact string). Reports automatically exclude `"CC Billing"` from expense totals.
+
 ## Step 3: Suggest Categories
 
 Generate category suggestions for both expenses and income. Present as two tables:

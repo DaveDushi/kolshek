@@ -3,6 +3,7 @@
  */
 
 import { getDatabase } from "../database.js";
+import { CC_BILLING_CATEGORY } from "../../types/transaction.js";
 
 export interface DateRange {
   from?: string;
@@ -46,7 +47,9 @@ function whereClause(conditions: string[]): string {
 export interface MonthlyRow {
   month: string;
   income: number;
-  expenses: number;
+  bankExpenses: number;
+  ccExpenses: number;
+  ccCharge: number;
   net: number;
   transactionCount: number;
 }
@@ -57,14 +60,22 @@ export function getMonthlyReport(
 ): MonthlyRow[] {
   const db = getDatabase();
   const { conditions, params } = buildDateConditions(range, providerType);
+  params.$ccBilling = CC_BILLING_CATEGORY;
 
   const sql = `
     SELECT
       strftime('%Y-%m', t.date) AS month,
       SUM(CASE WHEN t.charged_amount > 0 THEN t.charged_amount ELSE 0 END) AS income,
-      SUM(CASE WHEN t.charged_amount < 0 THEN ABS(t.charged_amount) ELSE 0 END) AS expenses,
-      SUM(t.charged_amount) AS net,
-      COUNT(*) AS transaction_count
+      SUM(CASE WHEN t.charged_amount < 0 AND p.type = 'bank'
+                AND COALESCE(t.category, '') != $ccBilling
+           THEN ABS(t.charged_amount) ELSE 0 END) AS bank_expenses,
+      SUM(CASE WHEN t.charged_amount < 0 AND p.type = 'credit_card'
+           THEN ABS(t.charged_amount) ELSE 0 END) AS cc_expenses,
+      SUM(CASE WHEN t.category = $ccBilling
+           THEN ABS(t.charged_amount) ELSE 0 END) AS cc_charge,
+      SUM(CASE WHEN COALESCE(t.category, '') != $ccBilling
+           THEN t.charged_amount ELSE 0 END) AS net,
+      COUNT(CASE WHEN COALESCE(t.category, '') != $ccBilling THEN 1 END) AS transaction_count
     FROM transactions t
     JOIN accounts a ON t.account_id = a.id
     JOIN providers p ON a.provider_id = p.id
@@ -76,7 +87,9 @@ export function getMonthlyReport(
   const rows = db.prepare(sql).all(params) as Array<{
     month: string;
     income: number;
-    expenses: number;
+    bank_expenses: number;
+    cc_expenses: number;
+    cc_charge: number;
     net: number;
     transaction_count: number;
   }>;
@@ -84,7 +97,9 @@ export function getMonthlyReport(
   return rows.map((r) => ({
     month: r.month,
     income: r.income,
-    expenses: r.expenses,
+    bankExpenses: r.bank_expenses,
+    ccExpenses: r.cc_expenses,
+    ccCharge: r.cc_charge,
     net: r.net,
     transactionCount: r.transaction_count,
   }));
@@ -107,9 +122,11 @@ export function getCategoryReport(
 ): CategoryRow[] {
   const db = getDatabase();
   const { conditions, params } = buildDateConditions(range, providerType);
+  params.$ccBilling = CC_BILLING_CATEGORY;
 
-  // Expenses only (charged_amount < 0)
+  // Expenses only, excluding CC billing (internal transfers)
   conditions.push("t.charged_amount < 0");
+  conditions.push("COALESCE(t.category, '') != $ccBilling");
 
   const sql = `
     SELECT
@@ -159,9 +176,11 @@ export function getMerchantReport(
 ): MerchantRow[] {
   const db = getDatabase();
   const { conditions, params } = buildDateConditions(range, providerType);
+  params.$ccBilling = CC_BILLING_CATEGORY;
 
-  // Expenses only
+  // Expenses only, excluding CC billing (internal transfers)
   conditions.push("t.charged_amount < 0");
+  conditions.push("COALESCE(t.category, '') != $ccBilling");
 
   params.$limit = limit;
 
@@ -228,6 +247,7 @@ export function getBalanceReport(): BalanceRow[] {
          FROM transactions t2
          WHERE t2.account_id = a.id
            AND t2.charged_amount < 0
+           AND COALESCE(t2.category, '') != 'CC Billing'
            AND t2.date >= date('now', '-30 days')),
         0
       ) AS recent_expenses_30d,
