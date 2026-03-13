@@ -36,12 +36,20 @@ import {
 // Zod schemas for conditions validation
 // ---------------------------------------------------------------------------
 
-const textMatchSchema = z.object({
+// Plain object form for text matching
+const textMatchObjectSchema = z.object({
   pattern: z.string().min(1),
   mode: z.enum(["substring", "exact", "regex"]).default("substring"),
 });
 
-const amountMatchSchema = z.object({
+// Accept string shorthand: "pattern" → { pattern, mode: "substring" }
+const textMatchSchema = z.preprocess(
+  (v) => (typeof v === "string" ? { pattern: v, mode: "substring" } : v),
+  textMatchObjectSchema,
+);
+
+// Plain object form for amount matching
+const amountMatchObjectSchema = z.object({
   exact: z.number().optional(),
   min: z.number().optional(),
   max: z.number().optional(),
@@ -50,7 +58,13 @@ const amountMatchSchema = z.object({
   { message: "Amount must have at least one of exact, min, or max" },
 );
 
-const ruleConditionsSchema = z.object({
+// Accept number shorthand: -6500 → { exact: -6500 }
+const amountMatchSchema = z.preprocess(
+  (v) => (typeof v === "number" ? { exact: v } : v),
+  amountMatchObjectSchema,
+);
+
+export const ruleConditionsSchema = z.object({
   description: textMatchSchema.optional(),
   memo: textMatchSchema.optional(),
   account: z.string().min(1).optional(),
@@ -60,6 +74,18 @@ const ruleConditionsSchema = z.object({
   (c) => c.description || c.memo || c.account || c.amount || c.direction,
   { message: "At least one condition is required" },
 );
+
+// ---------------------------------------------------------------------------
+// Validation error formatting
+// ---------------------------------------------------------------------------
+
+// Format Zod issues with full field paths for clear error messages
+export function formatZodErrors(issues: z.ZodIssue[]): string {
+  return issues.map((iss) => {
+    const path = iss.path.length ? iss.path.join(".") : "(root)";
+    return `  ${path}: ${iss.message}`;
+  }).join("\n");
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -138,6 +164,30 @@ export function registerCategorizeCommand(program: Command): void {
   ruleCmd
     .command("add <category>")
     .description("Create a category rule")
+    .addHelpText("after", `
+Examples:
+  Simple merchant rule:
+    kolshek cat rule add "Groceries" --match "שופרסל"
+
+  Exact description match:
+    kolshek cat rule add "Rent / Housing" --match-exact "Check"
+
+  Regex pattern:
+    kolshek cat rule add "Subscriptions" --match-regex "NETFLIX|SPOTIFY"
+
+  Account-specific rule:
+    kolshek cat rule add "Savings" --account "leumi:948-85326_77"
+
+  Amount match:
+    kolshek cat rule add "Rent / Housing" --amount -6500
+
+  Amount range:
+    kolshek cat rule add "Large Purchases" --amount-min -10000 --amount-max -1000
+
+  Multi-condition with priority:
+    kolshek cat rule add "Rent / Housing" --match-exact "Check" \\
+      --account "leumi:948-85326_77" --amount -6500 --direction debit --priority 100
+`)
     .option("--match <pattern>", "Substring match on description")
     .option("--match-exact <pattern>", "Exact match on description")
     .option("--match-regex <pattern>", "Regex match on description")
@@ -159,7 +209,7 @@ export function registerCategorizeCommand(program: Command): void {
       // Validate conditions with Zod
       const parsed = ruleConditionsSchema.safeParse(conditions);
       if (!parsed.success) {
-        printError("BAD_ARGS", parsed.error.issues[0].message);
+        printError("BAD_ARGS", `Invalid conditions:\n${formatZodErrors(parsed.error.issues)}`);
         process.exit(ExitCode.BadArgs);
       }
 
@@ -253,7 +303,43 @@ export function registerCategorizeCommand(program: Command): void {
       "Bulk-import category rules from a JSON file or stdin. " +
       "Accepts both legacy format [{category, matchPattern}] and new format [{category, conditions, priority?}]",
     )
-    .action(async (filePath?: string) => {
+    .addHelpText("after", `
+Conditions schema:
+  description  String shorthand: "pattern" (substring match)
+               Object form: {"pattern":"...","mode":"substring|exact|regex"}
+  memo         Same as description, matches memo field
+  account      String: "providerAlias:accountNumber" or just "accountNumber"
+  amount       Number shorthand: -6500 (exact match)
+               Object form: {"exact":-6500} or {"min":-7000,"max":-6000}
+  direction    "debit" (chargedAmount < 0) or "credit" (chargedAmount > 0)
+  priority     Number (higher = evaluated first, default: 0)
+
+  All present fields are AND'd together. At least one condition required.
+
+Examples:
+  Legacy format (simple substring match):
+    [{"category":"Groceries","matchPattern":"שופרסל"}]
+
+  Simple conditions with shorthands:
+    [{"category":"Rent","conditions":{"description":"Check","amount":-6500}}]
+
+  Advanced multi-field rule:
+    [{
+      "category": "Rent / Housing",
+      "conditions": {
+        "description": {"pattern":"Check","mode":"exact"},
+        "account": "leumi:948-85326_77",
+        "amount": {"exact":-6500},
+        "direction": "debit"
+      },
+      "priority": 100
+    }]
+
+  Validate before importing:
+    kolshek cat rule import rules.json --dry-run --json
+`)
+    .option("--dry-run", "Validate and preview rules without importing")
+    .action(async (filePath: string | undefined, opts: { dryRun?: boolean }) => {
       let rawJson: string;
 
       if (filePath) {
@@ -308,7 +394,15 @@ export function registerCategorizeCommand(program: Command): void {
           // New format: validate conditions with Zod
           const condParsed = ruleConditionsSchema.safeParse(e.conditions);
           if (!condParsed.success) {
-            printError("BAD_ARGS", `Invalid conditions at index ${i}: ${condParsed.error.issues[0].message}`);
+            printError("BAD_ARGS", `Invalid conditions at index ${i}:\n${formatZodErrors(condParsed.error.issues)}`, {
+              suggestions: [
+                'description: "pattern" or {"pattern":"...","mode":"substring|exact|regex"}',
+                'memo: "pattern" or {"pattern":"...","mode":"substring|exact|regex"}',
+                'amount: -6500 or {"exact":-6500} or {"min":-7000,"max":-6000}',
+                'direction: "debit" or "credit"',
+                'account: "provider:accountNumber"',
+              ],
+            });
             process.exit(ExitCode.BadArgs);
           }
           rules.push({
@@ -332,6 +426,39 @@ export function registerCategorizeCommand(program: Command): void {
         }
       }
 
+      // Dry-run: validate and preview without writing
+      if (opts.dryRun) {
+        const preview = rules.map((r) => ({
+          category: r.category,
+          conditions: r.conditions,
+          priority: r.priority ?? 0,
+          summary: formatConditions(r.conditions),
+        }));
+
+        if (isJsonMode()) {
+          printJson(jsonSuccess({ dryRun: true, rules: preview, count: preview.length }));
+          return;
+        }
+
+        if (preview.length === 0) {
+          info("No rules to import.");
+          return;
+        }
+
+        const table = createTable(
+          ["#", "Category", "Conditions", "Priority"],
+          preview.map((r, idx) => [
+            String(idx),
+            r.category,
+            r.summary,
+            String(r.priority),
+          ]),
+        );
+        console.log(table);
+        info(`\nDry run: ${preview.length} rule(s) validated — no changes made.`);
+        return;
+      }
+
       const result = bulkImportCategoryRules(rules);
 
       if (isJsonMode()) {
@@ -346,6 +473,18 @@ export function registerCategorizeCommand(program: Command): void {
   catCmd
     .command("apply")
     .description("Run category rules on transactions")
+    .addHelpText("after", `
+How recategorization works:
+  apply               Apply rules to uncategorized transactions only (safe default)
+  apply --all         Re-evaluate ALL transactions against current rules
+  apply --from-category "Old"  Re-evaluate only transactions currently in "Old"
+  apply --dry-run     Preview what would change without modifying data
+
+Related commands:
+  rename <old> <new>  Rename a category (updates transactions + rules)
+  reassign            Force-move transactions matching a pattern to a new category
+  migrate --file      Bulk rename/merge categories from a JSON mapping
+`)
     .option("--all", "Re-apply rules to all transactions, not just uncategorized")
     .option("--from-category <name>", "Re-apply rules only to transactions in this category")
     .option("--dry-run", "Preview changes without modifying data")
@@ -628,6 +767,17 @@ export function registerCategorizeCommand(program: Command): void {
   catCmd
     .command("list")
     .description("Show categories with transaction counts, totals, and source")
+    .addHelpText("after", `
+Output columns:
+  Category      Category name
+  Transactions  Number of transactions in this category
+  Total Amount  Sum of chargedAmount for all transactions
+  Rules         Number of matching rules targeting this category
+  Source         Where the category appears:
+                   "transactions" — has transactions but no rules
+                   "rules"        — has rules but no transactions yet
+                   "both"         — has both transactions and rules
+`)
     .action(() => {
       const categories = listCategoriesWithSource();
 
