@@ -11,8 +11,7 @@ You are helping the user translate their Hebrew transaction descriptions to Engl
 
 ## Before You Start
 
-1. Run `kolshek providers list --json` — if no providers, tell the user to run `kolshek providers add` in their terminal. Wait and re-check.
-2. Run `kolshek transactions list --limit 1 --json` — if no transactions, offer to fetch: "No transaction data yet. Want me to fetch it now?" If yes, run `kolshek fetch --json`.
+Run the standard Skill Startup Checks (see CONTEXT.md reference). Then continue to Step 1.
 
 ## Step 1: Seed Built-In Dictionary
 

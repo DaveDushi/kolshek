@@ -11,8 +11,9 @@ You are helping the user categorize their transactions. This covers both expense
 
 ## Before You Start
 
-1. Run `kolshek providers list --json` — if no providers, tell the user to run `kolshek providers add` in their terminal. Wait and re-check.
-2. Run `kolshek transactions list --limit 1 --json` — if no transactions, offer to fetch: "No transaction data yet. Want me to fetch it now?" If yes, run `kolshek fetch --json`.
+Run the standard Skill Startup Checks (see CONTEXT.md reference). Then:
+
+**Translation check:** Run `kolshek query "SELECT COUNT(*) as total, SUM(CASE WHEN description_en IS NOT NULL THEN 1 ELSE 0 END) as translated FROM transactions" --json`. If most descriptions lack `description_en`, suggest running `/kolshek:translate` first — categorizing English descriptions is more reliable than raw Hebrew.
 
 ## Step 1: Show Current State
 
@@ -41,9 +42,9 @@ kolshek query "SELECT description, COUNT(*) as count, SUM(charged_amount) as tot
 
 ### CC Billing Detection
 
-If the user has both bank and credit card providers, look for uncategorized bank transactions whose descriptions match credit card company names (e.g., "ויזה כאל", "כאל", "ישראכרט", "מקס", "אמריקן אקספרס", "visa cal"). These are **CC billing charges** — the monthly bank debit that pays the CC bill. They are internal transfers, not real expenses, and cause double-counting since the CC provider already tracks individual purchases.
+If the user has both bank and credit card providers, look for uncategorized bank transactions whose descriptions match credit card company names. These are CC billing charges — the monthly bank debit that pays the CC bill. They are internal transfers, not real expenses, and cause double-counting since the CC provider already tracks individual purchases.
 
-Suggest categorizing these as `"CC Billing"` (exact string). Reports automatically exclude `"CC Billing"` from expense totals.
+Suggest to the user that these transactions be categorized as `"CC Billing"` (exact string) — but let the user decide. Reports automatically exclude `"CC Billing"` from expense totals.
 
 ## Step 3: Suggest Categories
 

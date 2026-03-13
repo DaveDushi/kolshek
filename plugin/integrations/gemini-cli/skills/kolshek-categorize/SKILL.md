@@ -9,8 +9,9 @@ You are helping the user categorize their transactions. This covers both expense
 
 ## Before You Start
 
-1. Run `kolshek providers list --json` — if no providers, tell the user to run `kolshek providers add` in their terminal. Wait and re-check.
-2. Run `kolshek transactions list --limit 1 --json` — if no transactions, offer to fetch: "No transaction data yet. Want me to fetch it now?" If yes, run `kolshek fetch --json`.
+Run the standard Skill Startup Checks (see CONTEXT.md reference). Then:
+
+**Translation check:** Run `kolshek query "SELECT COUNT(*) as total, SUM(CASE WHEN description_en IS NOT NULL THEN 1 ELSE 0 END) as translated FROM transactions" --json`. If most descriptions lack `description_en`, suggest running `kolshek:translate` first — categorizing English descriptions is more reliable than raw Hebrew.
 
 ## Step 1: Show Current State
 
@@ -39,9 +40,9 @@ kolshek query "SELECT description, COUNT(*) as count, SUM(charged_amount) as tot
 
 ### CC Billing Detection
 
-If the user has both bank and credit card providers, look for uncategorized bank transactions whose descriptions match credit card company names (e.g., "ויזה כאל", "כאל", "ישראכרט", "מקס", "אמריקן אקספרס", "visa cal"). These are **CC billing charges** — the monthly bank debit that pays the CC bill. They are internal transfers, not real expenses, and cause double-counting since the CC provider already tracks individual purchases.
+If the user has both bank and credit card providers, look for uncategorized bank transactions whose descriptions match credit card company names. These are CC billing charges — the monthly bank debit that pays the CC bill. They are internal transfers, not real expenses, and cause double-counting since the CC provider already tracks individual purchases.
 
-Suggest categorizing these as `"CC Billing"` (exact string). Reports automatically exclude `"CC Billing"` from expense totals.
+Suggest to the user that these transactions be categorized as `"CC Billing"` (exact string) — but let the user decide. Reports automatically exclude `"CC Billing"` from expense totals.
 
 ## Step 3: Suggest Categories
 
@@ -157,6 +158,11 @@ kolshek categorize rule list [--json]
 kolshek categorize rule remove <id> [--json]
 kolshek categorize apply [--json]
 kolshek categorize list [--json]
+kolshek categorize rename <old> <new> [--dry-run] [--json]
+kolshek categorize migrate --file <path> [--dry-run] [--json]
+kolshek categorize reassign --match <pattern> --to <category> [--dry-run] [--json]
+kolshek categorize reassign --file <path> [--dry-run] [--json]
+kolshek categorize rule import [file] [--json]
 ```
 
 ### Translation (Hebrew→English)
@@ -166,7 +172,20 @@ kolshek translate rule list [--json]
 kolshek translate rule remove <id> [--json]
 kolshek translate apply [--json]
 kolshek translate seed [--json]
+kolshek translate rule import [file] [--json]
 ```
+
+### Spending & Income Analysis
+```
+kolshek spending [month] [--group-by <category|merchant|provider>] [--category <name>] [--top <n>] [--type] [--json]
+kolshek income [month] [--salary-only] [--include-refunds] [--json]
+kolshek trends [months] [--mode <total|category|fixed-variable>] [--category <name>] [--type] [--json]
+kolshek insights [--months <n>] [--json]
+```
+
+Month formats: `current`, `prev`, `-3`, `2026-03`, or omit for current month.
+
+**Income defaults to bank accounts only** — CC positive amounts are refunds, not income. Use `--include-refunds` to see them.
 
 ### Reports
 ```
@@ -202,7 +221,9 @@ kolshek init [--json]              # interactive wizard — loops to add multipl
 
 ### Date Formats
 
-All date flags accept: `YYYY-MM-DD`, `DD/MM/YYYY`, or relative like `30d` (last 30 days).
+All `--from`/`--to` date flags accept: `YYYY-MM-DD`, `DD/MM/YYYY`, or relative like `30d` (last 30 days).
+
+Month arguments (spending, income, trends) accept: `current`, `prev`, `-3` (3 months ago), `2026-03`.
 
 ### Exit Codes
 
@@ -220,6 +241,8 @@ All date flags accept: `YYYY-MM-DD`, `DD/MM/YYYY`, or relative like `30d` (last 
 
 **Sign convention:** negative `charged_amount` = expense, positive = income/refund.
 
+**CC Billing:** Transactions categorized as `"CC Billing"` are internal bank-to-CC transfers. Report commands auto-exclude them. When writing custom SQL for expenses, add `AND COALESCE(category, '') != 'CC Billing'` to avoid double-counting.
+
 **`authenticated` field:** appears in `kolshek providers list --json` output but is NOT a DB column — it's computed at runtime by checking the OS keychain.
 
 ### Tables
@@ -228,7 +251,7 @@ All date flags accept: `YYYY-MM-DD`, `DD/MM/YYYY`, or relative like `30d` (last 
 - **accounts** — discovered accounts (`id`, `provider_id`, `account_number`, `display_name`, `balance`, `currency`, `created_at`)
 - **transactions** — all scraped transactions (`id`, `account_id`, `type`, `identifier`, `date`, `processed_date`, `original_amount`, `original_currency`, `charged_amount`, `charged_currency`, `description`, `description_en`, `memo`, `status`, `installment_number`, `installment_total`, `category`, `hash`, `unique_id`, `created_at`, `updated_at`)
 - **sync_log** — fetch history (`id`, `provider_id`, `started_at`, `completed_at`, `status`, `transactions_added`, `transactions_updated`, `error_message`, `scrape_start_date`, `scrape_end_date`)
-- **category_rules** — auto-categorization rules (`id`, `category`, `match_pattern`, `created_at`)
+- **category_rules** — auto-categorization rules (`id`, `category`, `conditions` (JSON), `priority`, `created_at`)
 - **translation_rules** — Hebrew→English translations (`id`, `english_name`, `match_pattern`, `created_at`)
 
 ### Common SQL Patterns
@@ -252,6 +275,53 @@ GROUP BY date ORDER BY date;
 ```
 
 Always run `kolshek db schema <table>` first to verify column names before writing queries.
+
+## Direct SQL — Escape Hatch
+
+When built-in commands can't answer the question, use `kolshek query "<sql>" --json`:
+- **Read-only** — only SELECT, WITH, EXPLAIN, PRAGMA are allowed
+- **Auto-LIMIT** — defaults to 100 rows if no LIMIT clause
+- **Schema discovery** — run `kolshek db tables` then `kolshek db schema <table>` first
+
+Example queries:
+
+```sql
+-- Find recurring subscriptions (same merchant+amount, 3+ months)
+SELECT COALESCE(description_en, description) AS merchant,
+  ROUND(ABS(charged_amount), 2) AS amount,
+  COUNT(DISTINCT strftime('%Y-%m', date)) AS months
+FROM transactions WHERE charged_amount < 0
+  AND date >= date('now', '-180 days')
+GROUP BY merchant, ROUND(ABS(charged_amount), 2)
+HAVING months >= 3 ORDER BY amount DESC
+
+-- Spending by day of week
+SELECT CASE CAST(strftime('%w', date) AS INTEGER)
+  WHEN 0 THEN 'Sun' WHEN 1 THEN 'Mon' WHEN 2 THEN 'Tue'
+  WHEN 3 THEN 'Wed' WHEN 4 THEN 'Thu' WHEN 5 THEN 'Fri'
+  WHEN 6 THEN 'Sat' END AS day,
+  ROUND(SUM(ABS(charged_amount)), 2) AS total
+FROM transactions WHERE charged_amount < 0
+  AND date >= date('now', '-90 days')
+GROUP BY strftime('%w', date) ORDER BY total DESC
+
+-- Installment obligations
+SELECT COALESCE(description_en, description) AS merchant,
+  installment_number, installment_total,
+  ROUND(ABS(charged_amount), 2) AS payment,
+  (installment_total - installment_number) AS remaining
+FROM transactions WHERE installment_total > 1
+  AND date >= date('now', '-30 days')
+ORDER BY payment DESC
+```
+
+## Skill Startup Checks
+
+All skills should run these checks before starting work:
+
+1. **Providers configured:** `kolshek providers list --json` — if empty, guide user to `kolshek providers add`. If any show `authenticated: false`, tell user to run `kolshek providers auth <id>`.
+2. **Transaction data exists:** `kolshek transactions list --limit 1 --json` — if empty, offer to fetch.
+3. **Data freshness:** `kolshek query "SELECT MAX(completed_at) as last_sync FROM sync_log WHERE status = 'success'" --json` — if over 24h old, suggest `kolshek fetch`.
 
 ## User Configuration
 
