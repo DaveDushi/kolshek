@@ -23,6 +23,10 @@ import { registerCategorizeCommand } from "./commands/categorize.js";
 import { registerTranslateCommand } from "./commands/translate.js";
 import { registerScheduleCommand } from "./commands/schedule.js";
 import { registerPluginCommand } from "./commands/plugin.js";
+import { registerSpendingCommand } from "./commands/spending.js";
+import { registerIncomeCommand } from "./commands/income.js";
+import { registerTrendsCommand } from "./commands/trends.js";
+import { registerInsightsCommand } from "./commands/insights.js";
 import { getMostRecentSyncTime, listProviders } from "../db/repositories/providers.js";
 import { loadConfig } from "../config/loader.js";
 import { syncProviders } from "../core/sync-engine.js";
@@ -74,7 +78,7 @@ program
       }
 
       // Auto-fetch if data is stale
-      const autoFetchTriggers = new Set(["list", "search", "accounts", "reports", "query", "summary"]);
+      const autoFetchTriggers = new Set(["list", "search", "accounts", "reports", "query", "summary", "spending", "income", "trends", "insights"]);
       if (
         opts.autoFetch !== false &&
         autoFetchTriggers.has(commandName) &&
@@ -129,6 +133,10 @@ registerCategorizeCommand(program);
 registerTranslateCommand(program);
 registerScheduleCommand(program);
 registerPluginCommand(program);
+registerSpendingCommand(program);
+registerIncomeCommand(program);
+registerTrendsCommand(program);
+registerInsightsCommand(program);
 
 // Parse and run
 program.parseAsync(process.argv).then(() => {
