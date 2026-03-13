@@ -1,10 +1,8 @@
-/**
- * Shared date parsing utilities for CLI commands.
- */
+// Shared date parsing utilities for CLI commands.
 
 import { parseISO, subDays, isValid } from "date-fns";
 
-/** Parse a date string (YYYY-MM-DD, DD/MM/YYYY, or relative "30d") → ISO date string */
+// Parse a date string (YYYY-MM-DD, DD/MM/YYYY, or relative "30d") → ISO date string
 export function parseDateToString(input: string): string | null {
   const relMatch = input.match(/^(\d+)d$/);
   if (relMatch) {
@@ -25,7 +23,7 @@ export function parseDateToString(input: string): string | null {
   return null;
 }
 
-/** Parse a date string (YYYY-MM-DD, DD/MM/YYYY, or relative "30d") → Date object */
+// Parse a date string (YYYY-MM-DD, DD/MM/YYYY, or relative "30d") → Date object
 export function parseDateToDate(input: string): Date | null {
   const relMatch = input.match(/^(\d+)d$/);
   if (relMatch) {
@@ -51,7 +49,7 @@ export interface MonthRange {
 }
 
 // Parse month input ("current", "prev", "-3", "2026-03") → date range for that month
-export function parseMonthToRange(input?: string): MonthRange {
+export function parseMonthToRange(input?: string): MonthRange | null {
   const now = new Date();
   let year = now.getFullYear();
   let month = now.getMonth();
@@ -71,6 +69,8 @@ export function parseMonthToRange(input?: string): MonthRange {
       if (d) {
         year = d.getFullYear();
         month = d.getMonth();
+      } else {
+        return null;
       }
     }
   }

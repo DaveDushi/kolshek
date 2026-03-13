@@ -35,6 +35,11 @@ export function registerSpendingCommand(program: Command): void {
 
       const range = parseMonthToRange(month);
 
+      if (!range) {
+        printError("BAD_ARGS", `Could not parse month: "${month}". Use YYYY-MM, "prev", "-3", or a date.`);
+        process.exit(ExitCode.BadArgs);
+      }
+
       const result = getSpendingReport({
         from: range.from,
         to: range.to,

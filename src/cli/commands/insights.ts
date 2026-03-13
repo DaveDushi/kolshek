@@ -21,12 +21,14 @@ import {
   isJsonMode,
   printJson,
   jsonSuccess,
+  printError,
   info,
   getOutputOptions,
+  ExitCode,
 } from "../output.js";
 
 function formatInsight(insight: Insight, noColor: boolean): string {
-  const icon = insight.severity === "alert" ? "[!]" : insight.severity === "warning" ? "[!]" : "[i]";
+  const icon = insight.severity === "alert" ? "[!!]" : insight.severity === "warning" ? "[!]" : "[i]";
   const prefix = noColor
     ? icon
     : insight.severity === "alert"
@@ -46,68 +48,81 @@ export function registerInsightsCommand(program: Command): void {
     .option("--months <n>", "Lookback period in months", parseInt, 3)
     .action((opts) => {
       const monthCount = opts.months ?? 3;
-      const now = new Date();
-      const from = subMonths(now, monthCount).toISOString().slice(0, 10);
-      const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-
-      const insightOpts = { from, currentMonthStart };
-
-      // Gather all raw data
-      const categoryData = getCategoryByMonth(insightOpts);
-      const currentCategories = categoryData.filter((c) => c.month >= currentMonthStart.slice(0, 7));
-      const priorCategories = categoryData.filter((c) => c.month < currentMonthStart.slice(0, 7));
-
-      const { transactions: largeTxns, avgAmount } = getLargeTransactions(insightOpts);
-      const merchantHistory = getMerchantHistory(insightOpts);
-      const cashflow = getMonthCashflow(insightOpts);
-
-      // Run detectors
-      const insights: Insight[] = [
-        ...detectCategorySpikes(currentCategories, priorCategories),
-        ...detectLargeTransactions(largeTxns, avgAmount),
-        ...detectNewMerchants(merchantHistory),
-        ...detectRecurringChanges(merchantHistory),
-        ...detectTrendWarnings(cashflow),
-      ];
-
-      // Sort by severity
-      const order = { alert: 0, warning: 1, info: 2 };
-      insights.sort((a, b) => order[a.severity] - order[b.severity]);
-
-      if (isJsonMode()) {
-        const summary = {
-          total: insights.length,
-          alerts: insights.filter((i) => i.severity === "alert").length,
-          warnings: insights.filter((i) => i.severity === "warning").length,
-          info: insights.filter((i) => i.severity === "info").length,
-        };
-        printJson(jsonSuccess({ period: { from, months: monthCount }, insights, summary }));
-        return;
+      if (isNaN(monthCount) || monthCount < 1) {
+        printError("BAD_ARGS", "--months must be a positive integer");
+        process.exit(ExitCode.BadArgs);
       }
 
-      if (insights.length === 0) {
-        info("No insights to report — spending patterns look normal.");
-        return;
-      }
+      try {
+        const now = new Date();
+        const from = subMonths(now, monthCount).toISOString().slice(0, 10);
+        const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
-      const noColor = getOutputOptions().noColor;
-      const alerts = insights.filter((i) => i.severity === "alert");
-      const warnings = insights.filter((i) => i.severity === "warning");
-      const infos = insights.filter((i) => i.severity === "info");
+        const insightOpts = { from, currentMonthStart };
 
-      if (alerts.length > 0) {
-        console.log(noColor ? "\nAlerts:" : chalk.red.bold("\nAlerts:"));
-        for (const i of alerts) console.log(formatInsight(i, noColor));
-      }
-      if (warnings.length > 0) {
-        console.log(noColor ? "\nWarnings:" : chalk.yellow.bold("\nWarnings:"));
-        for (const i of warnings) console.log(formatInsight(i, noColor));
-      }
-      if (infos.length > 0) {
-        console.log(noColor ? "\nInfo:" : chalk.cyan.bold("\nInfo:"));
-        for (const i of infos) console.log(formatInsight(i, noColor));
-      }
+        // Gather all raw data
+        const categoryData = getCategoryByMonth(insightOpts);
+        const currentCategories = categoryData.filter((c) => c.month >= currentMonthStart.slice(0, 7));
+        const priorCategories = categoryData.filter((c) => c.month < currentMonthStart.slice(0, 7));
 
-      info(`\n${insights.length} insight(s) from the last ${monthCount} month(s).`);
+        const { transactions: largeTxns, avgAmount } = getLargeTransactions(insightOpts);
+        const merchantHistory = getMerchantHistory(insightOpts);
+        const cashflow = getMonthCashflow(insightOpts);
+
+        // Run detectors
+        const insights: Insight[] = [
+          ...detectCategorySpikes(currentCategories, priorCategories),
+          ...detectLargeTransactions(largeTxns, avgAmount),
+          ...detectNewMerchants(merchantHistory),
+          ...detectRecurringChanges(merchantHistory),
+          ...detectTrendWarnings(cashflow),
+        ];
+
+        // Sort by severity
+        const order = { alert: 0, warning: 1, info: 2 };
+        insights.sort((a, b) => order[a.severity] - order[b.severity]);
+
+        if (isJsonMode()) {
+          const summary = {
+            total: insights.length,
+            alerts: insights.filter((i) => i.severity === "alert").length,
+            warnings: insights.filter((i) => i.severity === "warning").length,
+            info: insights.filter((i) => i.severity === "info").length,
+          };
+          printJson(jsonSuccess({ period: { from, months: monthCount }, insights, summary }));
+          return;
+        }
+
+        if (insights.length === 0) {
+          info("No insights to report — spending patterns look normal.");
+          return;
+        }
+
+        const noColor = getOutputOptions().noColor;
+        const alerts = insights.filter((i) => i.severity === "alert");
+        const warnings = insights.filter((i) => i.severity === "warning");
+        const infos = insights.filter((i) => i.severity === "info");
+
+        if (alerts.length > 0) {
+          console.log(noColor ? "\nAlerts:" : chalk.red.bold("\nAlerts:"));
+          for (const i of alerts) console.log(formatInsight(i, noColor));
+        }
+        if (warnings.length > 0) {
+          console.log(noColor ? "\nWarnings:" : chalk.yellow.bold("\nWarnings:"));
+          for (const i of warnings) console.log(formatInsight(i, noColor));
+        }
+        if (infos.length > 0) {
+          console.log(noColor ? "\nInfo:" : chalk.cyan.bold("\nInfo:"));
+          for (const i of infos) console.log(formatInsight(i, noColor));
+        }
+
+        info(`\n${insights.length} insight(s) from the last ${monthCount} month(s).`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        printError("DB_ERROR", msg, {
+          suggestions: ["Run 'kolshek fetch' to populate data first."],
+        });
+        process.exit(ExitCode.Error);
+      }
     });
 }
