@@ -2,6 +2,7 @@
 // Uses card-style rows with improved visual hierarchy for Hebrew->English mapping.
 
 import { escapeHtml } from "../layout.js";
+import { simpleHash } from "./utils.js";
 import { listUntranslatedGrouped, type UntranslatedGroup } from "../../db/repositories/translations.js";
 
 export function untranslatedList(): string {
@@ -53,11 +54,3 @@ function untranslatedRow(group: UntranslatedGroup): string {
   </form>`;
 }
 
-// Simple hash for generating unique row IDs from Hebrew strings
-function simpleHash(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash).toString(36);
-}

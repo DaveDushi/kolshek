@@ -68,7 +68,7 @@ function txRow(tx: TransactionWithContext, currentCategory: string, allCategorie
     <div class="font-semibold tabular-nums text-sm ${amountColor} text-right whitespace-nowrap">${amountStr}</div>
     <select class="!w-auto !py-1 !px-2 !text-xs"
       hx-patch="/api/transactions/${tx.id}/category"
-      hx-vals='{"from": "${escapeHtml(currentCategory)}"}'
+      hx-vals='${escapeHtml(JSON.stringify({ from: currentCategory }))}'
       hx-target="#tx-row-${tx.id}"
       hx-swap="outerHTML"
       name="category">

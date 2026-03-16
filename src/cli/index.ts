@@ -32,6 +32,7 @@ import { getMostRecentSyncTime, listProviders } from "../db/repositories/provide
 import { loadConfig } from "../config/loader.js";
 import { syncProviders } from "../core/sync-engine.js";
 import pkg from "../../package.json";
+import { getSplashBanner } from "./splash.js";
 
 const program = new Command();
 
@@ -40,6 +41,7 @@ program
   .description(
     "Track finances from Israeli banks and credit cards (כל שקל)",
   )
+  .addHelpText("beforeAll", () => getSplashBanner(program.opts().color !== false))
   .version(pkg.version)
   .option("--json", "Output structured JSON", false)
   .option("-q, --quiet", "Suppress non-essential output", false)

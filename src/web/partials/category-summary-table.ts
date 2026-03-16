@@ -73,7 +73,11 @@ export function categorySummaryTable(): string {
   return `<tbody id="category-summary-tbody">${rows}</tbody>`;
 }
 
-// Generate a CSS-safe id from a category name
+// Generate a CSS-safe id from a category name (handles Hebrew and other non-ASCII)
 function cssId(name: string): string {
-  return name.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+  }
+  return `cat-${Math.abs(hash).toString(36)}`;
 }

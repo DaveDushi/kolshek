@@ -3,6 +3,7 @@
  */
 
 import { getDatabase } from "../database.js";
+import { escapeLike } from "../utils.js";
 
 export interface TranslationRule {
   id: number;
@@ -25,11 +26,6 @@ function rowToRule(row: TranslationRuleRow): TranslationRule {
     matchPattern: row.match_pattern,
     createdAt: row.created_at,
   };
-}
-
-/** Escape SQL LIKE wildcards so they are treated as literals. */
-function escapeLike(s: string): string {
-  return s.replace(/[%_\\]/g, "\\$&");
 }
 
 export function addTranslationRule(englishName: string, pattern: string): TranslationRule {
@@ -73,18 +69,25 @@ export function applyTranslationRules(): { applied: number } {
 
   let applied = 0;
 
-  for (const rule of rules) {
-    const pattern = `%${escapeLike(rule.match_pattern)}%`;
-    const result = db
-      .prepare(
-        `UPDATE transactions
-         SET description_en = $englishName, updated_at = datetime('now')
-         WHERE description LIKE $pattern ESCAPE '\\'
-           AND description_en IS NULL`,
-      )
-      .run({ $englishName: rule.english_name, $pattern: pattern });
+  db.run("BEGIN");
+  try {
+    for (const rule of rules) {
+      const pattern = `%${escapeLike(rule.match_pattern)}%`;
+      const result = db
+        .prepare(
+          `UPDATE transactions
+           SET description_en = $englishName, updated_at = datetime('now')
+           WHERE description LIKE $pattern ESCAPE '\\'
+             AND description_en IS NULL`,
+        )
+        .run({ $englishName: rule.english_name, $pattern: pattern });
 
-    applied += result.changes;
+      applied += result.changes;
+    }
+    db.run("COMMIT");
+  } catch (err) {
+    db.run("ROLLBACK");
+    throw err;
   }
 
   return { applied };

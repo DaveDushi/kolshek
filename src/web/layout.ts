@@ -17,7 +17,12 @@ const sunIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" 
 
 const moonIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="theme-icon-moon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
 
-export function layout(title: string, currentPath: string, body: string, counts?: NavCounts): string {
+export function layout(
+  title: string,
+  currentPath: string,
+  body: string,
+  counts?: NavCounts,
+): string {
   // Auto-query counts if not provided
   const c = counts ?? {
     providers: listProviders().length,
@@ -29,9 +34,10 @@ export function layout(title: string, currentPath: string, body: string, counts?
     const isActive = currentPath === href;
     const base = "nav-pill";
     const active = isActive ? "nav-pill--active" : "";
-    const badge = count != null && count > 0
-      ? ` <span class="nav-badge">${count}</span>`
-      : "";
+    const badge =
+      count != null && count > 0
+        ? ` <span class="nav-badge">${count}</span>`
+        : "";
     return `<a href="${href}" class="${base} ${active}"${isActive ? ' aria-current="page"' : ""}>${label}${badge}</a>`;
   };
 
@@ -44,6 +50,7 @@ export function layout(title: string, currentPath: string, body: string, counts?
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/logo.png">
   <link rel="stylesheet" href="/styles.css">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 </head>
@@ -51,8 +58,7 @@ export function layout(title: string, currentPath: string, body: string, counts?
   <header class="ks-header">
     <nav class="max-w-6xl mx-auto px-6 flex items-center justify-between h-14">
       <a href="/providers" class="ks-brand group">
-        <span class="ks-brand-mark">&#8362;</span>
-        <span class="ks-brand-text">KolShek</span>
+        <img src="/logo.png" alt="KolShek" style="height:70px;width:70px;border-radius:6px;">
       </a>
       <div class="flex items-center gap-1.5">
         ${navLink("/providers", "Providers", c.providers)}

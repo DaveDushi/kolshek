@@ -2,6 +2,7 @@
 // Rules use a JSON conditions column for multi-field matching.
 
 import { getDatabase } from "../database.js";
+import { escapeLike } from "../utils.js";
 import type {
   RuleConditions,
   CategoryRule,
@@ -42,11 +43,6 @@ function serializeConditions(conditions: RuleConditions): string {
   if (conditions.amount) sorted.amount = conditions.amount;
   if (conditions.direction) sorted.direction = conditions.direction;
   return JSON.stringify(sorted);
-}
-
-// Escape SQL LIKE wildcards so they are treated as literals.
-function escapeLike(s: string): string {
-  return s.replace(/[%_\\]/g, "\\$&");
 }
 
 // ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@
 // Uses card-style rows matching the untranslated list design.
 
 import { escapeHtml } from "../layout.js";
+import { simpleHash } from "./utils.js";
 import { listTranslatedGrouped, type TranslatedGroup } from "../../db/repositories/translations.js";
 
 export function translatedList(): string {
@@ -51,10 +52,3 @@ function translatedRow(group: TranslatedGroup): string {
   </form>`;
 }
 
-function simpleHash(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash).toString(36);
-}

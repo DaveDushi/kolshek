@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/logo.png" alt="KolShek logo" width="180" />
+
 # KolShek (כל שקל)
 
 **Your Israeli finances, locally, on your terms.**
@@ -19,6 +21,7 @@ An open-source CLI that pulls transactions from Israeli banks and credit cards i
 
 ## Features
 
+- **Web dashboard** — HTMX-powered settings UI for managing providers, categories, and translations with real-time fetch progress via SSE
 - **Built for AI agents** — first-class plugins for Claude Code, Cursor, Gemini CLI, and more. Let your AI assistant query your finances, build your budget, generate reports, and spot anomalies
 - **`kolshek query`** — read-only SQL so agents (or you) can ask anything
 - **`kolshek db`** — schema introspection for agents to self-discover your tables
@@ -130,6 +133,9 @@ kolshek schedule set 12h
 # Run a SQL query
 kolshek query "SELECT description, SUM(chargedAmount) as total FROM transactions GROUP BY description ORDER BY total LIMIT 10"
 
+# Open the web settings dashboard
+kolshek dashboard
+
 # Structured output for AI agents
 kolshek accounts --json
 ```
@@ -146,10 +152,12 @@ Config lives at your platform's standard config directory (e.g. `~/.config/kolsh
 
 ## Security
 
-- Credentials are stored in your **OS keychain** (Windows Credential Manager, macOS Keychain, Linux `secret-tool`). If unavailable, falls back to a local AES-256-GCM encrypted file.
-- Credentials are **never logged** and zeroed from memory after use.
-- All data stays on your machine. There is no cloud sync, no telemetry, no analytics.
-- The `query` command is read-only — `SELECT` only, no writes.
+- Credentials stored in your **OS keychain** (Windows Credential Manager, macOS Keychain, Linux `secret-tool`). Falls back to a local AES-256-GCM encrypted file.
+- Credentials **never logged** and zeroed from memory after use.
+- All data stays on your machine — no cloud sync, no telemetry, no analytics.
+- Database and config files restricted to owner-only permissions (icacls on Windows, chmod on Unix).
+- The `query` command is read-only — whitelisted `SELECT` and safe `PRAGMA` only, no writes.
+- Web dashboard binds to `localhost` only, with CSRF protection and XSS-safe HTML rendering.
 
 ## Building from Source
 

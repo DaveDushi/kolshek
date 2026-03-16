@@ -5,8 +5,14 @@ import { resolve } from "node:path";
 import { providersPage } from "./pages/providers.js";
 import { categoriesPage } from "./pages/categories.js";
 import { translationsPage } from "./pages/translations.js";
-import { providerLoginFields, providerAuthFields } from "./partials/provider-fields.js";
-import { providerCards, type ProviderCardData } from "./partials/provider-cards.js";
+import {
+  providerLoginFields,
+  providerAuthFields,
+} from "./partials/provider-fields.js";
+import {
+  providerCards,
+  type ProviderCardData,
+} from "./partials/provider-cards.js";
 import { categoryRulesTableBody } from "./partials/category-rules-table.js";
 import { categorySummaryTable } from "./partials/category-summary-table.js";
 import { categorySidebar } from "./partials/category-sidebar.js";
@@ -16,10 +22,26 @@ import { untranslatedList } from "./partials/untranslated-list.js";
 import { translatedList } from "./partials/translated-list.js";
 import { toastSuccess, toastError } from "./partials/toast.js";
 import { escapeHtml } from "./layout.js";
-import { listProviders, createProvider, deleteProvider, getProvider } from "../db/repositories/providers.js";
-import { hasCredentials, storeCredentials, deleteCredentials } from "../security/keychain.js";
-import { PROVIDERS, isValidCompanyId, type CompanyId } from "../types/provider.js";
-import { countTransactions, updateTransactionCategory } from "../db/repositories/transactions.js";
+import {
+  listProviders,
+  createProvider,
+  deleteProvider,
+  getProvider,
+} from "../db/repositories/providers.js";
+import {
+  hasCredentials,
+  storeCredentials,
+  deleteCredentials,
+} from "../security/keychain.js";
+import {
+  PROVIDERS,
+  isValidCompanyId,
+  type CompanyId,
+} from "../types/provider.js";
+import {
+  countTransactions,
+  updateTransactionCategory,
+} from "../db/repositories/transactions.js";
 import {
   listCategoryRules,
   addCategoryRule,
@@ -40,20 +62,37 @@ import {
   updateTranslationByDescription,
 } from "../db/repositories/translations.js";
 import { syncProviders } from "../core/sync-engine.js";
+import type { RuleConditions, MatchMode } from "../types/category-rule.js";
 
 // Track active fetch so we don't allow concurrent syncs
 let activeFetch: { promise: Promise<void>; events: string[] } | null = null;
 
-// Resolve path to built CSS (import.meta.dir is Bun-native, handles Windows)
+// Resolve paths to static assets (import.meta.dir is Bun-native, handles Windows)
 const cssPath = resolve(import.meta.dir, "dist/styles.css");
+const logoPath = resolve(import.meta.dir, "../../assets/logo.png");
 
 export function startDashboard(port: number) {
   const server = Bun.serve({
     port,
+    hostname: "localhost",
     async fetch(req) {
       const url = new URL(req.url);
       const path = url.pathname;
       const method = req.method;
+
+      // CSRF protection: block cross-origin mutations
+      if (method !== "GET" && method !== "HEAD") {
+        const origin = req.headers.get("origin") ?? "";
+        if (
+          origin &&
+          !origin.includes(`localhost:${port}`) &&
+          !origin.includes(`127.0.0.1:${port}`)
+        ) {
+          return new Response("Forbidden: cross-origin request", {
+            status: 403,
+          });
+        }
+      }
 
       try {
         // --- Static assets ---
@@ -61,10 +100,28 @@ export function startDashboard(port: number) {
           const file = Bun.file(cssPath);
           if (await file.exists()) {
             return new Response(file, {
-              headers: { "Content-Type": "text/css; charset=utf-8", "Cache-Control": "public, max-age=3600" },
+              headers: {
+                "Content-Type": "text/css; charset=utf-8",
+                "Cache-Control": "public, max-age=3600",
+              },
             });
           }
-          return new Response("/* CSS not built */", { status: 404, headers: { "Content-Type": "text/css" } });
+          return new Response("/* CSS not built */", {
+            status: 404,
+            headers: { "Content-Type": "text/css" },
+          });
+        }
+        if (method === "GET" && path === "/logo.png") {
+          const file = Bun.file(logoPath);
+          if (await file.exists()) {
+            return new Response(file, {
+              headers: {
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=86400",
+              },
+            });
+          }
+          return new Response("Not found", { status: 404 });
         }
 
         // --- Pages ---
@@ -90,13 +147,17 @@ export function startDashboard(port: number) {
         }
 
         // GET /api/providers/fields/:companyId — dynamic login fields
-        const fieldsMatch = path.match(/^\/api\/providers\/fields\/([a-zA-Z]+)$/);
+        const fieldsMatch = path.match(
+          /^\/api\/providers\/fields\/([a-zA-Z]+)$/,
+        );
         if (method === "GET" && fieldsMatch) {
           return html(providerLoginFields(fieldsMatch[1]));
         }
 
         // GET /api/providers/:id/auth-form — credential update form
-        const authFormMatch = path.match(/^\/api\/providers\/(\d+)\/auth-form$/);
+        const authFormMatch = path.match(
+          /^\/api\/providers\/(\d+)\/auth-form$/,
+        );
         if (method === "GET" && authFormMatch) {
           const provider = getProvider(Number(authFormMatch[1]));
           if (!provider) return html(toastError("Provider not found"), 404);
@@ -113,6 +174,15 @@ export function startDashboard(port: number) {
 
           const info = PROVIDERS[companyId];
           const alias = form.get("alias") || companyId;
+
+          if (!/^[a-zA-Z0-9_-]+$/.test(alias)) {
+            return html(
+              toastError(
+                "Alias must contain only letters, numbers, dashes, and underscores.",
+              ),
+              400,
+            );
+          }
 
           // Extract credentials from cred_* fields
           const credentials: Record<string, string> = {};
@@ -132,10 +202,14 @@ export function startDashboard(port: number) {
             createProvider(companyId, info.displayName, info.type, alias);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            return html(await providerCardsHtml() + toastError(`Failed: ${msg}`));
+            return html(
+              (await providerCardsHtml()) + toastError(`Failed: ${msg}`),
+            );
           }
 
-          return html(await providerCardsHtml() + toastSuccess("Provider added."));
+          return html(
+            (await providerCardsHtml()) + toastSuccess("Provider added."),
+          );
         }
 
         // POST /api/providers/:id/auth — update credentials
@@ -180,10 +254,15 @@ export function startDashboard(port: number) {
             deleteProvider(provider.id);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            return html(await providerCardsHtml() + toastError(`Failed: ${msg}`));
+            return html(
+              (await providerCardsHtml()) + toastError(`Failed: ${msg}`),
+            );
           }
 
-          return html(await providerCardsHtml() + toastSuccess(`Removed ${provider.displayName}.`));
+          return html(
+            (await providerCardsHtml()) +
+              toastSuccess(`Removed ${provider.displayName}.`),
+          );
         }
 
         // --- Category Entity API ---
@@ -196,9 +275,14 @@ export function startDashboard(port: number) {
 
           const created = createCategory(name);
           if (!created) {
-            return html(categorySummaryTable() + toastError("Category already exists."));
+            return html(
+              categorySummaryTable() + toastError("Category already exists."),
+            );
           }
-          return html(categorySummaryTable() + toastSuccess(`Category "${name}" created.`));
+          return html(
+            categorySummaryTable() +
+              toastSuccess(`Category "${name}" created.`),
+          );
         }
 
         // GET /api/categories/summary-table — category summary tbody (for cancel/refresh)
@@ -226,30 +310,42 @@ export function startDashboard(port: number) {
         }
 
         // POST /api/categories/:name/rename — execute rename
-        const catRenameMatch = path.match(/^\/api\/categories\/([^/]+)\/rename$/);
+        const catRenameMatch = path.match(
+          /^\/api\/categories\/([^/]+)\/rename$/,
+        );
         if (method === "POST" && catRenameMatch) {
           const oldName = decodeURIComponent(catRenameMatch[1]);
           const form = await parseForm(req);
           const newName = form.get("newName")?.trim() ?? "";
           if (!newName) return html(toastError("New name is required."), 400);
-          if (newName === oldName) return html(categorySummaryTable() + toastSuccess("No change."));
+          if (newName === oldName)
+            return html(categorySummaryTable() + toastSuccess("No change."));
 
           // If destination exists, this is a merge
           const exists = categoryExists(newName);
           const result = renameCategory(oldName, newName);
           const verb = exists ? "merged into" : "renamed to";
-          return html(categorySummaryTable() + toastSuccess(`"${oldName}" ${verb} "${newName}" (${result.transactionsUpdated} txs, ${result.rulesUpdated} rules).`));
+          return html(
+            categorySummaryTable() +
+              toastSuccess(
+                `"${oldName}" ${verb} "${newName}" (${result.transactionsUpdated} txs, ${result.rulesUpdated} rules).`,
+              ),
+          );
         }
 
         // GET /api/categories/:name/delete-confirm — delete confirmation panel
-        const catDeleteConfirmMatch = path.match(/^\/api\/categories\/([^/]+)\/delete-confirm$/);
+        const catDeleteConfirmMatch = path.match(
+          /^\/api\/categories\/([^/]+)\/delete-confirm$/,
+        );
         if (method === "GET" && catDeleteConfirmMatch) {
           const name = decodeURIComponent(catDeleteConfirmMatch[1]);
           return html(deleteConfirmPanel(name));
         }
 
         // POST /api/categories/:name/delete — execute delete
-        const catDeleteMatch = path.match(/^\/api\/categories\/([^/]+)\/delete$/);
+        const catDeleteMatch = path.match(
+          /^\/api\/categories\/([^/]+)\/delete$/,
+        );
         if (method === "POST" && catDeleteMatch) {
           const name = decodeURIComponent(catDeleteMatch[1]);
           const form = await parseForm(req);
@@ -263,8 +359,10 @@ export function startDashboard(port: number) {
           // Return updated summary table + cleared action panel + toast
           return html(
             categorySummaryTable() +
-            `<div id="category-action-panel" hx-swap-oob="innerHTML:#category-action-panel"></div>` +
-            toastSuccess(`Deleted "${name}". Moved ${result.transactionsUpdated} txs to "${moveTo}".`)
+              `<div id="category-action-panel" hx-swap-oob="innerHTML:#category-action-panel"></div>` +
+              toastSuccess(
+                `Deleted "${name}". Moved ${result.transactionsUpdated} txs to "${moveTo}".`,
+              ),
           );
         }
 
@@ -275,65 +373,106 @@ export function startDashboard(port: number) {
           const form = await parseForm(req);
           const category = form.get("category")?.trim() ?? "";
           const priority = Number(form.get("priority") ?? "10");
-          const descriptionPattern = form.get("descriptionPattern")?.trim() ?? "";
+          const descriptionPattern =
+            form.get("descriptionPattern")?.trim() ?? "";
           const descriptionMode = form.get("descriptionMode") ?? "substring";
           const memoPattern = form.get("memoPattern")?.trim() ?? "";
           const direction = form.get("direction")?.trim() ?? "";
 
-          if (!category) return html(toastError("Category name is required."), 400);
+          if (!category)
+            return html(toastError("Category name is required."), 400);
           if (!descriptionPattern && !memoPattern) {
-            return html(toastError("At least one condition (description or memo) is required."), 400);
+            return html(
+              toastError(
+                "At least one condition (description or memo) is required.",
+              ),
+              400,
+            );
           }
 
-          const conditions: Record<string, unknown> = {};
+          const validModes = new Set<MatchMode>([
+            "substring",
+            "exact",
+            "regex",
+          ]);
+          const mode: MatchMode = validModes.has(descriptionMode as MatchMode)
+            ? (descriptionMode as MatchMode)
+            : "substring";
+
+          const conditions: RuleConditions = {};
           if (descriptionPattern) {
-            conditions.description = { pattern: descriptionPattern, mode: descriptionMode };
+            conditions.description = { pattern: descriptionPattern, mode };
           }
           if (memoPattern) {
             conditions.memo = { pattern: memoPattern, mode: "substring" };
           }
-          if (direction) {
+          if (direction === "debit" || direction === "credit") {
             conditions.direction = direction;
           }
 
           try {
-            addCategoryRule(category, conditions as any, priority);
+            addCategoryRule(category, conditions, priority);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            return html(categoryRulesTableBody(listCategoryRules()) + toastError(`Failed: ${msg}`));
+            return html(
+              categoryRulesTableBody(listCategoryRules()) +
+                toastError(`Failed: ${msg}`),
+            );
           }
 
-          return html(categoryRulesTableBody(listCategoryRules()) + toastSuccess("Rule added."));
+          return html(
+            categoryRulesTableBody(listCategoryRules()) +
+              toastSuccess("Rule added."),
+          );
         }
 
         // DELETE /api/categories/rules/:id
-        const deleteCatRuleMatch = path.match(/^\/api\/categories\/rules\/(\d+)$/);
+        const deleteCatRuleMatch = path.match(
+          /^\/api\/categories\/rules\/(\d+)$/,
+        );
         if (method === "DELETE" && deleteCatRuleMatch) {
           const id = Number(deleteCatRuleMatch[1]);
           const removed = removeCategoryRule(id);
-          if (!removed) return html(categoryRulesTableBody(listCategoryRules()) + toastError("Rule not found."));
-          return html(categoryRulesTableBody(listCategoryRules()) + toastSuccess("Rule deleted."));
+          if (!removed)
+            return html(
+              categoryRulesTableBody(listCategoryRules()) +
+                toastError("Rule not found."),
+            );
+          return html(
+            categoryRulesTableBody(listCategoryRules()) +
+              toastSuccess("Rule deleted."),
+          );
         }
 
         // POST /api/categories/apply
         if (method === "POST" && path === "/api/categories/apply") {
           const form = await parseForm(req);
-          const scope = (form.get("scope") ?? "uncategorized") as "uncategorized" | "all";
+          const scope = (form.get("scope") ?? "uncategorized") as
+            | "uncategorized"
+            | "all";
           const result = applyCategoryRules({ scope });
-          return html(categorySummaryTable() + toastSuccess(`Applied rules: ${result.applied} transaction${result.applied !== 1 ? "s" : ""} categorized.`));
+          return html(
+            categorySummaryTable() +
+              toastSuccess(
+                `Applied rules: ${result.applied} transaction${result.applied !== 1 ? "s" : ""} categorized.`,
+              ),
+          );
         }
 
         // --- Transaction API ---
 
         // PATCH /api/transactions/:id/category — move single tx to different category
-        const txCategoryMatch = path.match(/^\/api\/transactions\/(\d+)\/category$/);
+        const txCategoryMatch = path.match(
+          /^\/api\/transactions\/(\d+)\/category$/,
+        );
         if (method === "PATCH" && txCategoryMatch) {
           const txId = Number(txCategoryMatch[1]);
           const form = await parseForm(req);
           const newCategory = form.get("category")?.trim() ?? "";
           const fromCategory = form.get("from")?.trim() ?? "";
 
-          if (!newCategory) return html(toastError("Category is required."), 400);
+          if (!newCategory)
+            return html(toastError("Category is required."), 400);
 
           const updated = updateTransactionCategory(txId, newCategory);
           if (!updated) return html(toastError("Transaction not found."), 404);
@@ -360,32 +499,54 @@ export function startDashboard(port: number) {
           const matchPattern = form.get("matchPattern")?.trim() ?? "";
 
           if (!englishName || !matchPattern) {
-            return html(toastError("Both English name and match pattern are required."), 400);
+            return html(
+              toastError("Both English name and match pattern are required."),
+              400,
+            );
           }
 
           try {
             addTranslationRule(englishName, matchPattern);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            return html(translationRulesTableBody(listTranslationRules()) + toastError(`Failed: ${msg}`));
+            return html(
+              translationRulesTableBody(listTranslationRules()) +
+                toastError(`Failed: ${msg}`),
+            );
           }
 
-          return html(translationRulesTableBody(listTranslationRules()) + toastSuccess("Rule added."));
+          return html(
+            translationRulesTableBody(listTranslationRules()) +
+              toastSuccess("Rule added."),
+          );
         }
 
         // DELETE /api/translations/rules/:id
-        const deleteTransRuleMatch = path.match(/^\/api\/translations\/rules\/(\d+)$/);
+        const deleteTransRuleMatch = path.match(
+          /^\/api\/translations\/rules\/(\d+)$/,
+        );
         if (method === "DELETE" && deleteTransRuleMatch) {
           const id = Number(deleteTransRuleMatch[1]);
           const removed = removeTranslationRule(id);
-          if (!removed) return html(translationRulesTableBody(listTranslationRules()) + toastError("Rule not found."));
-          return html(translationRulesTableBody(listTranslationRules()) + toastSuccess("Rule deleted."));
+          if (!removed)
+            return html(
+              translationRulesTableBody(listTranslationRules()) +
+                toastError("Rule not found."),
+            );
+          return html(
+            translationRulesTableBody(listTranslationRules()) +
+              toastSuccess("Rule deleted."),
+          );
         }
 
         // POST /api/translations/apply
         if (method === "POST" && path === "/api/translations/apply") {
           const result = applyTranslationRules();
-          return html(toastSuccess(`Applied translations: ${result.applied} transaction${result.applied !== 1 ? "s" : ""} updated.`));
+          return html(
+            toastSuccess(
+              `Applied translations: ${result.applied} transaction${result.applied !== 1 ? "s" : ""} updated.`,
+            ),
+          );
         }
 
         // GET /api/translations/untranslated — untranslated list partial
@@ -401,7 +562,10 @@ export function startDashboard(port: number) {
           const shouldCreateRule = form.get("createRule") === "1";
 
           if (!hebrew || !english) {
-            return html(toastError("Hebrew description and English name are required."), 400);
+            return html(
+              toastError("Hebrew description and English name are required."),
+              400,
+            );
           }
 
           const count = translateByDescription(hebrew, english);
@@ -427,13 +591,21 @@ export function startDashboard(port: number) {
           const english = form.get("english")?.trim() ?? "";
 
           if (!hebrew || !english) {
-            return html(toastError("Hebrew description and English name are required."), 400);
+            return html(
+              toastError("Hebrew description and English name are required."),
+              400,
+            );
           }
 
           const count = updateTranslationByDescription(hebrew, english);
 
           // Return refreshed translated list + toast
-          return html(translatedList() + toastSuccess(`Updated ${count} transaction${count !== 1 ? "s" : ""} to "${english}".`));
+          return html(
+            translatedList() +
+              toastSuccess(
+                `Updated ${count} transaction${count !== 1 ? "s" : ""} to "${english}".`,
+              ),
+          );
         }
 
         // GET /api/translations/translated — translated list partial
@@ -479,7 +651,11 @@ export function startDashboard(port: number) {
 function html(body: string, status = 200): Response {
   return new Response(body, {
     status,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+    },
   });
 }
 
@@ -509,7 +685,7 @@ function inlineRenameForm(name: string): string {
   return `<form class="flex items-center gap-1.5" hx-post="/api/categories/${encoded}/rename"
     hx-target="#category-summary-tbody" hx-swap="outerHTML">
     <input type="text" name="newName" value="${escapeHtml(name)}" required
-      class="min-w-[8rem]">
+      class="min-w-32">
     <button type="submit" class="btn btn-outline btn-sm">OK</button>
     <button type="button" class="btn btn-outline btn-sm"
       hx-get="/api/categories/summary-table" hx-target="#category-summary-tbody" hx-swap="outerHTML">Cancel</button>
@@ -521,10 +697,15 @@ function deleteConfirmPanel(name: string): string {
   const encoded = encodeURIComponent(name);
   const allCats = listAllCategories().filter((c) => c !== name);
   const options = allCats
-    .map((c) => `<option value="${escapeHtml(c)}"${c === "Uncategorized" ? " selected" : ""}>${escapeHtml(c)}</option>`)
+    .map(
+      (c) =>
+        `<option value="${escapeHtml(c)}"${c === "Uncategorized" ? " selected" : ""}>${escapeHtml(c)}</option>`,
+    )
     .join("");
 
-  const txCount = countTransactions({ category: name === "Uncategorized" ? null : name });
+  const txCount = countTransactions({
+    category: name === "Uncategorized" ? null : name,
+  });
 
   return `<div class="p-3 bg-indigo-50 dark:bg-indigo-900/20 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-2 flex-wrap text-sm">
     <form class="flex items-center gap-2 flex-wrap" hx-post="/api/categories/${encoded}/delete"
@@ -570,7 +751,13 @@ function startFetchSSE(visible: boolean): Response {
     return html(toastError("No providers configured."), 400);
   }
 
-  pushEvent(JSON.stringify({ type: "start", providers: providers.map((p) => p.alias), visible }));
+  pushEvent(
+    JSON.stringify({
+      type: "start",
+      providers: providers.map((p) => p.alias),
+      visible,
+    }),
+  );
 
   const fetchPromise = syncProviders(providers, {
     visible,
@@ -586,16 +773,23 @@ function startFetchSSE(visible: boolean): Response {
         updated: r.transactionsUpdated,
         error: r.error,
       }));
-      pushEvent(JSON.stringify({
-        type: "done",
-        success: !result.hasErrors,
-        totalAdded: result.totalAdded,
-        totalUpdated: result.totalUpdated,
-        results: summary,
-      }));
+      pushEvent(
+        JSON.stringify({
+          type: "done",
+          success: !result.hasErrors,
+          totalAdded: result.totalAdded,
+          totalUpdated: result.totalUpdated,
+          results: summary,
+        }),
+      );
     })
     .catch((err) => {
-      pushEvent(JSON.stringify({ type: "error", message: err instanceof Error ? err.message : String(err) }));
+      pushEvent(
+        JSON.stringify({
+          type: "error",
+          message: err instanceof Error ? err.message : String(err),
+        }),
+      );
     })
     .finally(() => {
       activeFetch = null;
@@ -603,22 +797,20 @@ function startFetchSSE(visible: boolean): Response {
 
   activeFetch = { promise: fetchPromise, events };
 
-  // Return an SSE response that streams events
+  // Return an SSE response that streams events.
+  // Register listener BEFORE replaying to avoid missing events pushed concurrently.
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
+      let closed = false;
 
-      // Send any events that already happened
-      for (const evt of events) {
-        controller.enqueue(encoder.encode(`data: ${evt}\n\n`));
-      }
-
-      // Listen for new events
       const listener = (data: string) => {
+        if (closed) return;
         try {
           controller.enqueue(encoder.encode(`data: ${data}\n\n`));
           const parsed = JSON.parse(data);
           if (parsed.type === "done" || parsed.type === "error") {
+            closed = true;
             listeners.delete(listener);
             controller.close();
           }
@@ -627,6 +819,12 @@ function startFetchSSE(visible: boolean): Response {
         }
       };
       listeners.add(listener);
+
+      // Replay events that already happened (listener catches any concurrent additions)
+      for (const evt of events) {
+        if (closed) break;
+        controller.enqueue(encoder.encode(`data: ${evt}\n\n`));
+      }
     },
   });
 
@@ -644,7 +842,10 @@ function fetchEventsSSE(): Response {
     // No active fetch — send an immediate "idle" event
     const body = `data: ${JSON.stringify({ type: "idle" })}\n\n`;
     return new Response(body, {
-      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+      },
     });
   }
 
@@ -652,6 +853,9 @@ function fetchEventsSSE(): Response {
   const events = activeFetch.events;
   const body = events.map((e) => `data: ${e}\n\n`).join("");
   return new Response(body, {
-    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+    },
   });
 }

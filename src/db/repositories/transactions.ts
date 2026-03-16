@@ -4,11 +4,7 @@ import type {
   TransactionFilters,
 } from "../../types/index.js";
 import { getDatabase } from "../database.js";
-
-/** Escape SQL LIKE wildcards so they are treated as literals. */
-function escapeLike(s: string): string {
-  return s.replace(/[%_\\]/g, "\\$&");
-}
+import { escapeLike } from "../utils.js";
 
 interface TransactionWithContextRow {
   id: number;

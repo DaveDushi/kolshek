@@ -38,6 +38,7 @@ import {
   formatAccountNumber,
   ExitCode,
 } from "../output.js";
+import { getSplashBanner } from "../splash.js";
 
 function zeroCredentials(creds: Record<string, string>): void {
   for (const key of Object.keys(creds)) {
@@ -75,8 +76,7 @@ export function registerInitCommand(program: Command): void {
       await ensureDirectories();
       initDatabase(getDbPath());
 
-      info("");
-      info("Welcome to kolshek (כל שקל) — Israeli finance tracker");
+      console.log(getSplashBanner());
       info("Let's set up your bank and credit card providers.\n");
 
       // Disclaimer

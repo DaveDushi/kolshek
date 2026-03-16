@@ -1,13 +1,7 @@
 // Translation rules table body partial -- returned on add/delete for HTMX swap.
 
 import { escapeHtml } from "../layout.js";
-
-export interface TranslationRule {
-  id: number;
-  englishName: string;
-  matchPattern: string;
-  createdAt: string;
-}
+import type { TranslationRule } from "../../db/repositories/translations.js";
 
 export function translationRulesTableBody(rules: TranslationRule[]): string {
   if (rules.length === 0) {

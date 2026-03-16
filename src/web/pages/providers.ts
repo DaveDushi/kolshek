@@ -85,8 +85,8 @@ export async function providersPage(): Promise<string> {
     </div>
 
     <script>
-      var bankOptions = ${JSON.stringify(banks.map((b) => ({ value: b.companyId, label: b.displayName })))};
-      var ccOptions = ${JSON.stringify(creditCards.map((c) => ({ value: c.companyId, label: c.displayName })))};
+      var bankOptions = ${JSON.stringify(banks.map((b) => ({ value: b.companyId, label: b.displayName }))).replace(/</g, "\\u003c")};
+      var ccOptions = ${JSON.stringify(creditCards.map((c) => ({ value: c.companyId, label: c.displayName }))).replace(/</g, "\\u003c")};
 
       function updateProviderOptions() {
         var typeSelect = document.getElementById('provider-type-select');
@@ -108,6 +108,10 @@ export async function providersPage(): Promise<string> {
         }
         htmx.ajax('GET', '/api/providers/fields/' + companyId, {target: '#dynamic-fields', swap: 'innerHTML'});
       });
+
+      function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      }
 
       function startFetch(visible) {
         var btn = document.getElementById('fetch-btn');
@@ -173,7 +177,7 @@ export async function providersPage(): Promise<string> {
               var statusBadge = r.success
                 ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">&#10003; OK</span>'
                 : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300">&#10007; Failed</span>';
-              html += '<tr class="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"><td class="px-4 py-3 text-sm">' + r.alias + '</td><td class="px-4 py-3 text-sm">' + statusBadge + (r.error ? ' <span class="text-zinc-500 dark:text-zinc-300 text-sm ml-1">' + r.error + '</span>' : '') + '</td><td class="px-4 py-3 text-sm">' + r.added + '</td><td class="px-4 py-3 text-sm">' + r.updated + '</td></tr>';
+              html += '<tr class="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"><td class="px-4 py-3 text-sm">' + escHtml(r.alias) + '</td><td class="px-4 py-3 text-sm">' + statusBadge + (r.error ? ' <span class="text-zinc-500 dark:text-zinc-300 text-sm ml-1">' + escHtml(r.error) + '</span>' : '') + '</td><td class="px-4 py-3 text-sm">' + r.added + '</td><td class="px-4 py-3 text-sm">' + r.updated + '</td></tr>';
               if (!r.success) hasFailures = true;
             }
             html += '</tbody></table></div>';
@@ -193,7 +197,7 @@ export async function providersPage(): Promise<string> {
             btn.disabled = false;
             btn.textContent = 'Fetch All';
             btn.removeAttribute('aria-busy');
-            results.innerHTML = '<div class="card p-4"><p class="mb-3"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300">Error</span> ' + evt.message + '</p><button onclick="startFetch(true)" class="btn btn-outline">Retry with visible browser</button></div>';
+            results.innerHTML = '<div class="card p-4"><p class="mb-3"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300">Error</span> ' + escHtml(evt.message) + '</p><button onclick="startFetch(true)" class="btn btn-outline">Retry with visible browser</button></div>';
             results.style.display = 'block';
           }
         }
