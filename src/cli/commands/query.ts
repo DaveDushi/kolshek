@@ -17,8 +17,9 @@ import {
 /** Read-only SQL keywords that may start a query */
 const READONLY_PREFIXES = /^\s*(SELECT|WITH|EXPLAIN|PRAGMA|VALUES)\b/i;
 
-// PRAGMAs that are safe to read (return data, don't mutate state)
-const SAFE_PRAGMAS = /^\s*PRAGMA\s+(table_info|table_list|index_list|index_info|database_list|compile_options|journal_mode|wal_checkpoint|page_count|page_size|freelist_count|integrity_check|quick_check|foreign_key_list|foreign_key_check|collation_list)\b/i;
+// PRAGMAs that are safe to read (return data, don't mutate state).
+// Must NOT contain '=' (which makes a pragma a setter/mutation).
+const SAFE_PRAGMAS = /^\s*PRAGMA\s+(table_info|table_list|index_list|index_info|database_list|compile_options|journal_mode|page_count|page_size|freelist_count|integrity_check|quick_check|foreign_key_list|foreign_key_check|collation_list)\b/i;
 
 /** Validate and sanitize user SQL */
 function validateSql(sql: string): string | null {
@@ -43,9 +44,15 @@ function validateSql(sql: string): string | null {
     return "Only read-only queries (SELECT, WITH, EXPLAIN) are allowed";
   }
 
-  // Block mutating PRAGMAs — only allow known safe read-only ones
-  if (/^\s*PRAGMA\b/i.test(cleaned) && !SAFE_PRAGMAS.test(cleaned)) {
-    return "Only read-only PRAGMAs are allowed (table_info, index_list, etc.)";
+  // Block mutating PRAGMAs — only allow known safe read-only ones.
+  // Any PRAGMA with '=' is a setter (mutation), always block it.
+  if (/^\s*PRAGMA\b/i.test(cleaned)) {
+    if (cleaned.includes("=")) {
+      return "PRAGMA setters (with =) are not allowed — only read-only PRAGMAs";
+    }
+    if (!SAFE_PRAGMAS.test(cleaned)) {
+      return "Only read-only PRAGMAs are allowed (table_info, index_list, etc.)";
+    }
   }
 
   return null;
@@ -73,10 +80,13 @@ export function registerQueryCommand(program: Command): void {
         cleaned = cleaned.slice(0, -1).trim();
       }
 
-      // Auto-append LIMIT if not present
-      const limit = opts.limit ?? 100;
-      if (!/\bLIMIT\b/i.test(cleaned)) {
-        cleaned = `${cleaned} LIMIT ${limit}`;
+      // Auto-append LIMIT if not present (skip for PRAGMA/VALUES which don't support it)
+      const isPragmaOrValues = /^\s*(PRAGMA|VALUES)\b/i.test(cleaned);
+      if (!isPragmaOrValues) {
+        const limit = opts.limit ?? 100;
+        if (!/\bLIMIT\b/i.test(cleaned)) {
+          cleaned = `${cleaned} LIMIT ${limit}`;
+        }
       }
 
       const db = getDatabase();
