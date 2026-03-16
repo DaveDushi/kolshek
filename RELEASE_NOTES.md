@@ -1,3 +1,22 @@
+## v0.3.1
+
+### Features
+
+- **Lifestyle spending mode**: New `spending --lifestyle` flag excludes user-defined financial mechanics (transfers, CC settlements) from spending reports. Manage exclusions with `spending exclude add/remove/list`.
+- **Duplicate rule detection**: `categorize rule add` now blocks duplicate conditions — same category warns "already exists", different category warns "conflict, remove first".
+
+### Bug Fixes
+
+- **Mutating PRAGMAs bypassed query validation**: `PRAGMA journal_mode=DELETE` and other setter PRAGMAs were incorrectly allowed through the `query` command. Now blocks any PRAGMA with `=` assignment.
+- **LIMIT appended to PRAGMA/VALUES queries**: The auto-appended `LIMIT 100` caused syntax errors on PRAGMA and VALUES queries which don't support LIMIT clauses.
+- **Insights included excluded categories**: Large transaction and merchant detection in `insights` now respect the `spending_excludes` list.
+
+### Other
+
+- Plugin skills migrated to [Agent Skills](https://agentskills.io/specification) open standard.
+
+---
+
 ## v0.3.0
 
 ### Features
