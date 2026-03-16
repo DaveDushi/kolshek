@@ -8,7 +8,7 @@
 
 An open-source CLI that pulls transactions from Israeli banks and credit cards into a local SQLite database. No cloud. No telemetry. No account required.
 
-[Quick Start](#quick-start) &bull; [Features](#features) &bull; [Supported Banks](#supported-institutions) &bull; [Usage](#usage) &bull; [Security](#security)
+[Quick Start](#quick-start) &bull; [Features](#features) &bull; [Supported Banks](#supported-institutions) &bull; [Usage](#usage) &bull; [Security](#security) &bull; [Docs](docs/)
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/DaveDushi/kolshek)](https://github.com/DaveDushi/kolshek/releases)
