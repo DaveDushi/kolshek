@@ -82,6 +82,18 @@ export function listCategoryRules(): CategoryRule[] {
   return rows.map(rowToRule);
 }
 
+// Find an existing rule with the same conditions (any category).
+// Used by `rule add` to warn on duplicates.
+export function findRuleByConditions(conditions: RuleConditions): CategoryRule | null {
+  const db = getDatabase();
+  const conditionsJson = serializeConditions(conditions);
+  const row = db
+    .prepare("SELECT * FROM category_rules WHERE conditions = $conditions")
+    .get({ $conditions: conditionsJson }) as CategoryRuleRow | null;
+
+  return row ? rowToRule(row) : null;
+}
+
 export function removeCategoryRule(id: number): boolean {
   const db = getDatabase();
   const result = db

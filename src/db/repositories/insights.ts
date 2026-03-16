@@ -2,6 +2,7 @@
 
 import { getDatabase } from "../database.js";
 import { CC_BILLING_CATEGORY } from "../../types/transaction.js";
+import { EXCLUDE_LIFESTYLE_SQL } from "./spending-excludes.js";
 
 interface InsightOpts {
   from: string;
@@ -14,6 +15,8 @@ export interface CategoryByMonth {
   total: number;
 }
 
+// Category spikes: keep CC Billing exclusion only.
+// Fee/transfer spikes ARE worth flagging as category anomalies.
 export function getCategoryByMonth(opts: InsightOpts): CategoryByMonth[] {
   const db = getDatabase();
   const sql = `
@@ -35,24 +38,26 @@ export interface LargeTransactionRow {
   date: string;
 }
 
+// Large transactions: exclude user-defined non-spending categories
+// so transfers, CC settlements, and investment moves don't appear as notable charges.
 export function getLargeTransactions(opts: InsightOpts): { transactions: LargeTransactionRow[]; avgAmount: number } {
   const db = getDatabase();
 
   const avgRow = db.prepare(`
-    SELECT ROUND(AVG(ABS(charged_amount)), 2) AS avg_amount
-    FROM transactions WHERE charged_amount < 0 AND date >= $from
-      AND COALESCE(category, '') != $ccBilling
-  `).get({ $from: opts.currentMonthStart, $ccBilling: CC_BILLING_CATEGORY }) as { avg_amount: number } | null;
+    SELECT ROUND(AVG(ABS(t.charged_amount)), 2) AS avg_amount
+    FROM transactions t WHERE t.charged_amount < 0 AND t.date >= $from
+      AND ${EXCLUDE_LIFESTYLE_SQL}
+  `).get({ $from: opts.currentMonthStart }) as { avg_amount: number } | null;
 
   const avgAmount = avgRow?.avg_amount ?? 0;
 
   const rows = db.prepare(`
-    SELECT COALESCE(description_en, description) AS description,
-      ABS(charged_amount) AS amount, date
-    FROM transactions WHERE charged_amount < 0 AND date >= $from
-      AND COALESCE(category, '') != $ccBilling
+    SELECT COALESCE(t.description_en, t.description) AS description,
+      ABS(t.charged_amount) AS amount, t.date
+    FROM transactions t WHERE t.charged_amount < 0 AND t.date >= $from
+      AND ${EXCLUDE_LIFESTYLE_SQL}
     ORDER BY amount DESC LIMIT 20
-  `).all({ $from: opts.currentMonthStart, $ccBilling: CC_BILLING_CATEGORY }) as LargeTransactionRow[];
+  `).all({ $from: opts.currentMonthStart }) as LargeTransactionRow[];
 
   return { transactions: rows, avgAmount };
 }
@@ -65,10 +70,10 @@ export interface MerchantHistoryRow {
   firstSeen: string;
 }
 
+// Merchant history: exclude user-defined non-spending categories
+// so internal transfers and settlements don't appear as merchants.
 export function getMerchantHistory(opts: InsightOpts): MerchantHistoryRow[] {
   const db = getDatabase();
-  // CTE computes per-month totals first, then aggregates across months
-  // so avg_amount is per-month average (not per-transaction)
   const sql = `
     WITH monthly AS (
       SELECT
@@ -78,7 +83,7 @@ export function getMerchantHistory(opts: InsightOpts): MerchantHistoryRow[] {
         MIN(t.date) AS first_tx
       FROM transactions t
       WHERE t.charged_amount < 0 AND t.date >= $from
-        AND COALESCE(t.category, '') != $ccBilling
+        AND ${EXCLUDE_LIFESTYLE_SQL}
       GROUP BY merchant, month
     )
     SELECT
@@ -95,7 +100,6 @@ export function getMerchantHistory(opts: InsightOpts): MerchantHistoryRow[] {
   const rows = db.prepare(sql).all({
     $from: opts.from,
     $currentMonth: opts.currentMonthStart,
-    $ccBilling: CC_BILLING_CATEGORY,
   }) as Array<{
     merchant: string;
     months_seen: number;
@@ -120,6 +124,8 @@ export interface MonthCashflowRow {
   net: number;
 }
 
+// Cashflow: keep CC Billing exclusion only.
+// Transfers/savings are real money movement from the account perspective.
 export function getMonthCashflow(opts: InsightOpts): MonthCashflowRow[] {
   const db = getDatabase();
   const sql = `

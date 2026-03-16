@@ -1,8 +1,11 @@
 ---
 name: init
-disable-model-invocation: true
-allowed-tools: Bash, Read, Write, AskUserQuestion
-description: Set up KolShek — connect your bank accounts, fetch transactions, and get your data ready.
+description: Set up KolShek from scratch — connect bank accounts and credit cards, fetch transactions, translate Hebrew descriptions, and categorize spending. Use when user wants to initialize, set up, onboard, or get started with KolShek.
+compatibility: Requires KolShek CLI (kolshek) installed and configured.
+metadata:
+  author: kolshek
+  version: "0.3.0"
+allowed-tools: Bash Read Write AskUserQuestion
 ---
 
 # /kolshek:init
@@ -136,11 +139,11 @@ If they choose auto-categorize:
 > Look good? You can suggest changes or approve.
 
 3. Let the user review — they can approve all, request changes to specific ones, or skip entries.
-4. For each approved rule, run `kolshek categorize rule add <category> --match <pattern> --json`.
+4. For each approved rule, run `kolshek categorize rule add <category> --match <pattern> --json`. For precise rules, use `--match-exact`, `--amount`, `--account`, or `--direction` options.
 5. Run `kolshek categorize apply --json` to apply all rules.
 6. Report how many transactions were categorized (expenses and income separately).
 
-Mention they can re-run `/kolshek:categorize` anytime to handle new merchants.
+Mention they can re-run `/kolshek:categorize` anytime to handle new merchants or use `categorize rename`, `migrate`, and `reassign` to refine categories later.
 
 ## Step 6: Schedule Auto-Fetch
 

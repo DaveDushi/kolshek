@@ -1,8 +1,11 @@
 ---
 name: categorize
-disable-model-invocation: true
-allowed-tools: Bash, Read, AskUserQuestion
-description: Analyze your transactions and set up category rules for expenses and income.
+description: Analyze transactions and create auto-categorization rules for expenses and income. Use when user asks to categorize, label, classify, or tag transactions, set up spending categories, manage category rules, rename or merge categories, or reassign transactions in KolShek.
+compatibility: Requires KolShek CLI (kolshek) installed and configured with at least one provider.
+metadata:
+  author: kolshek
+  version: "0.3.0"
+allowed-tools: Bash Read AskUserQuestion
 ---
 
 # /kolshek:categorize
@@ -79,14 +82,39 @@ For each approved rule:
 kolshek categorize rule add <category> --match <pattern> --json
 ```
 
+The `rule add` command supports rich conditions beyond simple `--match`:
+- `--match-exact <pattern>` — exact description match
+- `--match-regex <pattern>` — regex match
+- `--memo <pattern>` — match on memo field
+- `--account <alias:number>` — account-specific rule
+- `--amount <n>` / `--amount-min <n>` / `--amount-max <n>` — amount matching
+- `--direction <debit|credit>` — direction filter
+- `--priority <n>` — higher priority rules are evaluated first (default: 0)
+Use richer conditions when simple substring matching would be too broad (e.g., exact match for a common word, amount match for rent).
+
 Then apply all rules:
 ```
 kolshek categorize apply --json
 ```
 
+Other apply options:
+- `kolshek categorize apply --all --json` — re-apply rules to ALL transactions (not just uncategorized)
+- `kolshek categorize apply --from-category "OldName" --json` — re-apply only to a specific category
+
 Report how many transactions were categorized (expenses and income separately).
 
-## Step 5: Done
+## Step 5: Post-Categorization Tools
+
+After initial categorization, the user may want to clean up:
+
+- **Rename/merge:** `kolshek categorize rename "Old Name" "New Name" --json` — renames a category everywhere (transactions + rules)
+- **Bulk migrate:** `kolshek categorize migrate --file mapping.json --json` — rename many categories at once from a `{"Old":"New"}` mapping
+- **Reassign:** `kolshek categorize reassign --match "pattern" --to "Category" --json` — force-move transactions by description pattern
+- **Bulk import:** `kolshek categorize rule import rules.json --json` — import rules from a JSON file (deduplicates automatically)
+
+All support `--dry-run` to preview changes before applying.
+
+## Step 6: Done
 
 > Categorized N transactions (X expenses, Y income).
 > You now have Z category rules. Add more anytime with `kolshek categorize rule add <category> --match <pattern>`.

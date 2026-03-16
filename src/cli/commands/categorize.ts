@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { RuleConditions, CategoryRuleInput } from "../../types/index.js";
 import {
   addCategoryRule,
+  findRuleByConditions,
   listCategoryRules,
   removeCategoryRule,
   applyCategoryRules,
@@ -24,9 +25,11 @@ import {
   isJsonMode,
   printJson,
   jsonSuccess,
+  jsonError,
   printError,
   success,
   info,
+  warn,
   createTable,
   formatCurrency,
   ExitCode,
@@ -210,6 +213,27 @@ Examples:
       const parsed = ruleConditionsSchema.safeParse(conditions);
       if (!parsed.success) {
         printError("BAD_ARGS", `Invalid conditions:\n${formatZodErrors(parsed.error.issues)}`);
+        process.exit(ExitCode.BadArgs);
+      }
+
+      // Block duplicate rules (same conditions, any category)
+      const existing = findRuleByConditions(parsed.data);
+      if (existing) {
+        const condStr = formatConditions(existing.conditions);
+        if (existing.category === category) {
+          if (isJsonMode()) {
+            printJson(jsonError("DUPLICATE_RULE", `Rule #${existing.id} already matches these conditions for "${category}".`));
+          } else {
+            warn(`Duplicate: rule #${existing.id} already matches ${condStr} → "${existing.category}".`);
+          }
+        } else {
+          if (isJsonMode()) {
+            printJson(jsonError("CONFLICTING_RULE", `Rule #${existing.id} uses the same conditions but maps to "${existing.category}" (not "${category}").`, { suggestions: [`Remove it first: kolshek cat rule remove ${existing.id}`] }));
+          } else {
+            warn(`Conflict: rule #${existing.id} matches ${condStr} but maps to "${existing.category}" (not "${category}").`);
+            info(`  Remove it first: kolshek cat rule remove ${existing.id}`);
+          }
+        }
         process.exit(ExitCode.BadArgs);
       }
 

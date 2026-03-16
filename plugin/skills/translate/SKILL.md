@@ -1,8 +1,11 @@
 ---
 name: translate
-disable-model-invocation: true
-allowed-tools: Bash, Read, AskUserQuestion
-description: Translate Hebrew transaction descriptions to English.
+description: Translate Hebrew transaction descriptions to English for better readability and categorization. Use when user asks to translate, transliterate, or convert Hebrew merchant names to English in KolShek.
+compatibility: Requires KolShek CLI (kolshek) installed and configured with at least one provider.
+metadata:
+  author: kolshek
+  version: "0.3.0"
+allowed-tools: Bash Read AskUserQuestion
 ---
 
 # /kolshek:translate
@@ -60,6 +63,11 @@ Let the user review — they can approve all, request changes to specific ones, 
 For each approved translation:
 ```
 kolshek translate rule add "<english>" --match "<hebrew>" --json
+```
+
+For bulk operations, you can also use:
+```
+kolshek translate rule import rules.json --json
 ```
 
 Then apply all rules:

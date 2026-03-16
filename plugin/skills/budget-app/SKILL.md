@@ -1,8 +1,11 @@
 ---
 name: budget-app
-disable-model-invocation: true
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion
-description: Design and build a personal budget dashboard powered by your KolShek transaction data.
+description: Design and build a personal budget dashboard or Telegram bot powered by your KolShek transaction data. Use when user asks to create a budget, build a spending dashboard, track spending limits, set up envelope budgeting, 50/30/20, or financial alerts in KolShek.
+compatibility: Requires KolShek CLI (kolshek) installed and configured with transaction data.
+metadata:
+  author: kolshek
+  version: "0.3.0"
+allowed-tools: Bash Read Write Edit Glob Grep AskUserQuestion
 ---
 
 # /kolshek:budget-app
@@ -39,7 +42,9 @@ You are building a personal budget dashboard for the user. This is an opinionate
 
 Before asking about budgets, show the user their actual data so they can make informed decisions.
 
-Run `kolshek reports categories --from 90d --json` to get spending by category over the last 3 months.
+Run `kolshek spending --lifestyle --json` to get a lifestyle-focused spending breakdown (excludes categories the user has marked as non-spending like transfers, CC settlements, etc.). If no exclusions are configured, fall back to `kolshek reports categories --from 90d --json`.
+
+Also check available analysis: `kolshek insights --json` and `kolshek trends --json` provide additional context (spending spikes, new merchants, multi-month trends).
 
 Present a summary:
 

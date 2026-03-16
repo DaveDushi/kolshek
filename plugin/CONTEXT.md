@@ -59,17 +59,19 @@ kolshek accounts [--provider] [--type] [--json]
 
 ### Categorization
 ```
-kolshek categorize rule add <category> --match <pattern> [--json]
+kolshek categorize rule add <category> --match <pattern> [--match-exact] [--match-regex] [--memo] [--account] [--amount] [--amount-min] [--amount-max] [--direction] [--priority <n>] [--json]
 kolshek categorize rule list [--json]
 kolshek categorize rule remove <id> [--json]
-kolshek categorize apply [--json]
+kolshek categorize rule import [file] [--json]
+kolshek categorize apply [--all] [--from-category <name>] [--dry-run] [--json]
 kolshek categorize list [--json]
 kolshek categorize rename <old> <new> [--dry-run] [--json]
 kolshek categorize migrate --file <path> [--dry-run] [--json]
 kolshek categorize reassign --match <pattern> --to <category> [--dry-run] [--json]
 kolshek categorize reassign --file <path> [--dry-run] [--json]
-kolshek categorize rule import [file] [--json]
 ```
+
+`rule add` supports multiple conditions (AND'd together): `--match`/`--match-exact`/`--match-regex` for description, `--memo` for memo, `--account` for provider:account, `--amount`/`--amount-min`/`--amount-max` for amount, `--direction` for debit/credit. Use `--priority` to control evaluation order. Duplicate conditions are blocked — remove the existing rule first if you need to change its category.
 
 ### Translation (Hebrew→English)
 ```
@@ -83,13 +85,18 @@ kolshek translate rule import [file] [--json]
 
 ### Spending & Income Analysis
 ```
-kolshek spending [month] [--group-by <category|merchant|provider>] [--category <name>] [--top <n>] [--type] [--json]
+kolshek spending [month] [--group-by <category|merchant|provider>] [--category <name>] [--top <n>] [--type] [--lifestyle] [--json]
+kolshek spending exclude add <category>          # mark category as non-spending
+kolshek spending exclude remove <category>       # unmark
+kolshek spending exclude list [--json]           # show excluded categories
 kolshek income [month] [--salary-only] [--include-refunds] [--json]
 kolshek trends [months] [--mode <total|category|fixed-variable>] [--category <name>] [--type] [--json]
 kolshek insights [--months <n>] [--json]
 ```
 
 Month formats: `current`, `prev`, `-3`, `2026-03`, or omit for current month.
+
+**`--lifestyle` flag:** Excludes categories the user has marked as non-spending (transfers, CC settlements, investment moves, etc.). Use `spending exclude add/remove/list` to manage the exclusion list. Insights automatically uses this list for large-transaction and merchant detection.
 
 **Income defaults to bank accounts only** — CC positive amounts are refunds, not income. Use `--include-refunds` to see them.
 
