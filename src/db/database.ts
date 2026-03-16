@@ -250,6 +250,13 @@ DROP TABLE category_rules;
 ALTER TABLE category_rules_v2 RENAME TO category_rules;
 
 PRAGMA foreign_keys=ON;`],
+
+  ["010_spending_excludes.sql", `-- User-defined categories to exclude from spending/lifestyle analysis.
+-- Starts empty — the user decides what to exclude.
+CREATE TABLE IF NOT EXISTS spending_excludes (
+  category TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);`],
 ];
 
 // Run all pending SQL migrations.

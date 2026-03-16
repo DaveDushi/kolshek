@@ -2,6 +2,7 @@
 
 import { getDatabase } from "../database.js";
 import { CC_BILLING_CATEGORY } from "../../types/transaction.js";
+import { EXCLUDE_LIFESTYLE_SQL } from "./spending-excludes.js";
 
 export type SpendingGroupBy = "category" | "merchant" | "provider";
 
@@ -24,13 +25,14 @@ export interface SpendingResult {
   summary: SpendingSummary;
 }
 
-interface SpendingOpts {
+export interface SpendingOpts {
   from: string;
   to: string;
   groupBy: SpendingGroupBy;
   category?: string;
   providerType?: string;
   top?: number;
+  lifestyle?: boolean;
 }
 
 export function getSpendingReport(opts: SpendingOpts): SpendingResult {
@@ -38,14 +40,23 @@ export function getSpendingReport(opts: SpendingOpts): SpendingResult {
   const params: Record<string, string | number> = {
     $from: opts.from,
     $to: opts.to,
-    $ccBilling: CC_BILLING_CATEGORY,
   };
+
+  // --lifestyle uses the user-defined exclusion list (spending_excludes table).
+  // Default only excludes CC Billing (backward compatible).
+  const exclusionCondition = opts.lifestyle
+    ? EXCLUDE_LIFESTYLE_SQL
+    : "COALESCE(t.category, '') != $ccBilling";
+
+  if (!opts.lifestyle) {
+    params.$ccBilling = CC_BILLING_CATEGORY;
+  }
 
   const conditions = [
     "t.charged_amount < 0",
     "t.date >= $from",
     "t.date <= $to",
-    "COALESCE(t.category, '') != $ccBilling",
+    exclusionCondition,
   ];
 
   if (opts.category) {
