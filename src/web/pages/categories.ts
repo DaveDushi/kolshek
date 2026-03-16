@@ -1,4 +1,4 @@
-// Categories page — two sections: Category Manager (CRUD) + Transaction Triage (master-detail).
+// Categories page -- two sections: Category Manager (CRUD) + Transaction Triage (master-detail).
 
 import { layout } from "../layout.js";
 import { categorySummaryTable } from "../partials/category-summary-table.js";
@@ -22,103 +22,121 @@ export function categoriesPage(activeCategory?: string): string {
 
   const body = `
     <!-- Category Manager -->
-    <article>
-      <header style="display:flex;justify-content:space-between;align-items:center;">
-        <strong>Categories</strong>
-        <form hx-post="/api/categories" hx-target="#category-summary-tbody" hx-swap="outerHTML"
-          hx-on::after-request="if(event.detail.successful) this.reset()"
-          style="display:flex;gap:0.5rem;margin:0;">
-          <input type="text" name="name" placeholder="New category name..." required
-            style="margin:0;padding:0.3rem 0.6rem;font-size:0.85rem;height:auto;min-width:10rem;">
-          <button type="submit" class="outline" style="margin:0;padding:0.3rem 0.75rem;font-size:0.85rem;white-space:nowrap;">+ Add</button>
+    <div class="card">
+      <div class="card-header">
+        <div class="flex items-center gap-2.5">
+          <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-600 dark:text-emerald-400"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          </div>
+          <span class="font-semibold text-sm text-zinc-900 dark:text-white">Categories</span>
+        </div>
+        <form class="flex items-center gap-2" hx-post="/api/categories" hx-target="#category-summary-tbody" hx-swap="outerHTML"
+          hx-on::after-request="if(event.detail.successful) this.reset()">
+          <input type="text" name="name" placeholder="New category..." required
+            class="!w-44 !py-1.5 !text-sm">
+          <button type="submit" class="btn btn-outline btn-sm">+ Add</button>
         </form>
-      </header>
+      </div>
 
       <div id="category-action-panel"></div>
 
-      <table role="grid" class="card-table" style="margin:0;">
+      <table class="w-full text-sm">
         <thead>
-          <tr>
-            <th>Category</th>
-            <th>Transactions</th>
-            <th>Total</th>
-            <th>Source</th>
-            <th></th>
+          <tr class="border-b border-zinc-200 dark:border-zinc-800">
+            <th class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 px-4 py-2.5 text-left">Category</th>
+            <th class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 px-4 py-2.5 text-left">Transactions</th>
+            <th class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 px-4 py-2.5 text-right">Total</th>
+            <th class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 px-4 py-2.5"></th>
           </tr>
         </thead>
         ${categorySummaryTable()}
       </table>
-    </article>
+    </div>
 
     <!-- Transaction Triage -->
-    <article style="padding:0;overflow:visible;">
-      <header>
-        <strong>Transactions</strong>
-        <span class="text-muted" style="font-weight:400;margin-left:0.5rem;">${totalTx} total${uncatCount > 0 ? `, ${uncatCount} uncategorized` : ""}</span>
-      </header>
+    <div class="card mt-6">
+      <div class="card-header">
+        <div class="flex items-center gap-2.5">
+          <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600 dark:text-indigo-400"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          </div>
+          <span class="font-semibold text-sm text-zinc-900 dark:text-white">Transactions</span>
+          ${uncatCount > 0 ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">${uncatCount} uncategorized</span>` : ""}
+          <span class="text-zinc-400 dark:text-zinc-400 text-xs font-normal">${totalTx} total</span>
+        </div>
+      </div>
 
       ${totalTx === 0
-        ? `<div class="empty-state">
-            <span class="empty-icon">&#128176;</span>
-            <p>No transactions yet</p>
-            <p class="text-muted">Sync your bank accounts from the <a href="/providers">Providers</a> page to see transactions here.</p>
+        ? `<div class="flex flex-col items-center gap-3 py-14 text-center">
+            <div class="flex items-center justify-center w-14 h-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 mb-1">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-400 dark:text-zinc-500"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </div>
+            <p class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">No transactions yet</p>
+            <p class="text-zinc-500 dark:text-zinc-300 text-sm max-w-xs">Sync your bank accounts from the <a href="/providers" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Providers</a> page to see transactions here.</p>
           </div>`
-        : `<div class="categories-layout" style="padding:1rem;">
-            ${categorySidebar(selectedCat)}
+        : `<div class="grid grid-cols-[14rem_1fr] gap-0 divide-x divide-zinc-200 dark:divide-zinc-800 p-0">
+            <div class="bg-zinc-50/50 dark:bg-zinc-900/30">${categorySidebar(selectedCat)}</div>
             ${categoryTxPanel(selectedCat)}
           </div>`
       }
-    </article>
+    </div>
 
     <!-- Category Rules (collapsible) -->
-    <article>
+    <div class="card mt-6">
       <details${rules.length === 0 ? " open" : ""}>
-        <summary style="padding:0.85rem 1.25rem;cursor:pointer;font-weight:600;font-size:0.95rem;">
-          Category Rules <span class="text-muted" style="font-weight:400;">(${rules.length})</span>
+        <summary class="card-header cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+          <div class="flex items-center gap-2.5">
+            <div class="flex items-center justify-center w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-900/20">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-600 dark:text-amber-400"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <span class="font-semibold text-sm text-zinc-900 dark:text-white">Category Rules</span>
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 tabular-nums">${rules.length}</span>
+          </div>
+          <svg class="w-4 h-4 text-zinc-400 transition-transform [[open]>&]:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
         </summary>
-        <div style="padding:0 1.25rem 1rem;">
-          <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-bottom:0.75rem;">
-            <form hx-post="/api/categories/apply" hx-target="#category-summary-tbody" hx-swap="outerHTML" style="display:flex;gap:0.5rem;margin:0;">
-              <select name="scope" style="margin:0;font-size:0.85rem;padding:0.3rem;height:auto;">
+        <div class="p-5">
+          <div class="flex justify-end gap-2 mb-3">
+            <form class="flex items-center gap-2" hx-post="/api/categories/apply" hx-target="#category-summary-tbody" hx-swap="outerHTML">
+              <select name="scope" class="!w-auto !py-1 !text-xs !px-2">
                 <option value="uncategorized">Uncategorized only</option>
                 <option value="all">All transactions</option>
               </select>
-              <button type="submit" hx-disabled-elt="this" style="margin:0;padding:0.3rem 0.75rem;font-size:0.85rem;white-space:nowrap;">Apply</button>
+              <button type="submit" class="btn btn-primary btn-sm" hx-disabled-elt="this">Apply</button>
             </form>
           </div>
 
-          <table role="grid" class="card-table">
+          <table class="w-full text-sm">
             <thead>
-              <tr>
-                <th>Category</th>
-                <th>Conditions</th>
-                <th>Priority</th>
-                <th></th>
+              <tr class="border-b border-zinc-200 dark:border-zinc-800">
+                <th class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 px-4 py-2.5 text-left">Category</th>
+                <th class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 px-4 py-2.5 text-left">Conditions</th>
+                <th class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 px-4 py-2.5 text-right">Priority</th>
+                <th class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 px-4 py-2.5"></th>
               </tr>
             </thead>
             ${categoryRulesTableBody(rules)}
           </table>
 
-          <details style="margin-top:1rem;">
-            <summary role="button" class="outline" style="text-align:center;">+ Add Rule</summary>
-            <form hx-post="/api/categories/rules" hx-target="#category-rules-tbody" hx-swap="outerHTML"
+          <details class="mt-4">
+            <summary class="btn btn-outline w-full justify-center cursor-pointer list-none [&::-webkit-details-marker]:hidden">+ Add Rule</summary>
+            <form class="mt-4 space-y-4" hx-post="/api/categories/rules" hx-target="#category-rules-tbody" hx-swap="outerHTML"
               hx-on::after-request="if(event.detail.successful) this.reset()">
-              <div class="grid">
+              <div class="grid grid-cols-2 gap-4">
                 <label>
                   Category
                   <input type="text" name="category" placeholder="e.g. Groceries" required>
                 </label>
                 <label>
-                  Priority <small class="text-muted">(higher = first)</small>
+                  Priority <small class="text-zinc-500 dark:text-zinc-300 text-xs font-normal">(higher = first)</small>
                   <input type="number" name="priority" value="10">
                 </label>
               </div>
-              <fieldset>
-                <legend>Conditions</legend>
-                <div class="grid">
+              <fieldset class="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4">
+                <legend class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 px-2">Conditions</legend>
+                <div class="grid grid-cols-2 gap-4">
                   <label>
                     Description pattern
-                    <input type="text" name="descriptionPattern" placeholder="e.g. שופרסל">
+                    <input type="text" name="descriptionPattern" placeholder="e.g. &#1513;&#1493;&#1508;&#1512;&#1505;&#1500;">
                   </label>
                   <label>
                     Match mode
@@ -129,13 +147,13 @@ export function categoriesPage(activeCategory?: string): string {
                     </select>
                   </label>
                 </div>
-                <div class="grid">
+                <div class="grid grid-cols-2 gap-4 mt-3">
                   <label>
-                    Memo pattern <small class="text-muted">(optional)</small>
+                    Memo pattern <small class="text-zinc-500 dark:text-zinc-300 text-xs font-normal">(optional)</small>
                     <input type="text" name="memoPattern">
                   </label>
                   <label>
-                    Direction <small class="text-muted">(optional)</small>
+                    Direction <small class="text-zinc-500 dark:text-zinc-300 text-xs font-normal">(optional)</small>
                     <select name="direction">
                       <option value="">Any</option>
                       <option value="debit">Expense (debit)</option>
@@ -144,12 +162,12 @@ export function categoriesPage(activeCategory?: string): string {
                   </label>
                 </div>
               </fieldset>
-              <button type="submit" hx-disabled-elt="this">Add Rule</button>
+              <button type="submit" class="btn btn-primary" hx-disabled-elt="this">Add Rule</button>
             </form>
           </details>
         </div>
       </details>
-    </article>`;
+    </div>`;
 
   return layout("Categories", "/categories", body);
 }

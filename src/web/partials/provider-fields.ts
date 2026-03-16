@@ -6,7 +6,7 @@ import { getProvidersByCompanyId } from "../../db/repositories/providers.js";
 
 export function providerLoginFields(companyId: string): string {
   if (!isValidCompanyId(companyId)) {
-    return `<p class="text-muted">Unknown provider.</p>`;
+    return `<p class="text-zinc-500 dark:text-zinc-300 text-sm">Unknown provider.</p>`;
   }
 
   const info = PROVIDERS[companyId];
@@ -17,7 +17,7 @@ export function providerLoginFields(companyId: string): string {
     const existing = existingInstances.map((p) => p.alias).join(", ");
     aliasField = `
       <label>
-        Alias <small class="text-muted">(existing: ${existing})</small>
+        Alias <span class="text-zinc-500 dark:text-zinc-300 text-xs font-normal">(existing: ${existing})</span>
         <input type="text" name="alias" required placeholder="e.g. leumi-joint" pattern="[a-zA-Z0-9_-]+">
       </label>`;
   }
@@ -38,12 +38,12 @@ export function providerLoginFields(companyId: string): string {
 
   return `${aliasField}${fields}
     <input type="hidden" name="companyId" value="${companyId}">
-    <button type="submit" hx-disabled-elt="this">Add Provider</button>`;
+    <button type="submit" class="btn btn-primary mt-2" hx-disabled-elt="this">Add Provider</button>`;
 }
 
 export function providerAuthFields(companyId: string, providerId: number): string {
   if (!isValidCompanyId(companyId)) {
-    return `<p class="text-muted">Unknown provider.</p>`;
+    return `<p class="text-zinc-500 dark:text-zinc-300 text-sm">Unknown provider.</p>`;
   }
 
   const info = PROVIDERS[companyId];
@@ -62,16 +62,16 @@ export function providerAuthFields(companyId: string, providerId: number): strin
     })
     .join("\n");
 
-  return `<article>
-    <form hx-post="/api/providers/${providerId}/auth" hx-target="#auth-form-container" hx-swap="innerHTML">
-      <h4>Update Credentials</h4>
+  return `<div class="card mt-4">
+    <form class="p-5" hx-post="/api/providers/${providerId}/auth" hx-target="#auth-form-container" hx-swap="innerHTML">
+      <h4 class="text-base font-semibold text-zinc-900 dark:text-white mb-4">Update Credentials</h4>
       ${fields}
-      <div class="grid">
-        <button type="submit" hx-disabled-elt="this">Save</button>
-        <button type="button" class="secondary outline" onclick="document.getElementById('auth-form-container').innerHTML=''">Cancel</button>
+      <div class="grid grid-cols-2 gap-4 mt-4">
+        <button type="submit" class="btn btn-primary" hx-disabled-elt="this">Save</button>
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('auth-form-container').innerHTML=''">Cancel</button>
       </div>
     </form>
-  </article>`;
+  </div>`;
 }
 
 function fieldLabel(field: string): string {

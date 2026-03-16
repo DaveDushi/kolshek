@@ -1,7 +1,7 @@
 // Settings dashboard HTTP server — Bun.serve() with URL routing.
-// No framework, no build step. HTMX partials for inline updates.
+// HTMX partials for inline updates. Tailwind CSS built via @tailwindcss/cli.
 
-
+import { resolve } from "node:path";
 import { providersPage } from "./pages/providers.js";
 import { categoriesPage } from "./pages/categories.js";
 import { translationsPage } from "./pages/translations.js";
@@ -44,6 +44,9 @@ import { syncProviders } from "../core/sync-engine.js";
 // Track active fetch so we don't allow concurrent syncs
 let activeFetch: { promise: Promise<void>; events: string[] } | null = null;
 
+// Resolve path to built CSS (import.meta.dir is Bun-native, handles Windows)
+const cssPath = resolve(import.meta.dir, "dist/styles.css");
+
 export function startDashboard(port: number) {
   const server = Bun.serve({
     port,
@@ -53,6 +56,17 @@ export function startDashboard(port: number) {
       const method = req.method;
 
       try {
+        // --- Static assets ---
+        if (method === "GET" && path === "/styles.css") {
+          const file = Bun.file(cssPath);
+          if (await file.exists()) {
+            return new Response(file, {
+              headers: { "Content-Type": "text/css; charset=utf-8", "Cache-Control": "public, max-age=3600" },
+            });
+          }
+          return new Response("/* CSS not built */", { status: 404, headers: { "Content-Type": "text/css" } });
+        }
+
         // --- Pages ---
         if (method === "GET" && (path === "/" || path === "")) {
           return Response.redirect("/providers", 302);
@@ -326,7 +340,7 @@ export function startDashboard(port: number) {
 
           // Return moved-state row that fades out, plus OOB sidebar update + toast
           const movedRow = `<div class="tx-row tx-row--moved" id="tx-row-${txId}">
-            <div style="grid-column:1/-1;text-align:center;padding:0.5rem;color:var(--pico-primary);">
+            <div class="col-span-full text-center py-2 text-indigo-600 dark:text-indigo-400 text-sm font-medium">
               Moved to ${escapeHtml(newCategory)}
             </div>
           </div>`;
@@ -401,7 +415,7 @@ export function startDashboard(port: number) {
           }
 
           // Return a success row that fades out
-          return html(`<div class="translate-row translate-row-success" style="justify-content:center;padding:0.75rem;">
+          return html(`<div class="translate-row translate-row-success flex items-center justify-center p-3 mx-3 my-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-sm font-medium">
             Translated ${count} transaction${count !== 1 ? "s" : ""} as "${escapeHtml(english)}"
           </div>`);
         }
@@ -489,21 +503,20 @@ async function parseForm(req: Request): Promise<Map<string, string>> {
   return result;
 }
 
-// Inline rename form — replaces category name cell
+// Inline rename form -- replaces category name cell
 function inlineRenameForm(name: string): string {
   const encoded = encodeURIComponent(name);
-  return `<form hx-post="/api/categories/${encoded}/rename"
-    hx-target="#category-summary-tbody" hx-swap="outerHTML"
-    style="display:flex;gap:0.3rem;align-items:center;margin:0;">
+  return `<form class="flex items-center gap-1.5" hx-post="/api/categories/${encoded}/rename"
+    hx-target="#category-summary-tbody" hx-swap="outerHTML">
     <input type="text" name="newName" value="${escapeHtml(name)}" required
-      style="margin:0;padding:0.2rem 0.4rem;font-size:0.85rem;height:auto;">
-    <button type="submit" class="outline" style="margin:0;padding:0.2rem 0.5rem;font-size:0.8rem;white-space:nowrap;">OK</button>
-    <button type="button" class="outline secondary" style="margin:0;padding:0.2rem 0.5rem;font-size:0.8rem;white-space:nowrap;"
+      class="min-w-[8rem]">
+    <button type="submit" class="btn btn-outline btn-sm">OK</button>
+    <button type="button" class="btn btn-outline btn-sm"
       hx-get="/api/categories/summary-table" hx-target="#category-summary-tbody" hx-swap="outerHTML">Cancel</button>
   </form>`;
 }
 
-// Delete confirmation panel — appears in #category-action-panel
+// Delete confirmation panel -- appears in #category-action-panel
 function deleteConfirmPanel(name: string): string {
   const encoded = encodeURIComponent(name);
   const allCats = listAllCategories().filter((c) => c !== name);
@@ -513,18 +526,17 @@ function deleteConfirmPanel(name: string): string {
 
   const txCount = countTransactions({ category: name === "Uncategorized" ? null : name });
 
-  return `<div class="category-action-panel">
-    <form hx-post="/api/categories/${encoded}/delete"
-      hx-target="#category-summary-tbody" hx-swap="outerHTML"
-      style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin:0;">
-      <strong>Delete "${escapeHtml(name)}"</strong>
-      <span class="text-muted">(${txCount} transaction${txCount !== 1 ? "s" : ""})</span>
-      <span>Move to:</span>
-      <select name="moveTo" style="margin:0;font-size:0.85rem;padding:0.3rem;height:auto;width:auto;">
+  return `<div class="p-3 bg-indigo-50 dark:bg-indigo-900/20 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-2 flex-wrap text-sm">
+    <form class="flex items-center gap-2 flex-wrap" hx-post="/api/categories/${encoded}/delete"
+      hx-target="#category-summary-tbody" hx-swap="outerHTML">
+      <strong class="text-sm">Delete &ldquo;${escapeHtml(name)}&rdquo;</strong>
+      <span class="text-zinc-500 dark:text-zinc-300 text-sm">(${txCount} tx${txCount !== 1 ? "s" : ""})</span>
+      <span class="text-sm">Move to:</span>
+      <select name="moveTo" class="m-0 text-sm py-1 px-2 h-auto w-auto">
         ${options}
       </select>
-      <button type="submit" class="outline" style="margin:0;padding:0.3rem 0.75rem;font-size:0.85rem;">Confirm Delete</button>
-      <button type="button" class="outline secondary" style="margin:0;padding:0.3rem 0.75rem;font-size:0.85rem;"
+      <button type="submit" class="btn btn-outline btn-sm">Confirm</button>
+      <button type="button" class="btn btn-outline btn-sm"
         onclick="document.getElementById('category-action-panel').innerHTML=''">Cancel</button>
     </form>
   </div>`;

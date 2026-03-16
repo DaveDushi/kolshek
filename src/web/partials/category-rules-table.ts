@@ -1,4 +1,4 @@
-// Category rules table body partial — returned on add/delete for HTMX swap.
+// Category rules table body partial -- returned on add/delete for HTMX swap.
 
 import { escapeHtml } from "../layout.js";
 import type { CategoryRule } from "../../types/index.js";
@@ -6,22 +6,29 @@ import type { CategoryRule } from "../../types/index.js";
 export function categoryRulesTableBody(rules: CategoryRule[]): string {
   if (rules.length === 0) {
     return `<tbody id="category-rules-tbody"><tr><td colspan="4">
-      <div class="empty-state">
-        <span class="empty-icon">&#128203;</span>
-        <p>No rules defined yet</p>
-        <p class="text-muted">Rules automatically classify your transactions by matching description and memo patterns.</p>
+      <div class="flex flex-col items-center gap-2 py-12 text-center">
+        <span class="text-4xl">&#128203;</span>
+        <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300">No rules defined yet</p>
+        <p class="text-zinc-500 dark:text-zinc-300 text-sm">Rules automatically classify your transactions by matching description and memo patterns.</p>
       </div>
     </td></tr></tbody>`;
   }
 
   const rowsHtml = rules
     .map((r) => {
-      return `<tr>
-        <td data-label="Category">${escapeHtml(r.category)}</td>
-        <td data-label="Conditions">${formatConditions(r.conditions)}</td>
-        <td data-label="Priority">${r.priority}</td>
-        <td data-label="" class="actions">
-          <button hx-delete="/api/categories/rules/${r.id}" hx-target="#category-rules-tbody" hx-swap="outerHTML" hx-confirm="Delete this rule?" class="outline secondary" title="Delete rule">&#10005;</button>
+      return `<tr class="border-b border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+        <td class="px-4 py-3 text-sm"><span class="font-medium text-zinc-900 dark:text-zinc-100">${escapeHtml(r.category)}</span></td>
+        <td class="px-4 py-3 text-sm">${formatConditions(r.conditions)}</td>
+        <td class="px-4 py-3 text-sm text-right tabular-nums text-zinc-700 dark:text-zinc-300">${r.priority}</td>
+        <td class="px-4 py-3 text-sm text-right">
+          <button class="btn btn-ghost btn-ghost-danger"
+            hx-delete="/api/categories/rules/${r.id}"
+            hx-target="#category-rules-tbody"
+            hx-swap="outerHTML"
+            hx-confirm="Delete this rule?"
+            title="Delete rule">
+            &#10005; Delete
+          </button>
         </td>
       </tr>`;
     })
@@ -65,7 +72,7 @@ function formatConditions(cond: unknown): string {
     parts.push(`direction = ${direction}`);
   }
 
-  if (parts.length === 0) return `<span class="text-muted">No conditions</span>`;
+  if (parts.length === 0) return `<span class="text-zinc-500 dark:text-zinc-300 text-sm">No conditions</span>`;
 
-  return parts.map((p) => `<span class="condition-tag">${p}</span>`).join(" ");
+  return parts.map((p) => `<span class="inline-block px-2 py-0.5 text-xs font-mono bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded">${p}</span>`).join(" ");
 }
