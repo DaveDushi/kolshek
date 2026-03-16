@@ -90,6 +90,88 @@ export function applyTranslationRules(): { applied: number } {
   return { applied };
 }
 
+export interface UntranslatedGroup {
+  description: string;
+  count: number;
+  totalAmount: number;
+}
+
+export function listUntranslatedGrouped(): UntranslatedGroup[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT description, COUNT(*) AS count, SUM(ABS(charged_amount)) AS total_amount
+       FROM transactions
+       WHERE description_en IS NULL
+       GROUP BY description
+       ORDER BY count DESC, total_amount DESC`,
+    )
+    .all() as Array<{ description: string; count: number; total_amount: number }>;
+
+  return rows.map((r) => ({
+    description: r.description,
+    count: r.count,
+    totalAmount: r.total_amount,
+  }));
+}
+
+// Translate all transactions matching a Hebrew description
+export function translateByDescription(
+  hebrewDesc: string,
+  englishName: string,
+): number {
+  const db = getDatabase();
+  const result = db
+    .prepare(
+      `UPDATE transactions SET description_en = $en, updated_at = datetime('now')
+       WHERE description = $desc AND description_en IS NULL`,
+    )
+    .run({ $en: englishName, $desc: hebrewDesc });
+  return result.changes;
+}
+
+export interface TranslatedGroup {
+  description: string;
+  descriptionEn: string;
+  count: number;
+  totalAmount: number;
+}
+
+export function listTranslatedGrouped(): TranslatedGroup[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT description, description_en, COUNT(*) AS count, SUM(ABS(charged_amount)) AS total_amount
+       FROM transactions
+       WHERE description_en IS NOT NULL
+       GROUP BY description, description_en
+       ORDER BY count DESC, total_amount DESC`,
+    )
+    .all() as Array<{ description: string; description_en: string; count: number; total_amount: number }>;
+
+  return rows.map((r) => ({
+    description: r.description,
+    descriptionEn: r.description_en,
+    count: r.count,
+    totalAmount: r.total_amount,
+  }));
+}
+
+// Update translation for all transactions matching a Hebrew description (overwrites existing)
+export function updateTranslationByDescription(
+  hebrewDesc: string,
+  englishName: string,
+): number {
+  const db = getDatabase();
+  const result = db
+    .prepare(
+      `UPDATE transactions SET description_en = $en, updated_at = datetime('now')
+       WHERE description = $desc`,
+    )
+    .run({ $en: englishName, $desc: hebrewDesc });
+  return result.changes;
+}
+
 export interface TranslationRuleInput {
   englishName: string;
   matchPattern: string;

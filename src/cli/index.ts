@@ -27,6 +27,7 @@ import { registerSpendingCommand } from "./commands/spending.js";
 import { registerIncomeCommand } from "./commands/income.js";
 import { registerTrendsCommand } from "./commands/trends.js";
 import { registerInsightsCommand } from "./commands/insights.js";
+import { registerDashboardCommand } from "./commands/dashboard.js";
 import { getMostRecentSyncTime, listProviders } from "../db/repositories/providers.js";
 import { loadConfig } from "../config/loader.js";
 import { syncProviders } from "../core/sync-engine.js";
@@ -137,6 +138,7 @@ registerSpendingCommand(program);
 registerIncomeCommand(program);
 registerTrendsCommand(program);
 registerInsightsCommand(program);
+registerDashboardCommand(program);
 
 // Parse and run
 program.parseAsync(process.argv).then(() => {

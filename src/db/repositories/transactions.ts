@@ -294,6 +294,19 @@ function buildFilterClauses(filters: TransactionFilters): {
     conditions.push("t.description LIKE $description ESCAPE '\\'");
     params.$description = `%${escapeLike(filters.description)}%`;
   }
+  if (filters.category !== undefined) {
+    if (filters.category === null || filters.category === "Uncategorized") {
+      conditions.push("(t.category IS NULL OR t.category = 'Uncategorized')");
+    } else {
+      conditions.push("t.category = $category");
+      params.$category = filters.category;
+    }
+  }
+  if (filters.translated === true) {
+    conditions.push("t.description_en IS NOT NULL");
+  } else if (filters.translated === false) {
+    conditions.push("t.description_en IS NULL");
+  }
 
   return { conditions, params };
 }
@@ -388,6 +401,32 @@ export function deleteTransaction(
       date: existing.date,
     },
   };
+}
+
+export function updateTransactionCategory(
+  id: number,
+  category: string,
+): boolean {
+  const db = getDatabase();
+  const result = db
+    .prepare(
+      "UPDATE transactions SET category = $category, updated_at = datetime('now') WHERE id = $id",
+    )
+    .run({ $id: id, $category: category });
+  return result.changes > 0;
+}
+
+export function updateTransactionTranslation(
+  id: number,
+  descriptionEn: string,
+): boolean {
+  const db = getDatabase();
+  const result = db
+    .prepare(
+      "UPDATE transactions SET description_en = $descriptionEn, updated_at = datetime('now') WHERE id = $id",
+    )
+    .run({ $id: id, $descriptionEn: descriptionEn });
+  return result.changes > 0;
 }
 
 export function countTransactions(filters?: TransactionFilters): number {

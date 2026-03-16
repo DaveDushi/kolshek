@@ -50,7 +50,47 @@ function escapeLike(s: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// CRUD
+// Category entity CRUD (categories table)
+// ---------------------------------------------------------------------------
+
+export function createCategory(name: string): boolean {
+  const db = getDatabase();
+  const result = db
+    .prepare("INSERT OR IGNORE INTO categories (name) VALUES ($name)")
+    .run({ $name: name });
+  return result.changes > 0;
+}
+
+export function categoryExists(name: string): boolean {
+  const db = getDatabase();
+  const row = db
+    .prepare("SELECT 1 FROM categories WHERE name = $name")
+    .get({ $name: name });
+  return !!row;
+}
+
+export function deleteCategory(
+  name: string,
+  moveTo: string,
+): { transactionsUpdated: number; rulesUpdated: number } {
+  const result = renameCategory(name, moveTo);
+  const db = getDatabase();
+  db.prepare("DELETE FROM categories WHERE name = $name").run({ $name: name });
+  // Ensure destination exists
+  db.prepare("INSERT OR IGNORE INTO categories (name) VALUES ($name)").run({ $name: moveTo });
+  return result;
+}
+
+export function listAllCategories(): string[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare("SELECT name FROM categories ORDER BY name")
+    .all() as Array<{ name: string }>;
+  return rows.map((r) => r.name);
+}
+
+// ---------------------------------------------------------------------------
+// Rule CRUD
 // ---------------------------------------------------------------------------
 
 export function addCategoryRule(
@@ -289,6 +329,10 @@ export function renameCategory(oldName: string, newName: string): RenameResult {
       .prepare("UPDATE category_rules SET category = $new WHERE category = $old")
       .run({ $old: oldName, $new: newName });
 
+    // Update categories table: ensure new exists, remove old
+    db.prepare("INSERT OR IGNORE INTO categories (name) VALUES ($name)").run({ $name: newName });
+    db.prepare("DELETE FROM categories WHERE name = $name").run({ $name: oldName });
+
     db.run("COMMIT");
     return {
       transactionsUpdated: txResult.changes,
@@ -469,6 +513,8 @@ export function listCategoriesWithSource(): CategoryWithSource[] {
          SELECT COALESCE(category, 'Uncategorized') AS category FROM transactions
          UNION
          SELECT category FROM category_rules
+         UNION
+         SELECT name AS category FROM categories
        ) cat
        LEFT JOIN (
          SELECT COALESCE(category, 'Uncategorized') AS category,
