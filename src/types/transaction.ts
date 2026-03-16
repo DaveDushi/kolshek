@@ -75,6 +75,8 @@ export interface TransactionFilters {
   maxAmount?: number;
   status?: TransactionStatus;
   description?: string;
+  category?: string | null;
+  translated?: boolean;
   sort?: "date" | "amount";
   sortDirection?: "asc" | "desc";
   limit?: number;

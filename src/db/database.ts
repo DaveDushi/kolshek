@@ -257,6 +257,17 @@ CREATE TABLE IF NOT EXISTS spending_excludes (
   category TEXT PRIMARY KEY,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );`],
+
+  ["011_categories.sql", `-- First-class categories table so users can pre-create category names.
+CREATE TABLE IF NOT EXISTS categories (
+  name TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+-- Seed from existing transaction and rule data
+INSERT OR IGNORE INTO categories (name)
+  SELECT COALESCE(category, 'Uncategorized') FROM transactions
+  UNION
+  SELECT category FROM category_rules;`],
 ];
 
 // Run all pending SQL migrations.
