@@ -1292,6 +1292,29 @@ body {
   border: 1px solid rgba(99, 102, 241, 0.2);
 }
 
+.badge-beta {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.25);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  font-size: 0.625rem;
+}
+
+[data-theme="light"] .badge-beta {
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+  border-color: rgba(217, 119, 6, 0.25);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .badge-beta {
+    background: rgba(217, 119, 6, 0.1);
+    color: #b45309;
+    border-color: rgba(217, 119, 6, 0.25);
+  }
+}
+
 /* ── Provider grid ─────────────────────────────────────────── */
 .provider-grid {
   display: grid;

@@ -375,28 +375,34 @@ window
     if (footerEl) footerEl.textContent = "KolShek " + tag;
   }
 
+  function applyDownloads(count) {
+    var el = document.getElementById("hero-downloads");
+    if (el) el.textContent = count >= 1000 ? (count / 1000).toFixed(1) + "k" : String(count);
+  }
+
   try {
     var cached = JSON.parse(sessionStorage.getItem(CACHE_KEY));
     if (cached && Date.now() - cached.ts < CACHE_TTL) {
       applyVersion(cached.tag);
+      if (cached.downloads != null) applyDownloads(cached.downloads);
       return;
     }
   } catch (e) {}
 
-  fetch("https://api.github.com/repos/" + REPO + "/releases/latest")
-    .then(function (r) {
-      return r.json();
-    })
-    .then(function (data) {
-      if (data.tag_name) {
-        applyVersion(data.tag_name);
-        try {
-          sessionStorage.setItem(
-            CACHE_KEY,
-            JSON.stringify({ tag: data.tag_name, ts: Date.now() }),
-          );
-        } catch (e) {}
-      }
+  fetch("https://api.github.com/repos/" + REPO + "/releases")
+    .then(function (r) { return r.json(); })
+    .then(function (releases) {
+      if (!Array.isArray(releases) || !releases.length) return;
+      var latest = releases[0];
+      if (latest.tag_name) applyVersion(latest.tag_name);
+      var total = 0;
+      releases.forEach(function (rel) {
+        if (rel.assets) rel.assets.forEach(function (a) { total += a.download_count || 0; });
+      });
+      applyDownloads(total);
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ tag: latest.tag_name, downloads: total, ts: Date.now() }));
+      } catch (e) {}
     })
     .catch(function () {});
 })();
