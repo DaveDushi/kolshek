@@ -424,3 +424,13 @@ Financial alerts and recommendations based on spending patterns.
 | Option | Description |
 |--------|-------------|
 | `--months <n>` | Lookback period in months (default: 3) |
+
+---
+
+### `update`
+
+Self-update KolShek to the latest release. Downloads the correct binary for your platform from GitHub and replaces the current executable in-place.
+
+| Option | Description |
+|--------|-------------|
+| `--check` | Only check for updates without installing |

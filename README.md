@@ -137,6 +137,9 @@ kolshek query "SELECT description, SUM(chargedAmount) as total FROM transactions
 # Open the web settings dashboard
 kolshek dashboard
 
+# Update to the latest version
+kolshek update
+
 # Structured output for AI agents
 kolshek accounts --json
 ```
