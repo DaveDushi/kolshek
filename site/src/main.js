@@ -26,6 +26,17 @@ document.querySelectorAll(".hero-demo-tab").forEach(function (tab) {
   });
 });
 
+// ── Chat auto-scroll on message appear ───────────────────────
+(function () {
+  var chatBody = document.querySelector("#demo-chat .chat-body");
+  if (!chatBody) return;
+  chatBody.querySelectorAll(".chat-anim-trigger").forEach(function (msg) {
+    msg.addEventListener("animationstart", function () {
+      msg.scrollIntoView({ behavior: "smooth", block: "end" });
+    }, { once: true });
+  });
+})();
+
 // ── Nav scroll effect ─────────────────────────────────────────
 const nav = document.getElementById("nav");
 let lastScroll = 0;
