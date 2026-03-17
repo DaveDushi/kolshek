@@ -8,10 +8,11 @@
 // Credentials are stored as base64-encoded JSON in keychain,
 // or AES-256-GCM encrypted in a local file.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, renameSync } from "fs";
 import { join } from "path";
 import { randomBytes, createCipheriv, createDecipheriv } from "crypto";
 import envPaths from "env-paths";
+import { restrictPathToOwner } from "./permissions.js";
 
 const SERVICE = "kolshek";
 const paths = envPaths("kolshek");
@@ -24,6 +25,19 @@ function targetName(companyId: string): string {
   return `${SERVICE}:${companyId}`;
 }
 
+// Validate alias/companyId to prevent prototype pollution and injection.
+function validateAlias(alias: string): void {
+  if (typeof alias !== "string" || alias.length === 0 || alias.length > 64) {
+    throw new Error("Invalid credential alias: must be 1-64 characters");
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(alias)) {
+    throw new Error("Invalid credential alias: only alphanumeric, dash, underscore allowed");
+  }
+  if (alias === "__proto__" || alias === "constructor" || alias === "prototype") {
+    throw new Error(`Reserved alias: ${alias}`);
+  }
+}
+
 // Base64-encode a JSON object for safe storage in credential password fields.
 function encodePayload(data: Record<string, string>): string {
   return Buffer.from(JSON.stringify(data), "utf-8").toString("base64");
@@ -32,6 +46,9 @@ function encodePayload(data: Record<string, string>): string {
 // Decode a base64-encoded JSON payload back to an object.
 // Validates the parsed result is a flat Record<string, string>.
 function decodePayload(encoded: string): Record<string, string> {
+  if (encoded.length > 65536) {
+    throw new Error("Credential payload too large");
+  }
   const parsed: unknown = JSON.parse(Buffer.from(encoded, "base64").toString("utf-8"));
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw new Error("Invalid credential payload structure");
@@ -101,6 +118,7 @@ function getOrCreateKey(): Buffer {
   ensureDataDir();
   const key = randomBytes(32);
   writeFileSync(keyPath, key, { mode: 0o600 });
+  if (process.platform === "win32") restrictPathToOwner(keyPath);
   return key;
 }
 
@@ -151,7 +169,11 @@ function saveCredentialsFile(data: Record<string, Record<string, string>>): void
   const key = getOrCreateKey();
   const json = JSON.stringify(data);
   const blob = encryptData(json, key);
-  writeFileSync(credentialsEncPath(), blob, { mode: 0o600 });
+  const encPath = credentialsEncPath();
+  const tmpPath = encPath + ".tmp";
+  writeFileSync(tmpPath, blob, { mode: 0o600 });
+  renameSync(tmpPath, encPath);
+  if (process.platform === "win32") restrictPathToOwner(encPath);
 }
 
 function deleteCredentialsFile(): void {
@@ -225,15 +247,26 @@ export function getCredentialSource(): "keychain" | "env" | "file" {
   return "keychain";
 }
 
+// Cached keychain support result — avoids repeated probe writes.
+let _keychainSupported: boolean | null = null;
+
 // Test if the OS keychain is available on this platform.
+// Result is cached after the first successful probe.
 export async function hasKeychainSupport(): Promise<boolean> {
+  if (_keychainSupported !== null) return _keychainSupported;
   try {
     await Bun.secrets.set({ service: SERVICE, name: "__kolshek_probe__", value: "p" });
     await Bun.secrets.delete({ service: SERVICE, name: "__kolshek_probe__" });
-    return true;
+    _keychainSupported = true;
   } catch {
-    return false;
+    _keychainSupported = false;
   }
+  return _keychainSupported;
+}
+
+// Reset the cached keychain support result (for testing).
+export function resetKeychainCache(): void {
+  _keychainSupported = null;
 }
 
 // Store credentials for a provider.
@@ -242,6 +275,7 @@ export async function storeCredentials(
   companyId: string,
   credentials: Record<string, string>,
 ): Promise<"keychain" | "file"> {
+  validateAlias(companyId);
   const keychainOk = await hasKeychainSupport();
   if (keychainOk) {
     const target = targetName(companyId);
@@ -281,6 +315,7 @@ export async function storeCredentials(
 export async function getCredentials(
   companyId: string,
 ): Promise<Record<string, string> | null> {
+  validateAlias(companyId);
   // Env vars take priority (CI / automation)
   const fromEnv = getCredentialsFromEnv(companyId);
   if (fromEnv) return fromEnv;
@@ -303,6 +338,7 @@ export async function getCredentials(
 
 // Check if credentials exist for a provider (env, keychain, or file).
 export async function hasCredentials(companyId: string): Promise<boolean> {
+  validateAlias(companyId);
   const fromEnv = getCredentialsFromEnv(companyId);
   if (fromEnv) return true;
 
@@ -320,6 +356,7 @@ export async function hasCredentials(companyId: string): Promise<boolean> {
 
 // Delete stored credentials for a provider from keychain and/or file.
 export async function deleteCredentials(companyId: string): Promise<void> {
+  validateAlias(companyId);
   // Try keychain
   const target = targetName(companyId);
   try {
@@ -339,3 +376,17 @@ export async function deleteCredentials(companyId: string): Promise<void> {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Test-only exports — pure functions safe to expose for unit testing.
+// ---------------------------------------------------------------------------
+export const _internal = {
+  validateAlias,
+  encodePayload,
+  decodePayload,
+  sanitizeError,
+  encryptData,
+  decryptData,
+  getCredentialsFromEnv,
+  targetName,
+};
