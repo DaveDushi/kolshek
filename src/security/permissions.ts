@@ -17,8 +17,15 @@ export function restrictPathToOwner(targetPath: string): void {
 
 function restrictWindows(targetPath: string): void {
   // icacls: remove inherited permissions, grant only current user full control
-  const username = process.env.USERNAME;
-  if (!username) return;
+  const username = process.env.USERNAME
+    || process.env.USERPROFILE?.split("\\").pop();
+  if (!username) {
+    console.error(
+      `[security] WARNING: Cannot determine username for file permissions on ${targetPath}. ` +
+      "Credentials may be accessible to other users.",
+    );
+    return;
+  }
 
   const result = spawnSync("icacls", [
     targetPath,
@@ -27,10 +34,8 @@ function restrictWindows(targetPath: string): void {
     `${username}:(F)`,
   ], { stdio: "pipe", timeout: 5000 });
 
-  // Best-effort: if icacls fails (e.g. not on PATH), silently continue.
-  // The data is still protected by Windows user-session isolation.
-  if (result.status !== 0 && process.env.DEBUG) {
+  if (result.status !== 0) {
     const stderr = result.stderr?.toString().trim();
-    if (stderr) console.error(`[permissions] icacls warning: ${stderr}`);
+    console.error(`[security] WARNING: Failed to restrict permissions on ${targetPath}: ${stderr || "unknown error"}`);
   }
 }
