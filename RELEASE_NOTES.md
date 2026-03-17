@@ -1,11 +1,22 @@
-## v0.3.5
+## v0.3.6
 
-### Security
+### Features
 
-- **Migrated credential storage to Bun.secrets**: Replaced platform-specific subprocess wrappers (PowerShell+advapi32, macOS `security` CLI, Linux `secret-tool`) with Bun's native `Bun.secrets` API. Eliminates credential exposure in process listings and removes the PowerShell script injection surface.
-- **Input validation on credential aliases**: All credential storage functions now validate provider aliases against prototype pollution (`__proto__`, `constructor`), path traversal, and special character injection.
-- **Atomic credential file writes**: Encrypted credential files now use write-to-temp + rename to prevent corruption on crash or power loss.
-- **Windows permission hardening**: Credential files now get explicit owner-only ACLs via `icacls` (not just the parent directory). Permission failures are always logged instead of silently swallowed.
-- **Keychain probe caching**: The OS keychain availability check is cached after the first call, avoiding repeated probe writes that could leave residual entries on process interruption.
-- **Payload size limits**: Credential payloads larger than 64KB are rejected before parsing to prevent resource exhaustion.
-- **Security test suite**: Added 47 unit tests covering alias validation, AES-256-GCM encrypt/decrypt roundtrips, tamper detection, error sanitization, and environment variable credential parsing.
+- **Multi-agent plugin rewrite**: Consolidated plugin system from 7+ tool-specific integration folders into a single canonical source. Skills now install from one source to Claude Code, OpenCode, Codex, and OpenClaw.
+- **New skills — analyze and review** (by Adir): `/kolshek:analyze` for deep-dive financial analysis with budget targets, and `/kolshek:review` for monthly spending reviews with progress report cards.
+- **CLI reference documentation**: Added complete CLI reference to plugin skills covering all commands, global flags, command aliases, exit codes, DB schema, and SQL patterns.
+
+### Bug Fixes
+
+- **Fixed init wizard offering unsupported AI tools**: Removed dead tool options (Cursor, Gemini CLI, Windsurf, Aider) and added missing ones (OpenCode, Codex) to match supported tools.
+- **Fixed Codex skill install path**: Skills now install to `~/.codex/skills/` instead of the incorrect `.agents/skills/`.
+- **Fixed OpenClaw skill install path**: Skills now install to `~/.openclaw/workspace/skills/` instead of the incorrect `.agents/skills/`.
+- **Fixed `--type` flag documentation**: Corrected `--type <bank|card>` to `--type <bank|credit_card>` to match actual CLI.
+- **Removed dead `/kolshek:budget-app` references**: Replaced all references to the removed skill in init workflow and check-config hook.
+- **Fixed `/dev/null` usage in check-config hook**: Replaced with variable capture for Windows compatibility.
+
+### Other
+
+- **Standardized skill frontmatter**: All 5 skills now have consistent `allowed-tools`, `compatibility`, and `metadata` fields.
+- **Added missing commands to CLI reference**: Documented `dashboard`, `update`, and `plugin` commands, plus `--visible` and `-m, --month-offset` flags.
+- **Added release step for plugin bundle regeneration**: Release command now regenerates embedded plugin files before committing.
