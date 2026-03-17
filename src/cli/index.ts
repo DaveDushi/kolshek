@@ -28,6 +28,7 @@ import { registerIncomeCommand } from "./commands/income.js";
 import { registerTrendsCommand } from "./commands/trends.js";
 import { registerInsightsCommand } from "./commands/insights.js";
 import { registerDashboardCommand } from "./commands/dashboard.js";
+import { registerUpdateCommand } from "./commands/update.js";
 import { getMostRecentSyncTime, listProviders } from "../db/repositories/providers.js";
 import { loadConfig } from "../config/loader.js";
 import { syncProviders } from "../core/sync-engine.js";
@@ -62,7 +63,7 @@ program
 
     // Ensure data directories and init DB for commands that need it
     const commandName = actionCommand.name();
-    if (commandName !== "init") {
+    if (commandName !== "init" && commandName !== "update") {
       await ensureDirectories();
       const dbPath = getDbPath();
       initDatabase(dbPath);
@@ -141,6 +142,7 @@ registerIncomeCommand(program);
 registerTrendsCommand(program);
 registerInsightsCommand(program);
 registerDashboardCommand(program);
+registerUpdateCommand(program);
 
 // Parse and run
 program.parseAsync(process.argv).then(() => {
