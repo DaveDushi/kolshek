@@ -23,7 +23,7 @@ An open-source CLI that pulls transactions from Israeli banks and credit cards i
 ## Features
 
 - **Web dashboard** — HTMX-powered settings UI for managing providers, categories, and translations with real-time fetch progress via SSE
-- **Built for AI agents** — first-class plugins for Claude Code, Cursor, Gemini CLI, and more. Let your AI assistant query your finances, build your budget, generate reports, and spot anomalies
+- **Built for AI agents** — first-class plugins for Claude Code, OpenCode, Codex, and OpenClaw. Let your AI assistant query your finances, analyze spending, generate reports, and spot anomalies
 - **`kolshek query`** — read-only SQL so agents (or you) can ask anything
 - **`kolshek db`** — schema introspection for agents to self-discover your tables
 - **`--json` on every command** — structured output agents can parse and act on
@@ -74,10 +74,13 @@ This walks you through adding your first bank or credit card, testing the connec
 kolshek accounts
 ```
 
-4. (Optional) Install the AI agent plugin:
+4. (Optional) Install the AI agent plugin for your tool:
 
 ```bash
-kolshek plugin install claude-code
+kolshek plugin install claude-code   # Claude Code
+kolshek plugin install opencode      # OpenCode
+kolshek plugin install codex         # Codex (OpenAI)
+kolshek plugin install openclaw      # OpenClaw
 ```
 
 ### Prerequisites
