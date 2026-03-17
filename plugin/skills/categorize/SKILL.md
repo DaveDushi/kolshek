@@ -4,7 +4,7 @@ description: Analyze transactions and create auto-categorization rules for expen
 compatibility: Requires KolShek CLI (kolshek) installed and configured with at least one provider.
 metadata:
   author: kolshek
-  version: "0.3.2"
+  version: "0.3.3"
 allowed-tools: Bash Read AskUserQuestion
 ---
 
