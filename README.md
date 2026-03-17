@@ -8,7 +8,7 @@
 
 An open-source CLI that pulls transactions from Israeli banks and credit cards into a local SQLite database. No cloud. No telemetry. No account required.
 
-[Website](https://kolshek.com) &bull; [Quick Start](#quick-start) &bull; [Features](#features) &bull; [Supported Banks](#supported-institutions) &bull; [Usage](#usage) &bull; [Security](#security) &bull; [Docs](docs/)
+[Website](https://kolshek.com) &bull; [Quick Start](#quick-start) &bull; [Features](#features) &bull; [Supported Banks](#supported-institutions) &bull; [Usage](#usage) &bull; [AI Skills](#ai-agent-skills) &bull; [Security](#security) &bull; [Docs](docs/)
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/DaveDushi/kolshek)](https://github.com/DaveDushi/kolshek/releases)
@@ -146,6 +146,22 @@ kolshek update
 # Structured output for AI agents
 kolshek accounts --json
 ```
+
+## AI Agent Skills
+
+The plugin gives your AI agent specialized skills for working with your financial data:
+
+| Skill | What it does |
+|-------|-------------|
+| `/kolshek:init` | Set up from scratch — connect banks, fetch transactions, translate Hebrew, categorize spending |
+| `/kolshek:translate` | Translate Hebrew merchant names to English with review and approval |
+| `/kolshek:categorize` | Analyze transactions and create auto-categorization rules for expenses and income |
+| `/kolshek:analyze` | Deep-dive financial analysis — income/expense mapping, savings opportunities, phased action plan |
+| `/kolshek:review` | Monthly financial review — budget compliance, anomaly detection, report card |
+
+The `analyze` and `review` skills were designed by [Adir Traitel](https://adirtraitel.com/).
+
+See [AI Agent Integration](docs/ai-agents.md) for full details.
 
 ## Configuration
 
