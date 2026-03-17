@@ -1,11 +1,9 @@
 ---
 name: categorize
-description: Analyze transactions and create auto-categorization rules for expenses and income. Use when user asks to categorize, label, classify, or tag transactions, set up spending categories, manage category rules, rename or merge categories, or reassign transactions in KolShek.
-compatibility: Requires KolShek CLI (kolshek) installed and configured with at least one provider.
-metadata:
-  author: kolshek
-  version: "0.3.4"
-allowed-tools: Bash Read AskUserQuestion
+description: >
+  Analyze transactions and create auto-categorization rules for expenses and income.
+  Use when: categorize, label, classify, tag transactions, set up spending categories,
+  manage category rules, rename or merge categories, reassign transactions in KolShek.
 ---
 
 # /kolshek:categorize
@@ -14,7 +12,12 @@ You are helping the user categorize their transactions. This covers both expense
 
 ## Before You Start
 
-Run the standard Skill Startup Checks (see CONTEXT.md reference). Then:
+Read `references/cli-reference.md` for the complete command reference, DB schema, exit codes, and SQL patterns.
+
+Run startup checks:
+1. `kolshek providers list --json` — if empty, guide user to `kolshek providers add`.
+2. `kolshek transactions list --limit 1 --json` — if empty, offer to fetch.
+3. `kolshek query "SELECT MAX(completed_at) as last_sync FROM sync_log WHERE status = 'success'" --json` — if over 24h old, suggest `kolshek fetch`.
 
 **Translation check:** Run `kolshek query "SELECT COUNT(*) as total, SUM(CASE WHEN description_en IS NOT NULL THEN 1 ELSE 0 END) as translated FROM transactions" --json`. If most descriptions lack `description_en`, suggest running `/kolshek:translate` first — categorizing English descriptions is more reliable than raw Hebrew.
 

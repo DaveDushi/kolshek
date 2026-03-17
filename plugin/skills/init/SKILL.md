@@ -1,16 +1,18 @@
 ---
 name: init
-description: Set up KolShek from scratch — connect bank accounts and credit cards, fetch transactions, translate Hebrew descriptions, and categorize spending. Use when user wants to initialize, set up, onboard, or get started with KolShek.
-compatibility: Requires KolShek CLI (kolshek) installed and configured.
-metadata:
-  author: kolshek
-  version: "0.3.4"
-allowed-tools: Bash Read Write AskUserQuestion
+description: >
+  Set up KolShek from scratch — connect bank accounts and credit cards,
+  fetch transactions, translate Hebrew descriptions, and categorize spending.
+  Use when: initialize, set up, onboard, get started with KolShek.
 ---
 
 # /kolshek:init
 
 You are running the KolShek initialization skill. Your job is to get the user's financial data flowing — providers connected, transactions fetched, translated, and categorized. No project setup here — that happens in dedicated skills like `/kolshek:budget-app`.
+
+## Before You Start
+
+Read `references/cli-reference.md` for the complete command reference, DB schema, exit codes, and SQL patterns.
 
 ## Step 1: Check CLI
 
