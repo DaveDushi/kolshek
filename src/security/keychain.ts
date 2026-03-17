@@ -2,7 +2,7 @@
 //
 // Three backends (checked in order):
 //   1. Environment variables (for CI/automation)
-//   2. OS keychain (Windows Credential Manager / macOS Keychain / Linux secret-tool)
+//   2. OS keychain via Bun.secrets (Windows Credential Manager / macOS Keychain / Linux libsecret)
 //   3. Encrypted file (AES-256-GCM fallback when keychain unavailable, e.g. WSL)
 //
 // Credentials are stored as base64-encoded JSON in keychain,
@@ -24,7 +24,7 @@ function targetName(companyId: string): string {
   return `${SERVICE}:${companyId}`;
 }
 
-/** Base64-encode a JSON object for safe storage in credential password fields. */
+// Base64-encode a JSON object for safe storage in credential password fields.
 function encodePayload(data: Record<string, string>): string {
   return Buffer.from(JSON.stringify(data), "utf-8").toString("base64");
 }
@@ -44,7 +44,7 @@ function decodePayload(encoded: string): Record<string, string> {
   return parsed as Record<string, string>;
 }
 
-/** Strip any credential values from an error message to prevent leaks. */
+// Strip any credential values from an error message to prevent leaks.
 function sanitizeError(err: unknown, secrets: string[]): Error {
   let msg = err instanceof Error ? err.message : String(err);
   for (const s of secrets) {
@@ -53,213 +53,20 @@ function sanitizeError(err: unknown, secrets: string[]): Error {
   return new Error(msg);
 }
 
-/** Run a subprocess and return stdout. Throws on non-zero exit. */
-async function run(
-  cmd: string[],
-  stdin?: string,
-): Promise<string> {
-  const proc = Bun.spawn(cmd, {
-    stdout: "pipe",
-    stderr: "pipe",
-    stdin: stdin !== undefined ? "pipe" : undefined,
-  });
-
-  if (stdin !== undefined && proc.stdin) {
-    proc.stdin.write(stdin);
-    proc.stdin.end();
-  }
-
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-
-  if (exitCode !== 0) {
-    throw new Error(`Command failed (exit ${exitCode}): ${stderr.trim() || stdout.trim()}`);
-  }
-  return stdout;
-}
-
 // ---------------------------------------------------------------------------
-// Windows — PowerShell + advapi32 CredRead / CredWrite / CredDelete
+// OS keychain via Bun.secrets
 // ---------------------------------------------------------------------------
 
-const WIN_PS_PREAMBLE = `
-Add-Type -Namespace Win32 -Name Cred -UsingNamespace System.Text -MemberDefinition @'
-  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-  public struct CREDENTIAL {
-    public int Flags;
-    public int Type;
-    public string TargetName;
-    public string Comment;
-    public long LastWritten;
-    public int CredentialBlobSize;
-    public IntPtr CredentialBlob;
-    public int Persist;
-    public int AttributeCount;
-    public IntPtr Attributes;
-    public string TargetAlias;
-    public string UserName;
-  }
-
-  [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-  public static extern bool CredRead(string target, int type, int reservedFlag, out IntPtr credential);
-
-  [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-  public static extern bool CredWrite([In] ref CREDENTIAL credential, [In] uint flags);
-
-  [DllImport("advapi32.dll", SetLastError = true)]
-  public static extern bool CredDelete(string target, int type, int flags);
-
-  [DllImport("advapi32.dll", SetLastError = true)]
-  public static extern void CredFree(IntPtr cred);
-'@
-`;
-
-/** Escape a string for safe embedding in a PowerShell double-quoted string */
-function escapePsString(s: string): string {
-  return s
-    .replace(/\0/g, "")           // strip null bytes
-    .replace(/[`"$]/g, "`$&")
-    .replace(/\r/g, "`r")
-    .replace(/\n/g, "`n");
+async function keychainStore(target: string, encoded: string): Promise<void> {
+  await Bun.secrets.set({ service: SERVICE, name: target, value: encoded });
 }
 
-function winStoreScript(target: string, encoded: string): string {
-  const safeTarget = escapePsString(target);
-  const safeEncoded = escapePsString(encoded);
-  return `${WIN_PS_PREAMBLE}
-$bytes = [System.Text.Encoding]::Unicode.GetBytes("${safeEncoded}")
-$cred = New-Object Win32.Cred+CREDENTIAL
-$cred.Type = 1          # CRED_TYPE_GENERIC
-$cred.TargetName = "${safeTarget}"
-$cred.UserName = "${SERVICE}"
-$cred.Persist = 2       # CRED_PERSIST_LOCAL_MACHINE
-$cred.CredentialBlobSize = $bytes.Length
-$cred.CredentialBlob = [Runtime.InteropServices.Marshal]::AllocHGlobal($bytes.Length)
-[Runtime.InteropServices.Marshal]::Copy($bytes, 0, $cred.CredentialBlob, $bytes.Length)
-$ok = [Win32.Cred]::CredWrite([ref]$cred, 0)
-[Runtime.InteropServices.Marshal]::FreeHGlobal($cred.CredentialBlob)
-if (-not $ok) { throw "CredWrite failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
-`;
+async function keychainRead(target: string): Promise<string | null> {
+  return Bun.secrets.get({ service: SERVICE, name: target });
 }
 
-function winReadScript(target: string): string {
-  const safeTarget = escapePsString(target);
-  return `${WIN_PS_PREAMBLE}
-$ptr = [IntPtr]::Zero
-$ok = [Win32.Cred]::CredRead("${safeTarget}", 1, 0, [ref]$ptr)
-if (-not $ok) { exit 1 }
-$cred = [Runtime.InteropServices.Marshal]::PtrToStructure($ptr, [Type][Win32.Cred+CREDENTIAL])
-$size = $cred.CredentialBlobSize
-$bytes = New-Object byte[] $size
-[Runtime.InteropServices.Marshal]::Copy($cred.CredentialBlob, $bytes, 0, $size)
-[Win32.Cred]::CredFree($ptr)
-[System.Text.Encoding]::Unicode.GetString($bytes)
-`;
-}
-
-function winDeleteScript(target: string): string {
-  const safeTarget = escapePsString(target);
-  return `${WIN_PS_PREAMBLE}
-$ok = [Win32.Cred]::CredDelete("${safeTarget}", 1, 0)
-if (-not $ok) { throw "CredDelete failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
-`;
-}
-
-async function winStore(target: string, encoded: string): Promise<void> {
-  // Pass script via stdin to avoid exposing credentials in process command line
-  await run(["powershell", "-NoProfile", "-NonInteractive", "-Command", "-"], winStoreScript(target, encoded));
-}
-
-async function winRead(target: string): Promise<string | null> {
-  try {
-    const out = await run(["powershell", "-NoProfile", "-NonInteractive", "-Command", "-"], winReadScript(target));
-    return out.trim();
-  } catch {
-    return null;
-  }
-}
-
-async function winDelete(target: string): Promise<void> {
-  await run(["powershell", "-NoProfile", "-NonInteractive", "-Command", "-"], winDeleteScript(target));
-}
-
-async function winHasKeychain(): Promise<boolean> {
-  try {
-    await run(["powershell", "-NoProfile", "-NonInteractive", "-Command", "echo ok"]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// macOS — security CLI
-// ---------------------------------------------------------------------------
-
-async function macStore(target: string, encoded: string): Promise<void> {
-  // -U = update if exists (no need for delete-first)
-  // -w VALUE = set password directly (stdin piping is unreliable — macOS prompts
-  //   "retype password" via /dev/tty even when stdin is a pipe, causing silent failures)
-  // The value is base64-encoded, and ps is same-user-only on macOS 10.12+.
-  await run(["security", "add-generic-password", "-U", "-s", SERVICE, "-a", target, "-w", encoded]);
-}
-
-async function macRead(target: string): Promise<string | null> {
-  try {
-    const out = await run(["security", "find-generic-password", "-s", SERVICE, "-a", target, "-w"]);
-    return out.trim();
-  } catch {
-    return null;
-  }
-}
-
-async function macDelete(target: string): Promise<void> {
-  await run(["security", "delete-generic-password", "-s", SERVICE, "-a", target]);
-}
-
-async function macHasKeychain(): Promise<boolean> {
-  try {
-    await run(["security", "help"]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Linux — secret-tool CLI (freedesktop Secret Service)
-// ---------------------------------------------------------------------------
-
-async function linuxStore(target: string, encoded: string): Promise<void> {
-  await run(
-    ["secret-tool", "store", "--label", target, "service", SERVICE, "account", target],
-    encoded,
-  );
-}
-
-async function linuxRead(target: string): Promise<string | null> {
-  try {
-    const out = await run(["secret-tool", "lookup", "service", SERVICE, "account", target]);
-    return out.trim();
-  } catch {
-    return null;
-  }
-}
-
-async function linuxDelete(target: string): Promise<void> {
-  await run(["secret-tool", "clear", "service", SERVICE, "account", target]);
-}
-
-async function linuxHasKeychain(): Promise<boolean> {
-  try {
-    await run(["which", "secret-tool"]);
-    return true;
-  } catch {
-    return false;
-  }
+async function keychainDelete(target: string): Promise<boolean> {
+  return Bun.secrets.delete({ service: SERVICE, name: target });
 }
 
 // ---------------------------------------------------------------------------
@@ -353,35 +160,6 @@ function deleteCredentialsFile(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Platform dispatch
-// ---------------------------------------------------------------------------
-
-type Platform = "win32" | "darwin" | "linux";
-
-function getPlatform(): Platform {
-  const p = process.platform;
-  if (p === "win32" || p === "darwin" || p === "linux") return p;
-  throw new Error(`Unsupported platform for keychain: ${p}`);
-}
-
-interface KeychainBackend {
-  store(target: string, encoded: string): Promise<void>;
-  read(target: string): Promise<string | null>;
-  delete(target: string): Promise<void>;
-  hasKeychain(): Promise<boolean>;
-}
-
-const backends: Record<Platform, KeychainBackend> = {
-  win32: { store: winStore, read: winRead, delete: winDelete, hasKeychain: winHasKeychain },
-  darwin: { store: macStore, read: macRead, delete: macDelete, hasKeychain: macHasKeychain },
-  linux: { store: linuxStore, read: linuxRead, delete: linuxDelete, hasKeychain: linuxHasKeychain },
-};
-
-function backend(): KeychainBackend {
-  return backends[getPlatform()];
-}
-
-// ---------------------------------------------------------------------------
 // Environment variable backend
 // ---------------------------------------------------------------------------
 
@@ -416,12 +194,7 @@ function getCredentialsFromEnv(companyId: string): Record<string, string> | null
 // Public API
 // ---------------------------------------------------------------------------
 
-/**
- * Determine which credential source is being used.
- * Returns 'env' if KOLSHEK_CREDENTIALS_JSON or any KOLSHEK_*_USERNAME/PASSWORD
- * env var is set; otherwise returns 'keychain'.
- */
-/** Non-credential env vars that should not trigger env credential source */
+// Non-credential env vars that should not trigger env credential source
 const NON_CREDENTIAL_VARS = new Set([
   "KOLSHEK_CHROME_PATH",
   "KOLSHEK_CONCURRENCY",
@@ -430,6 +203,7 @@ const NON_CREDENTIAL_VARS = new Set([
   "KOLSHEK_NO_SANDBOX",
 ]);
 
+// Determine which credential source is being used.
 export function getCredentialSource(): "keychain" | "env" | "file" {
   if (process.env.KOLSHEK_CREDENTIALS_JSON) return "env";
 
@@ -451,12 +225,12 @@ export function getCredentialSource(): "keychain" | "env" | "file" {
   return "keychain";
 }
 
-/**
- * Test if the OS keychain is available on this platform.
- */
+// Test if the OS keychain is available on this platform.
 export async function hasKeychainSupport(): Promise<boolean> {
   try {
-    return await backend().hasKeychain();
+    await Bun.secrets.set({ service: SERVICE, name: "__kolshek_probe__", value: "p" });
+    await Bun.secrets.delete({ service: SERVICE, name: "__kolshek_probe__" });
+    return true;
   } catch {
     return false;
   }
@@ -473,7 +247,7 @@ export async function storeCredentials(
     const target = targetName(companyId);
     const encoded = encodePayload(credentials);
     try {
-      await backend().store(target, encoded);
+      await keychainStore(target, encoded);
     } catch (err) {
       throw sanitizeError(err, [encoded, ...Object.values(credentials)]);
     }
@@ -514,13 +288,13 @@ export async function getCredentials(
   // OS keychain
   const target = targetName(companyId);
   try {
-    const encoded = await backend().read(target);
+    const encoded = await keychainRead(target);
     if (encoded) return decodePayload(encoded);
   } catch {
     // Keychain failed — fall through to file
   }
 
-  // Credentials file (varlock fallback)
+  // Credentials file (fallback)
   const fromFile = loadCredentialsFile();
   if (fromFile[companyId]) return fromFile[companyId];
 
@@ -534,7 +308,7 @@ export async function hasCredentials(companyId: string): Promise<boolean> {
 
   const target = targetName(companyId);
   try {
-    const encoded = await backend().read(target);
+    const encoded = await keychainRead(target);
     if (encoded != null && encoded.length > 0) return true;
   } catch {
     // Keychain failed — check file
@@ -549,7 +323,7 @@ export async function deleteCredentials(companyId: string): Promise<void> {
   // Try keychain
   const target = targetName(companyId);
   try {
-    await backend().delete(target);
+    await keychainDelete(target);
   } catch {
     // May not exist in keychain
   }
