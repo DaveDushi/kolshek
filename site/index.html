@@ -55,14 +55,14 @@
                 <!-- Brand -->
                 <a
                     href="#"
-                    class="flex items-center gap-2.5 text-heading font-semibold text-lg no-underline"
+                    class="flex items-center gap-2 text-heading font-semibold text-lg no-underline"
                 >
                     <img
                         src="logo.png"
                         alt="KolShek"
-                        class="w-12 h-12 rounded-lg"
+                        class="w-8 h-8 rounded-md"
                     />
-                    <!--<span>KolShek</span>-->
+                    <span>KolShek</span>
                 </a>
 
                 <!-- Desktop nav pills -->
@@ -301,24 +301,26 @@
                 <!-- Left: text content -->
                 <div class="hero-left">
                     <!-- Logo + Badge -->
-                    <div
-                        class="flex items-center gap-3 mb-6 font-bold text-2xl"
-                    >
-                        <span>KolShek</span>
+                    <div class="flex items-center gap-3 mb-6">
                         <img
                             src="logo.png"
                             alt="KolShek logo"
                             class="w-14 h-14 md:w-16 md:h-16 rounded-xl logo-glow"
                         />
-                        <span class="badge" id="hero-version"></span>
-                        <span class="badge badge-beta">BETA</span>
+                        <div class="flex flex-col gap-1">
+                            <span class="text-2xl font-bold text-heading">KolShek</span>
+                            <div class="flex items-center gap-2">
+                                <span class="badge" id="hero-version"></span>
+                                <span class="badge badge-beta">BETA</span>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Headline -->
                     <h1
                         class="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-4"
                     >
-                        <span style="color: var(--color-primary-500)">Your Israeli finances, locally,</span><br />
+                        <span class="text-heading">Your Israeli finances, </span><span style="color: var(--color-primary-500)">locally,</span><br />
                         <span class="text-heading">on your terms.</span>
                     </h1>
 
