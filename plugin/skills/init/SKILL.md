@@ -1,9 +1,11 @@
 ---
 name: init
-description: >
-  Set up KolShek from scratch — connect bank accounts and credit cards,
-  fetch transactions, translate Hebrew descriptions, and categorize spending.
-  Use when: initialize, set up, onboard, get started with KolShek.
+description: Set up KolShek from scratch — connect bank accounts and credit cards, fetch transactions, translate Hebrew descriptions, and categorize spending. Use when user wants to initialize, set up, onboard, or get started with KolShek.
+compatibility: Requires KolShek CLI (kolshek) installed and configured.
+metadata:
+  author: kolshek
+  version: "0.3.5"
+allowed-tools: Bash Read Write AskUserQuestion
 ---
 
 # /kolshek:init

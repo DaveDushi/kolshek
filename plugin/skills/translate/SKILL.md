@@ -1,9 +1,11 @@
 ---
 name: translate
-description: >
-  Translate Hebrew transaction descriptions to English for better readability
-  and categorization. Use when: translate, transliterate, or convert Hebrew
-  merchant names to English in KolShek.
+description: Translate Hebrew transaction descriptions to English for better readability and categorization. Use when user asks to translate, transliterate, or convert Hebrew merchant names to English in KolShek.
+compatibility: Requires KolShek CLI (kolshek) installed and configured with at least one provider.
+metadata:
+  author: kolshek
+  version: "0.3.5"
+allowed-tools: Bash Read AskUserQuestion
 ---
 
 # /kolshek:translate

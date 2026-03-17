@@ -1,9 +1,11 @@
 ---
 name: categorize
-description: >
-  Analyze transactions and create auto-categorization rules for expenses and income.
-  Use when: categorize, label, classify, tag transactions, set up spending categories,
-  manage category rules, rename or merge categories, reassign transactions in KolShek.
+description: Analyze transactions and create auto-categorization rules for expenses and income. Use when user asks to categorize, label, classify, or tag transactions, set up spending categories, manage category rules, rename or merge categories, or reassign transactions in KolShek.
+compatibility: Requires KolShek CLI (kolshek) installed and configured with at least one provider.
+metadata:
+  author: kolshek
+  version: "0.3.5"
+allowed-tools: Bash Read AskUserQuestion
 ---
 
 # /kolshek:categorize

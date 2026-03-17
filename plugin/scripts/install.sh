@@ -3,14 +3,14 @@
 # install.sh — Install KolShek plugin for a specific agentic tool.
 #
 # Generates tool-specific configs directly from canonical plugin/skills/
-# and plugin/agents/ sources. No convert.sh or integrations/ needed.
+# sources. No convert.sh or integrations/ needed.
 #
 # Usage:
 #   ./plugin/scripts/install.sh --tool <name> [--project-dir <path>] [--help]
 #
 # Tools:
 #   claude-code  — Copy plugin to ~/.claude/plugins/kolshek/ (native)
-#   opencode     — Generate .opencode/ configs in project dir
+#   opencode     — Generate .opencode/skills/ in project dir
 #   codex        — Generate AGENTS.md + .agents/skills/ in project dir
 #   openclaw     — Generate .agents/skills/ in project dir
 
@@ -52,18 +52,11 @@ get_frontmatter() {
   sed -n '/^---$/,/^---$/p' "$file" | grep "^${field}:" | sed "s/^${field}:[[:space:]]*//"
 }
 
-# Extract body (everything after second ---) from a markdown file
-get_body() {
-  local file="$1"
-  sed -n '/^---$/,/^---$/!p' "$file" | tail -n +1
-}
-
 # --- Claude Code ---
 install_claude_code() {
   local dest="${HOME}/.claude/plugins/kolshek"
   mkdir -p "$dest"
   cp -r "$PLUGIN_DIR/.claude-plugin" "$dest/" 2>&1 || true
-  cp -r "$PLUGIN_DIR/agents" "$dest/" 2>&1 || true
   cp -r "$PLUGIN_DIR/skills" "$dest/" 2>&1 || true
   cp -r "$PLUGIN_DIR/hooks" "$dest/" 2>&1 || true
   cp -r "$PLUGIN_DIR/references" "$dest/" 2>&1 || true
@@ -76,8 +69,7 @@ install_claude_code() {
 # --- OpenCode ---
 install_opencode() {
   local skills_dest="$PROJECT_DIR/.opencode/skills"
-  local agent_dest="$PROJECT_DIR/.opencode/agent"
-  mkdir -p "$skills_dest" "$agent_dest"
+  mkdir -p "$skills_dest"
 
   local count=0
   for d in "$PLUGIN_DIR"/skills/*/; do
@@ -88,35 +80,7 @@ install_opencode() {
     (( count++ )) || true
   done
 
-  # Convert agents to OpenCode agent format
-  for f in "$PLUGIN_DIR"/agents/*.md; do
-    [[ -f "$f" ]] || continue
-    local agent_name
-    agent_name="$(basename "$f" .md)"
-    local desc
-    desc="$(get_frontmatter "$f" "description" | head -1)"
-    local color
-    color="$(get_frontmatter "$f" "color")"
-    local body
-    body="$(get_body "$f")"
-
-    cat > "$agent_dest/kolshek-${agent_name}.md" <<AGENT_EOF
----
-name: kolshek-${agent_name}
-description: ${desc}
-color: ${color:-green}
----
-
-${body}
-
-## CLI Reference
-
-Read \`.opencode/skills/kolshek-init/references/cli-reference.md\` for the complete KolShek command reference.
-AGENT_EOF
-    (( count++ )) || true
-  done
-
-  info "OpenCode: $count items -> $PROJECT_DIR/.opencode/"
+  info "OpenCode: $count skills -> $PROJECT_DIR/.opencode/"
   warn "Project-scoped. Run from your project root."
 }
 
@@ -132,24 +96,12 @@ install_codex() {
     local name
     name="$(basename "$d")"
     copy_skill_with_context "$d" "$skills_dest/kolshek-$name"
-    local desc
-    desc="$(get_frontmatter "$d/SKILL.md" "name")"
     skill_index="${skill_index}\n- **kolshek-${name}**: $(get_frontmatter "$d/SKILL.md" "description" | head -1)"
     (( count++ )) || true
   done
 
-  # Generate AGENTS.md with finance-assistant + skill index
-  local fa_body=""
-  if [[ -f "$PLUGIN_DIR/agents/finance-assistant.md" ]]; then
-    fa_body="$(get_body "$PLUGIN_DIR/agents/finance-assistant.md")"
-  fi
-
   cat > "$PROJECT_DIR/AGENTS.md" <<AGENTS_EOF
 # KolShek (כל שקל) — Israeli Finance CLI
-
-## Finance Assistant
-
-${fa_body}
 
 ## Available Skills
 
@@ -179,28 +131,6 @@ install_openclaw() {
     copy_skill_with_context "$d" "$skills_dest/kolshek-$name"
     (( count++ )) || true
   done
-
-  # Convert finance-assistant agent to a skill for OpenClaw
-  if [[ -f "$PLUGIN_DIR/agents/finance-assistant.md" ]]; then
-    local fa_dest="$skills_dest/kolshek-finance-assistant"
-    mkdir -p "$fa_dest/references"
-    local desc
-    desc="$(get_frontmatter "$PLUGIN_DIR/agents/finance-assistant.md" "description" | head -1)"
-    local body
-    body="$(get_body "$PLUGIN_DIR/agents/finance-assistant.md")"
-
-    cat > "$fa_dest/SKILL.md" <<SKILL_EOF
----
-name: finance-assistant
-description: ${desc}
----
-
-${body}
-SKILL_EOF
-
-    cp "$PLUGIN_DIR/references/cli-reference.md" "$fa_dest/references/"
-    (( count++ )) || true
-  fi
 
   info "OpenClaw: $count skills -> $skills_dest/"
   warn "Project-scoped. Run from your project root."
