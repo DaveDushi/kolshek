@@ -10,7 +10,7 @@ allowed-tools: Bash Read Write AskUserQuestion
 
 # /kolshek:init
 
-You are running the KolShek initialization skill. Your job is to get the user's financial data flowing — providers connected, transactions fetched, translated, and categorized. No project setup here — that happens in dedicated skills like `/kolshek:budget-app`.
+You are running the KolShek initialization skill. Your job is to get the user's financial data flowing — providers connected, transactions fetched, translated, and categorized.
 
 ## Before You Start
 
@@ -178,7 +178,7 @@ Present:
 > - **Auto-fetch:** every Xh / not scheduled
 >
 > **What's next?**
-> - `/kolshek:budget-app` — Build a personal budget dashboard
+> - `/kolshek:analyze` — Deep-dive financial analysis with budget targets
 > - `/kolshek:categorize` — Update category rules
 > - `/kolshek:translate` — Update translation rules
 > - Or just ask me anything about your finances.

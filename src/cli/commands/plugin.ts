@@ -50,8 +50,8 @@ function getInstallTarget(tool: Tool): { dir: string; description: string } {
       };
     case "openclaw":
       return {
-        dir: join(process.cwd(), ".agents", "skills"),
-        description: "OpenClaw skills (project-scoped)",
+        dir: join(homedir(), ".openclaw", "workspace", "skills"),
+        description: "OpenClaw skills",
       };
   }
 }
@@ -160,7 +160,7 @@ export function registerPluginCommand(program: Command): void {
         } else if (tool === "codex") {
           info("  Also created AGENTS.md at project root.");
           warn("  Project-scoped — run from your project root.");
-        } else {
+        } else if (tool === "opencode") {
           warn("  Project-scoped — run from your project root.");
         }
       }

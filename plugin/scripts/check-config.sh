@@ -9,7 +9,7 @@ if [ $? -ne 0 ] || [ -z "$CONFIG_DIR" ]; then
 fi
 
 # Check if kolshek CLI is available
-if ! command -v kolshek &>/dev/null; then
+if ! _kolshek_path=$(command -v kolshek 2>&1); then
   echo "KolShek CLI is not installed. Run /kolshek:init to get started."
   exit 0
 fi
@@ -50,7 +50,7 @@ fi
 status_msg="KolShek: ready"
 [ -n "$config_files" ] && status_msg="${status_msg}, configured:${config_files}"
 [ -n "$has_schedule" ] && status_msg="${status_msg}, auto-fetch: on"
-[ -z "$config_files" ] && status_msg="${status_msg}. Try /kolshek:budget-app to build something."
+[ -z "$config_files" ] && status_msg="${status_msg}. Run /kolshek:analyze to set budget targets."
 
 echo "$status_msg"
 exit 0

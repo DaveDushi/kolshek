@@ -5,6 +5,11 @@ description: >
   targets, detects anomalies, and produces a progress report card.
   Use when: monthly review, month comparison, budget check, spending review,
   report card, how they did this month, progress check, monthly checkup.
+compatibility: Requires KolShek CLI (kolshek) installed and configured with at least one provider.
+metadata:
+  author: kolshek
+  version: "0.3.5"
+allowed-tools: Bash Read Write AskUserQuestion
 ---
 
 # /kolshek:review

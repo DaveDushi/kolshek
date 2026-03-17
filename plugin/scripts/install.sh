@@ -120,7 +120,7 @@ AGENTS_EOF
 
 # --- OpenClaw ---
 install_openclaw() {
-  local skills_dest="$PROJECT_DIR/.agents/skills"
+  local skills_dest="${HOME}/.openclaw/workspace/skills"
   mkdir -p "$skills_dest"
 
   local count=0
@@ -133,7 +133,6 @@ install_openclaw() {
   done
 
   info "OpenClaw: $count skills -> $skills_dest/"
-  warn "Project-scoped. Run from your project root."
 }
 
 # --- Main ---

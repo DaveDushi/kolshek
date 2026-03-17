@@ -11,22 +11,35 @@ You are working with **KolShek** (כל שקל), an Israeli finance CLI that scra
 5. **Check exit codes** on every command and handle accordingly (see table below).
 6. **Providers can have aliases.** The same bank/card company can have multiple instances (e.g., personal + joint account). Use the alias to target a specific instance, or company ID to target all instances of that company.
 
+## Global Flags
+
+These flags work on any command:
+
+```
+--json                Output as JSON (envelope format)
+-q, --quiet           Suppress non-essential output
+--no-color            Disable ANSI colors
+--no-progress         Disable spinners and progress bars
+--non-interactive     Never prompt; fail if input is needed
+--no-auto-fetch       Skip automatic fetch on stale data
+```
+
 ## Command Quick Reference
 
 ### Provider Management
 ```
 kolshek providers list [--json]
-kolshek providers add                          # interactive — user runs this themselves, supports multi-instance with aliases
-kolshek providers auth <id>                    # interactive — update credentials for existing provider
+kolshek providers add [--visible]               # interactive — user runs this themselves, supports multi-instance with aliases
+kolshek providers auth <id> [--visible]        # interactive — update credentials for existing provider
 kolshek providers remove <id> [--json]
-kolshek providers test <id> [--json]
+kolshek providers test <id> [--visible] [--json]
 ```
 
 **Provider resolution in commands:** providers can be referenced by numeric ID, alias (exact match), or company ID (matches ALL instances of that company).
 
 ### Fetching Data
 ```
-kolshek fetch [providers...] [--from <date>] [--to <date>] [--force] [--type <bank|card>] [--stealth] [--visible] [--json]
+kolshek fetch [providers...] [--from <date>] [--to <date>] [--force] [--type <bank|credit_card>] [--stealth] [--visible] [--json]
 ```
 
 Fetch output includes `scrapeStartDate` and `scrapeEndDate` per provider in JSON mode.
@@ -50,14 +63,14 @@ Uses OS scheduler (Windows Task Scheduler / cron / systemd). Config stored in da
 
 ### Viewing Data
 ```
-kolshek transactions list [--from] [--to] [--provider] [--type] [--account] [--min] [--max] [--status] [--sort] [--limit] [--json]
+kolshek transactions list [--from] [--to] [--provider] [--type] [--account] [--min] [--max] [--status] [--sort] [--limit] [--json]   # alias: tx
 kolshek transactions search <query> [--from] [--to] [--provider] [--limit] [--json]
 kolshek transactions delete <id> [--yes] [--json]
 kolshek transactions export <csv|json> [--from] [--to] [--output <path>] [--json]
-kolshek accounts [--provider] [--type] [--json]
+kolshek accounts [--provider] [--type] [--json]                                                                                       # alias: bal
 ```
 
-### Categorization
+### Categorization (alias: cat)
 ```
 kolshek categorize rule add <category> --match <pattern> [--match-exact] [--match-regex] [--memo] [--account] [--amount] [--amount-min] [--amount-max] [--direction] [--priority <n>] [--json]
 kolshek categorize rule list [--json]
@@ -73,7 +86,7 @@ kolshek categorize reassign --file <path> [--dry-run] [--json]
 
 `rule add` supports multiple conditions (AND'd together): `--match`/`--match-exact`/`--match-regex` for description, `--memo` for memo, `--account` for provider:account, `--amount`/`--amount-min`/`--amount-max` for amount, `--direction` for debit/credit. Use `--priority` to control evaluation order. Duplicate conditions are blocked — remove the existing rule first if you need to change its category.
 
-### Translation (Hebrew→English)
+### Translation (alias: tr)
 ```
 kolshek translate rule add <english> --match <pattern> [--json]
 kolshek translate rule list [--json]
@@ -85,11 +98,11 @@ kolshek translate rule import [file] [--json]
 
 ### Spending & Income Analysis
 ```
-kolshek spending [month] [--group-by <category|merchant|provider>] [--category <name>] [--top <n>] [--type] [--lifestyle] [--json]
+kolshek spending [month] [--group-by <category|merchant|provider>] [--category <name>] [--top <n>] [--type] [-m, --month-offset <n>] [--lifestyle] [--json]
 kolshek spending exclude add <category>          # mark category as non-spending
 kolshek spending exclude remove <category>       # unmark
 kolshek spending exclude list [--json]           # show excluded categories
-kolshek income [month] [--salary-only] [--include-refunds] [--json]
+kolshek income [month] [--salary-only] [--include-refunds] [-m, --month-offset <n>] [--json]
 kolshek trends [months] [--mode <total|category|fixed-variable>] [--category <name>] [--type] [--json]
 kolshek insights [--months <n>] [--json]
 ```
@@ -100,7 +113,7 @@ Month formats: `current`, `prev`, `-3`, `2026-03`, or omit for current month.
 
 **Income defaults to bank accounts only** — CC positive amounts are refunds, not income. Use `--include-refunds` to see them.
 
-### Reports
+### Reports (alias: report)
 ```
 kolshek reports monthly [--from] [--to] [--type] [--json]
 kolshek reports categories [--from] [--to] [--type] [--json]
@@ -108,11 +121,27 @@ kolshek reports merchants [--from] [--to] [--type] [--limit] [--json]
 kolshek reports balance [--json]
 ```
 
-### Database & Queries
+### Database & Queries (query alias: sql)
 ```
 kolshek db tables [--json]
 kolshek db schema <table> [--json]
 kolshek query <sql> [--limit] [--json]
+```
+
+### Dashboard
+```
+kolshek dashboard [-p, --port <port>] [--no-open]   # open local settings dashboard (default port: 3000)
+```
+
+### Self-Update
+```
+kolshek update [--check]           # update to latest release; --check only reports without installing
+```
+
+### Plugin Management
+```
+kolshek plugin install <tool>      # install AI agent plugin (claude-code, opencode, codex, openclaw)
+kolshek plugin list                # list available integrations and install status
 ```
 
 ### Setup

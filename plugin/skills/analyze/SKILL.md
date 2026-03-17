@@ -5,6 +5,11 @@ description: >
   opportunities, and creates a phased action plan with budget targets.
   Use when: analyze finances, financial checkup, deep dive, find savings,
   audit expenses, map income, understand where money goes, check financial health.
+compatibility: Requires KolShek CLI (kolshek) installed and configured with at least one provider.
+metadata:
+  author: kolshek
+  version: "0.3.5"
+allowed-tools: Bash Read Write AskUserQuestion
 ---
 
 # /kolshek:analyze

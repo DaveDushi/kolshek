@@ -338,12 +338,10 @@ export function registerInitCommand(program: Command): void {
         message: "Do you use an AI coding assistant? Install the KolShek plugin:",
         choices: [
           { value: "skip", name: "Skip — I'll do this later" },
-          { value: "openclaw", name: "OpenClaw" },
           { value: "claude-code", name: "Claude Code" },
-          { value: "cursor", name: "Cursor" },
-          { value: "gemini-cli", name: "Gemini CLI" },
-          { value: "windsurf", name: "Windsurf" },
-          { value: "aider", name: "Aider" },
+          { value: "opencode", name: "OpenCode" },
+          { value: "codex", name: "Codex" },
+          { value: "openclaw", name: "OpenClaw" },
         ],
       });
 
