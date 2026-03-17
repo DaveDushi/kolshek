@@ -4,7 +4,7 @@ description: Design and build a personal budget dashboard or Telegram bot powere
 compatibility: Requires KolShek CLI (kolshek) installed and configured with transaction data.
 metadata:
   author: kolshek
-  version: "0.3.0"
+  version: "0.3.2"
 allowed-tools: Bash Read Write Edit Glob Grep AskUserQuestion
 ---
 
