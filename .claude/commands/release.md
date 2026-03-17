@@ -11,11 +11,14 @@ Create a new release for KolShek. Steps:
    - minor: 0.1.4 → 0.2.0
    - major: 0.1.4 → 1.0.0
 3. Run `git log --oneline` from the last tag to HEAD to see what changed
-4. Update `RELEASE_NOTES.md` with a summary of the changes since the last release. Group by:
-   - **Features** (new functionality)
-   - **Bug Fixes** (corrections)
-   - **Other** (refactors, docs, etc.) — omit if empty
-   Write concise, user-facing descriptions (not raw commit messages). Skip version bump commits.
+4. Write the new release notes:
+   a. **Replace** `RELEASE_NOTES.md` with ONLY the new version's notes (no previous versions). Group by:
+      - **Features** (new functionality)
+      - **Bug Fixes** (corrections)
+      - **Security** (security improvements) — omit if empty
+      - **Other** (refactors, docs, etc.) — omit if empty
+      Write concise, user-facing descriptions (not raw commit messages). Skip version bump commits.
+   b. **Prepend** the same section to `CHANGELOG.md` — insert it right after the `# Changelog` header, above the previous entries, with a `---` separator between versions.
 5. Update the `"version"` field in `package.json`
 6. Update the `version` field in all skill and plugin files:
    - `plugin/.claude-plugin/plugin.json`
