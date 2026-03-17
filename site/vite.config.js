@@ -3,6 +3,7 @@ import { resolve } from "path";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
+  base: "/kolshek/",
   plugins: [tailwindcss()],
   build: {
     outDir: "dist",
