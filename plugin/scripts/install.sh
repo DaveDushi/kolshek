@@ -86,36 +86,19 @@ install_opencode() {
 
 # --- Codex ---
 install_codex() {
-  local skills_dest="$PROJECT_DIR/.agents/skills"
+  local skills_dest="${HOME}/.codex/skills"
   mkdir -p "$skills_dest"
 
   local count=0
-  local skill_index=""
   for d in "$PLUGIN_DIR"/skills/*/; do
     [[ -f "$d/SKILL.md" ]] || continue
     local name
     name="$(basename "$d")"
     copy_skill_with_context "$d" "$skills_dest/kolshek-$name"
-    skill_index="${skill_index}\n- **kolshek-${name}**: $(get_frontmatter "$d/SKILL.md" "description" | head -1)"
     (( count++ )) || true
   done
 
-  cat > "$PROJECT_DIR/AGENTS.md" <<AGENTS_EOF
-# KolShek (כל שקל) — Israeli Finance CLI
-
-## Available Skills
-
-Skills are located in \`.agents/skills/kolshek-*/SKILL.md\`. Read a skill file for detailed instructions.
-
-$(echo -e "$skill_index")
-
-## CLI Reference
-
-Read \`.agents/skills/kolshek-init/references/cli-reference.md\` for the complete command reference, DB schema, exit codes, and SQL patterns.
-AGENTS_EOF
-
-  info "Codex: $count skills + AGENTS.md -> $PROJECT_DIR/"
-  warn "Project-scoped. Run from your project root."
+  info "Codex: $count skills -> $skills_dest/"
 }
 
 # --- OpenClaw ---

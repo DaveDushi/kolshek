@@ -19,7 +19,7 @@ import {
   warn,
   ExitCode,
 } from "../output.js";
-import { PLUGIN_FILES, AGENTS_MD, type PluginBundle } from "../plugin-files.js";
+import { PLUGIN_FILES, type PluginBundle } from "../plugin-files.js";
 
 const SUPPORTED_TOOLS = [
   "claude-code",
@@ -45,8 +45,8 @@ function getInstallTarget(tool: Tool): { dir: string; description: string } {
       };
     case "codex":
       return {
-        dir: join(process.cwd(), ".agents", "skills"),
-        description: "Codex skills (project-scoped)",
+        dir: join(home, ".codex", "skills"),
+        description: "Codex skills",
       };
     case "openclaw":
       return {
@@ -87,12 +87,6 @@ export function installPlugin(
 
   const target = getInstallTarget(tool as Tool);
   const count = writeFiles(files, target.dir);
-
-  // Codex also gets AGENTS.md at project root
-  if (tool === "codex") {
-    const agentsPath = join(process.cwd(), "AGENTS.md");
-    writeFileSync(agentsPath, AGENTS_MD, "utf-8");
-  }
 
   return { success: true, count, dir: target.dir, description: target.description };
 }
@@ -157,9 +151,6 @@ export function registerPluginCommand(program: Command): void {
           info(
             `  Add to settings: "pluginDirs": ["${result.dir}"]`,
           );
-        } else if (tool === "codex") {
-          info("  Also created AGENTS.md at project root.");
-          warn("  Project-scoped — run from your project root.");
         } else if (tool === "opencode") {
           warn("  Project-scoped — run from your project root.");
         }

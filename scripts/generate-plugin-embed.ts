@@ -70,9 +70,8 @@ try {
   }
 } catch {}
 
-// --- Codex: skills → .agents/skills/kolshek-{name}/ + AGENTS.md ---
+// --- Codex: skills → ~/.codex/skills/kolshek-{name}/ ---
 const codexFiles: ToolFiles = {};
-const skillIndex: string[] = [];
 try {
   for (const skillName of readdirSync(skillsDir)) {
     const skillDir = join(skillsDir, skillName);
@@ -85,47 +84,11 @@ try {
       const cliRef = readFileSync(join(PLUGIN_DIR, "references", "cli-reference.md"), "utf-8");
       codexFiles[`kolshek-${skillName}/references/cli-reference.md`] = cliRef;
     } catch {}
-    // Read skill description for index (handles single-line and YAML folded block >)
-    try {
-      const skillMd = readFileSync(join(skillDir, "SKILL.md"), "utf-8");
-      const frontmatter = skillMd.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-      if (frontmatter) {
-        const fm = frontmatter[1];
-        // Check for multiline first: description: >\n  indented text
-        const multiLine = fm.match(/^description:\s*>\s*\r?\n((?:[ \t]+.+(?:\r?\n|$))+)/m);
-        if (multiLine) {
-          const desc = multiLine[1].replace(/\r?\n\s*/g, " ").trim();
-          skillIndex.push(`- **kolshek-${skillName}**: ${desc}`);
-        } else {
-          // Single-line: description: Some text
-          const singleLine = fm.match(/^description:\s*(.+)$/m);
-          if (singleLine && singleLine[1].trim() !== ">") {
-            skillIndex.push(`- **kolshek-${skillName}**: ${singleLine[1].trim()}`);
-          }
-        }
-      }
-    } catch {}
   }
 } catch {}
 
-// Generate AGENTS.md content
-const agentsMd = [
-  "# KolShek (כל שקל) — Israeli Finance CLI",
-  "",
-  "## Available Skills",
-  "",
-  "Skills are located in `.agents/skills/kolshek-*/SKILL.md`. Read a skill file for detailed instructions.",
-  "",
-  ...skillIndex,
-  "",
-  "## CLI Reference",
-  "",
-  "Read `.agents/skills/kolshek-init/references/cli-reference.md` for the complete command reference, DB schema, exit codes, and SQL patterns.",
-  "",
-].join("\n");
-
-// --- OpenClaw: same as Codex layout (agentskills.io standard) ---
-// OpenClaw reads .agents/skills/ natively, same file layout as Codex
+// --- OpenClaw: skills → ~/.openclaw/workspace/skills/kolshek-{name}/ ---
+// Same file layout as Codex (SKILL.md + references/), different install destination
 const openclawFiles: ToolFiles = { ...codexFiles };
 
 // Build the bundle
@@ -144,9 +107,6 @@ const lines: string[] = [
   "export interface PluginBundle {",
   "  [tool: string]: { [path: string]: string };",
   "}",
-  "",
-  "// AGENTS.md content for Codex installs",
-  `export const AGENTS_MD: string = ${JSON.stringify(agentsMd)};`,
   "",
   "export const PLUGIN_FILES: PluginBundle = {",
 ];
