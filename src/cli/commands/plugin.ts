@@ -1,5 +1,7 @@
 /**
  * kolshek plugin — Install AI agent integrations for various tools.
+ *
+ * Supports: Claude Code, OpenCode, Codex, OpenClaw
  */
 
 import type { Command } from "commander";
@@ -17,17 +19,13 @@ import {
   warn,
   ExitCode,
 } from "../output.js";
-import { PLUGIN_FILES, type PluginBundle } from "../plugin-files.js";
+import { PLUGIN_FILES, AGENTS_MD, type PluginBundle } from "../plugin-files.js";
 
 const SUPPORTED_TOOLS = [
   "claude-code",
-  "openclaw",
-  "cursor",
-  "gemini-cli",
-  "antigravity",
   "opencode",
-  "aider",
-  "windsurf",
+  "codex",
+  "openclaw",
 ] as const;
 
 type Tool = (typeof SUPPORTED_TOOLS)[number];
@@ -40,40 +38,20 @@ function getInstallTarget(tool: Tool): { dir: string; description: string } {
         dir: join(home, ".claude", "plugins", "kolshek"),
         description: "Claude Code plugin",
       };
-    case "openclaw":
-      return {
-        dir: join(home, ".openclaw", "skills"),
-        description: "OpenClaw skills",
-      };
-    case "cursor":
-      return {
-        dir: join(process.cwd(), ".cursor", "rules"),
-        description: "Cursor rules (project-scoped)",
-      };
-    case "gemini-cli":
-      return {
-        dir: join(home, ".gemini", "extensions", "kolshek"),
-        description: "Gemini CLI extension",
-      };
-    case "antigravity":
-      return {
-        dir: join(home, ".gemini", "antigravity", "skills"),
-        description: "Antigravity skills",
-      };
     case "opencode":
       return {
-        dir: join(process.cwd(), ".opencode", "agent"),
-        description: "OpenCode agents (project-scoped)",
+        dir: join(process.cwd(), ".opencode"),
+        description: "OpenCode skills (project-scoped)",
       };
-    case "aider":
+    case "codex":
       return {
-        dir: process.cwd(),
-        description: "Aider conventions (project-scoped)",
+        dir: join(process.cwd(), ".agents", "skills"),
+        description: "Codex skills (project-scoped)",
       };
-    case "windsurf":
+    case "openclaw":
       return {
-        dir: process.cwd(),
-        description: "Windsurf rules (project-scoped)",
+        dir: join(process.cwd(), ".agents", "skills"),
+        description: "OpenClaw skills (project-scoped)",
       };
   }
 }
@@ -108,9 +86,14 @@ export function installPlugin(
   }
 
   const target = getInstallTarget(tool as Tool);
-  writeFiles(files, target.dir);
+  const count = writeFiles(files, target.dir);
 
-  const count = Object.keys(files).length;
+  // Codex also gets AGENTS.md at project root
+  if (tool === "codex") {
+    const agentsPath = join(process.cwd(), "AGENTS.md");
+    writeFileSync(agentsPath, AGENTS_MD, "utf-8");
+  }
+
   return { success: true, count, dir: target.dir, description: target.description };
 }
 
@@ -170,21 +153,14 @@ export function registerPluginCommand(program: Command): void {
         );
         info(`  Location: ${result.dir}`);
 
-        // Tool-specific post-install hints
         if (tool === "claude-code") {
           info(
             `  Add to settings: "pluginDirs": ["${result.dir}"]`,
           );
-        } else if (tool === "openclaw") {
-          info(
-            "  Skills are ready. Restart OpenClaw or ask it to refresh skills.",
-          );
-        } else if (
-          tool === "cursor" ||
-          tool === "opencode" ||
-          tool === "aider" ||
-          tool === "windsurf"
-        ) {
+        } else if (tool === "codex") {
+          info("  Also created AGENTS.md at project root.");
+          warn("  Project-scoped — run from your project root.");
+        } else {
           warn("  Project-scoped — run from your project root.");
         }
       }

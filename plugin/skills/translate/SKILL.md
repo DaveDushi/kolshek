@@ -14,7 +14,12 @@ You are helping the user translate their Hebrew transaction descriptions to Engl
 
 ## Before You Start
 
-Run the standard Skill Startup Checks (see CONTEXT.md reference). Then continue to Step 1.
+Read `references/cli-reference.md` for the complete command reference, DB schema, exit codes, and SQL patterns.
+
+Run startup checks:
+1. `kolshek providers list --json` — if empty, guide user to `kolshek providers add`.
+2. `kolshek transactions list --limit 1 --json` — if empty, offer to fetch.
+3. `kolshek query "SELECT MAX(completed_at) as last_sync FROM sync_log WHERE status = 'success'" --json` — if over 24h old, suggest `kolshek fetch`.
 
 ## Step 1: Seed Built-In Dictionary
 

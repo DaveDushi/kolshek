@@ -2,21 +2,17 @@
 #
 # install.sh — Install KolShek plugin for a specific agentic tool.
 #
-# Reads generated files from plugin/integrations/ and copies them to the
-# appropriate config directory. Run plugin/scripts/convert.sh first if
-# integrations/ is missing or stale.
+# Generates tool-specific configs directly from canonical plugin/skills/
+# sources. No convert.sh or integrations/ needed.
 #
 # Usage:
-#   ./plugin/scripts/install.sh --tool <name> [--help]
+#   ./plugin/scripts/install.sh --tool <name> [--project-dir <path>] [--help]
 #
 # Tools:
-#   claude-code  — Install plugin to ~/.claude/plugins/kolshek/ (native)
-#   cursor       — Copy rules to .cursor/rules/ in current directory
-#   gemini-cli   — Install extension to ~/.gemini/extensions/kolshek/
-#   antigravity  — Copy skills to ~/.gemini/antigravity/skills/
-#   opencode     — Copy agents to .opencode/agent/ in current directory
-#   aider        — Copy CONVENTIONS.md to current directory
-#   windsurf     — Copy .windsurfrules to current directory
+#   claude-code  — Copy plugin to ~/.claude/plugins/kolshek/ (native)
+#   opencode     — Generate .opencode/skills/ in project dir
+#   codex        — Generate AGENTS.md + .agents/skills/ in project dir
+#   openclaw     — Generate .agents/skills/ in project dir
 
 set -euo pipefail
 
@@ -35,155 +31,137 @@ header() { printf "\n${BOLD}%s${RESET}\n" "$*"; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-INTEGRATIONS="$PLUGIN_DIR/integrations"
+PROJECT_DIR="${PWD}"
 
 usage() {
-  sed -n '3,20p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '3,16p' "$0" | sed 's/^# \{0,1\}//'
   exit 0
 }
 
-check_integrations() {
-  if [[ ! -d "$INTEGRATIONS" ]]; then
-    error "integrations/ not found. Run ./plugin/scripts/convert.sh first."
-    exit 1
-  fi
+# Copy a skill directory + inject cli-reference.md into its references/
+copy_skill_with_context() {
+  local skill_dir="$1" dest_dir="$2"
+  cp -r "$skill_dir" "$dest_dir"
+  mkdir -p "$dest_dir/references"
+  cp "$PLUGIN_DIR/references/cli-reference.md" "$dest_dir/references/"
 }
 
+# Extract YAML frontmatter field from a markdown file
+get_frontmatter() {
+  local file="$1" field="$2"
+  sed -n '/^---$/,/^---$/p' "$file" | grep "^${field}:" | sed "s/^${field}:[[:space:]]*//"
+}
+
+# --- Claude Code ---
 install_claude_code() {
-  # Claude Code: copy the entire plugin directory as-is
   local dest="${HOME}/.claude/plugins/kolshek"
   mkdir -p "$dest"
-  # Copy canonical plugin files (not integrations)
-  cp -r "$PLUGIN_DIR/.claude-plugin" "$dest/" 2>/dev/null || true
-  cp -r "$PLUGIN_DIR/agents" "$dest/" 2>/dev/null || true
-  cp -r "$PLUGIN_DIR/skills" "$dest/" 2>/dev/null || true
-  cp -r "$PLUGIN_DIR/hooks" "$dest/" 2>/dev/null || true
-  cp -r "$PLUGIN_DIR/scripts" "$dest/" 2>/dev/null || true
-  cp "$PLUGIN_DIR/CONTEXT.md" "$dest/" 2>/dev/null || true
+  cp -r "$PLUGIN_DIR/.claude-plugin" "$dest/" 2>&1 || true
+  cp -r "$PLUGIN_DIR/skills" "$dest/" 2>&1 || true
+  cp -r "$PLUGIN_DIR/hooks" "$dest/" 2>&1 || true
+  cp -r "$PLUGIN_DIR/references" "$dest/" 2>&1 || true
+  mkdir -p "$dest/scripts"
+  cp "$PLUGIN_DIR/scripts/check-config.sh" "$dest/scripts/" 2>&1 || true
   info "Claude Code: plugin installed -> $dest"
-  echo "  Add to ~/.claude/settings.json: \"pluginDirs\": [\"$dest\"]"
+  echo "  Ensure ~/.claude/settings.json has: \"pluginDirs\": [\"$dest\"]"
 }
 
-install_cursor() {
-  local src="$INTEGRATIONS/cursor/rules"
-  local dest="${PWD}/.cursor/rules"
-  [[ -d "$src" ]] || { error "Run convert.sh first."; exit 1; }
-  mkdir -p "$dest"
-  local count=0
-  for f in "$src"/*.mdc; do
-    [[ -f "$f" ]] || continue
-    cp "$f" "$dest/"
-    (( count++ )) || true
-  done
-  info "Cursor: $count rules -> $dest"
-  warn "Project-scoped. Run from your project root."
-}
-
-install_gemini_cli() {
-  local src="$INTEGRATIONS/gemini-cli"
-  local dest="${HOME}/.gemini/extensions/kolshek"
-  [[ -d "$src" ]] || { error "Run convert.sh first."; exit 1; }
-  mkdir -p "$dest/skills"
-  cp "$src/gemini-extension.json" "$dest/"
-  local count=0
-  for d in "$src"/skills/*/; do
-    [[ -f "$d/SKILL.md" ]] || continue
-    local name
-    name="$(basename "$d")"
-    mkdir -p "$dest/skills/$name"
-    cp "$d/SKILL.md" "$dest/skills/$name/"
-    (( count++ )) || true
-  done
-  info "Gemini CLI: $count skills -> $dest"
-}
-
-install_antigravity() {
-  local src="$INTEGRATIONS/antigravity"
-  local dest="${HOME}/.gemini/antigravity/skills"
-  [[ -d "$src" ]] || { error "Run convert.sh first."; exit 1; }
-  mkdir -p "$dest"
-  local count=0
-  for d in "$src"/*/; do
-    [[ -f "$d/SKILL.md" ]] || continue
-    local name
-    name="$(basename "$d")"
-    mkdir -p "$dest/$name"
-    cp "$d/SKILL.md" "$dest/$name/"
-    (( count++ )) || true
-  done
-  info "Antigravity: $count skills -> $dest"
-}
-
+# --- OpenCode ---
 install_opencode() {
-  local src="$INTEGRATIONS/opencode/agent"
-  local dest="${PWD}/.opencode/agent"
-  [[ -d "$src" ]] || { error "Run convert.sh first."; exit 1; }
-  mkdir -p "$dest"
+  local skills_dest="$PROJECT_DIR/.opencode/skills"
+  mkdir -p "$skills_dest"
+
   local count=0
-  for f in "$src"/*.md; do
-    [[ -f "$f" ]] || continue
-    cp "$f" "$dest/"
+  for d in "$PLUGIN_DIR"/skills/*/; do
+    [[ -f "$d/SKILL.md" ]] || continue
+    local name
+    name="$(basename "$d")"
+    copy_skill_with_context "$d" "$skills_dest/kolshek-$name"
     (( count++ )) || true
   done
-  info "OpenCode: $count agents -> $dest"
+
+  info "OpenCode: $count skills -> $PROJECT_DIR/.opencode/"
   warn "Project-scoped. Run from your project root."
 }
 
-install_aider() {
-  local src="$INTEGRATIONS/aider/CONVENTIONS.md"
-  local dest="${PWD}/CONVENTIONS.md"
-  [[ -f "$src" ]] || { error "Run convert.sh first."; exit 1; }
-  if [[ -f "$dest" ]]; then
-    warn "CONVENTIONS.md already exists at $dest — remove to reinstall."
-    return 0
-  fi
-  cp "$src" "$dest"
-  info "Aider: CONVENTIONS.md -> $dest"
+# --- Codex ---
+install_codex() {
+  local skills_dest="$PROJECT_DIR/.agents/skills"
+  mkdir -p "$skills_dest"
+
+  local count=0
+  local skill_index=""
+  for d in "$PLUGIN_DIR"/skills/*/; do
+    [[ -f "$d/SKILL.md" ]] || continue
+    local name
+    name="$(basename "$d")"
+    copy_skill_with_context "$d" "$skills_dest/kolshek-$name"
+    skill_index="${skill_index}\n- **kolshek-${name}**: $(get_frontmatter "$d/SKILL.md" "description" | head -1)"
+    (( count++ )) || true
+  done
+
+  cat > "$PROJECT_DIR/AGENTS.md" <<AGENTS_EOF
+# KolShek (כל שקל) — Israeli Finance CLI
+
+## Available Skills
+
+Skills are located in \`.agents/skills/kolshek-*/SKILL.md\`. Read a skill file for detailed instructions.
+
+$(echo -e "$skill_index")
+
+## CLI Reference
+
+Read \`.agents/skills/kolshek-init/references/cli-reference.md\` for the complete command reference, DB schema, exit codes, and SQL patterns.
+AGENTS_EOF
+
+  info "Codex: $count skills + AGENTS.md -> $PROJECT_DIR/"
   warn "Project-scoped. Run from your project root."
 }
 
-install_windsurf() {
-  local src="$INTEGRATIONS/windsurf/.windsurfrules"
-  local dest="${PWD}/.windsurfrules"
-  [[ -f "$src" ]] || { error "Run convert.sh first."; exit 1; }
-  if [[ -f "$dest" ]]; then
-    warn ".windsurfrules already exists at $dest — remove to reinstall."
-    return 0
-  fi
-  cp "$src" "$dest"
-  info "Windsurf: .windsurfrules -> $dest"
+# --- OpenClaw ---
+install_openclaw() {
+  local skills_dest="$PROJECT_DIR/.agents/skills"
+  mkdir -p "$skills_dest"
+
+  local count=0
+  for d in "$PLUGIN_DIR"/skills/*/; do
+    [[ -f "$d/SKILL.md" ]] || continue
+    local name
+    name="$(basename "$d")"
+    copy_skill_with_context "$d" "$skills_dest/kolshek-$name"
+    (( count++ )) || true
+  done
+
+  info "OpenClaw: $count skills -> $skills_dest/"
   warn "Project-scoped. Run from your project root."
 }
 
+# --- Main ---
 main() {
   local tool=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --tool) tool="${2:?'--tool requires a value'}"; shift 2 ;;
+      --project-dir) PROJECT_DIR="${2:?'--project-dir requires a value'}"; shift 2 ;;
       --help|-h) usage ;;
       *) error "Unknown option: $1"; usage ;;
     esac
   done
 
   if [[ -z "$tool" ]]; then
-    error "Missing --tool. Options: claude-code, cursor, gemini-cli, antigravity, opencode, aider, windsurf"
+    error "Missing --tool. Options: claude-code, opencode, codex, openclaw"
     exit 1
   fi
 
-  check_integrations
-
-  header "KolShek -- Installing for $tool"
+  header "KolShek — Installing for $tool"
 
   case "$tool" in
     claude-code) install_claude_code ;;
-    cursor)      install_cursor      ;;
-    gemini-cli)  install_gemini_cli  ;;
-    antigravity) install_antigravity ;;
     opencode)    install_opencode    ;;
-    aider)       install_aider       ;;
-    windsurf)    install_windsurf    ;;
-    *) error "Unknown tool '$tool'."; exit 1 ;;
+    codex)       install_codex       ;;
+    openclaw)    install_openclaw    ;;
+    *) error "Unknown tool '$tool'. Options: claude-code, opencode, codex, openclaw"; exit 1 ;;
   esac
 
   echo ""

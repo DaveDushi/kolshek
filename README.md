@@ -8,7 +8,7 @@
 
 An open-source CLI that pulls transactions from Israeli banks and credit cards into a local SQLite database. No cloud. No telemetry. No account required.
 
-[Website](https://kolshek.com) &bull; [Quick Start](#quick-start) &bull; [Features](#features) &bull; [Supported Banks](#supported-institutions) &bull; [Usage](#usage) &bull; [Security](#security) &bull; [Docs](docs/)
+[Website](https://kolshek.com) &bull; [Quick Start](#quick-start) &bull; [Features](#features) &bull; [Supported Banks](#supported-institutions) &bull; [Usage](#usage) &bull; [AI Skills](#ai-agent-skills) &bull; [Security](#security) &bull; [Docs](docs/)
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/DaveDushi/kolshek)](https://github.com/DaveDushi/kolshek/releases)
@@ -23,7 +23,7 @@ An open-source CLI that pulls transactions from Israeli banks and credit cards i
 ## Features
 
 - **Web dashboard** — HTMX-powered settings UI for managing providers, categories, and translations with real-time fetch progress via SSE
-- **Built for AI agents** — first-class plugins for Claude Code, Cursor, Gemini CLI, and more. Let your AI assistant query your finances, build your budget, generate reports, and spot anomalies
+- **Built for AI agents** — first-class plugins for Claude Code, OpenCode, Codex, and OpenClaw. Let your AI assistant query your finances, analyze spending, generate reports, and spot anomalies
 - **`kolshek query`** — read-only SQL so agents (or you) can ask anything
 - **`kolshek db`** — schema introspection for agents to self-discover your tables
 - **`--json` on every command** — structured output agents can parse and act on
@@ -74,10 +74,13 @@ This walks you through adding your first bank or credit card, testing the connec
 kolshek accounts
 ```
 
-4. (Optional) Install the AI agent plugin:
+4. (Optional) Install the AI agent plugin for your tool:
 
 ```bash
-kolshek plugin install claude-code
+kolshek plugin install claude-code   # Claude Code
+kolshek plugin install opencode      # OpenCode
+kolshek plugin install codex         # Codex (OpenAI)
+kolshek plugin install openclaw      # OpenClaw
 ```
 
 ### Prerequisites
@@ -143,6 +146,22 @@ kolshek update
 # Structured output for AI agents
 kolshek accounts --json
 ```
+
+## AI Agent Skills
+
+The plugin gives your AI agent specialized skills for working with your financial data:
+
+| Skill | What it does |
+|-------|-------------|
+| `/kolshek:init` | Set up from scratch — connect banks, fetch transactions, translate Hebrew, categorize spending |
+| `/kolshek:translate` | Translate Hebrew merchant names to English with review and approval |
+| `/kolshek:categorize` | Analyze transactions and create auto-categorization rules for expenses and income |
+| `/kolshek:analyze` | Deep-dive financial analysis — income/expense mapping, savings opportunities, phased action plan |
+| `/kolshek:review` | Monthly financial review — budget compliance, anomaly detection, report card |
+
+The `analyze` and `review` skills were designed by [Adir Traitel](https://adirtraitel.com/).
+
+See [AI Agent Integration](docs/ai-agents.md) for full details.
 
 ## Configuration
 

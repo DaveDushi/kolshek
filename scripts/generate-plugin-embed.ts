@@ -34,41 +34,107 @@ function collectFiles(dir: string, base: string): [string, string][] {
   return results;
 }
 
-// Collect files per tool integration
-const bundle: PluginBundle = {};
-
-// Claude Code — the canonical plugin (agents, skills, hooks, scripts, CONTEXT.md, plugin.json)
-const claudeFiles: ToolFiles = {};
-const claudeDirs = ["agents", "skills", "hooks", "scripts", ".claude-plugin"];
-for (const dir of claudeDirs) {
+// Collect all canonical plugin files
+const pluginFiles: [string, string][] = [];
+const pluginDirs = ["skills", "hooks", "references", "scripts", ".claude-plugin"];
+for (const dir of pluginDirs) {
   const dirPath = join(PLUGIN_DIR, dir);
   try {
-    for (const [rel, content] of collectFiles(dirPath, PLUGIN_DIR)) {
-      claudeFiles[rel] = content;
-    }
+    pluginFiles.push(...collectFiles(dirPath, PLUGIN_DIR));
   } catch {
     // dir may not exist
   }
 }
-// Add CONTEXT.md
-try {
-  claudeFiles["CONTEXT.md"] = readFileSync(join(PLUGIN_DIR, "CONTEXT.md"), "utf-8");
-} catch {}
-bundle["claude-code"] = claudeFiles;
 
-// Other tools — from integrations/
-const integrationsDir = join(PLUGIN_DIR, "integrations");
+// --- Claude Code: gets the entire plugin as-is ---
+const claudeFiles: ToolFiles = {};
+for (const [rel, content] of pluginFiles) {
+  claudeFiles[rel] = content;
+}
+
+// --- OpenCode: skills → .opencode/skills/kolshek-{name}/ ---
+const opencodeFiles: ToolFiles = {};
+const skillsDir = join(PLUGIN_DIR, "skills");
 try {
-  for (const tool of readdirSync(integrationsDir)) {
-    const toolDir = join(integrationsDir, tool);
-    if (!statSync(toolDir).isDirectory()) continue;
-    const files: ToolFiles = {};
-    for (const [rel, content] of collectFiles(toolDir, toolDir)) {
-      files[rel] = content;
+  for (const skillName of readdirSync(skillsDir)) {
+    const skillDir = join(skillsDir, skillName);
+    if (!statSync(skillDir).isDirectory()) continue;
+    for (const [rel, content] of collectFiles(skillDir, skillDir)) {
+      opencodeFiles[`skills/kolshek-${skillName}/${rel}`] = content;
     }
-    bundle[tool] = files;
+    // Inject cli-reference.md into each skill's references/
+    try {
+      const cliRef = readFileSync(join(PLUGIN_DIR, "references", "cli-reference.md"), "utf-8");
+      opencodeFiles[`skills/kolshek-${skillName}/references/cli-reference.md`] = cliRef;
+    } catch {}
   }
 } catch {}
+
+// --- Codex: skills → .agents/skills/kolshek-{name}/ + AGENTS.md ---
+const codexFiles: ToolFiles = {};
+const skillIndex: string[] = [];
+try {
+  for (const skillName of readdirSync(skillsDir)) {
+    const skillDir = join(skillsDir, skillName);
+    if (!statSync(skillDir).isDirectory()) continue;
+    for (const [rel, content] of collectFiles(skillDir, skillDir)) {
+      codexFiles[`kolshek-${skillName}/${rel}`] = content;
+    }
+    // Inject cli-reference.md
+    try {
+      const cliRef = readFileSync(join(PLUGIN_DIR, "references", "cli-reference.md"), "utf-8");
+      codexFiles[`kolshek-${skillName}/references/cli-reference.md`] = cliRef;
+    } catch {}
+    // Read skill description for index (handles single-line and YAML folded block >)
+    try {
+      const skillMd = readFileSync(join(skillDir, "SKILL.md"), "utf-8");
+      const frontmatter = skillMd.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+      if (frontmatter) {
+        const fm = frontmatter[1];
+        // Check for multiline first: description: >\n  indented text
+        const multiLine = fm.match(/^description:\s*>\s*\r?\n((?:[ \t]+.+(?:\r?\n|$))+)/m);
+        if (multiLine) {
+          const desc = multiLine[1].replace(/\r?\n\s*/g, " ").trim();
+          skillIndex.push(`- **kolshek-${skillName}**: ${desc}`);
+        } else {
+          // Single-line: description: Some text
+          const singleLine = fm.match(/^description:\s*(.+)$/m);
+          if (singleLine && singleLine[1].trim() !== ">") {
+            skillIndex.push(`- **kolshek-${skillName}**: ${singleLine[1].trim()}`);
+          }
+        }
+      }
+    } catch {}
+  }
+} catch {}
+
+// Generate AGENTS.md content
+const agentsMd = [
+  "# KolShek (כל שקל) — Israeli Finance CLI",
+  "",
+  "## Available Skills",
+  "",
+  "Skills are located in `.agents/skills/kolshek-*/SKILL.md`. Read a skill file for detailed instructions.",
+  "",
+  ...skillIndex,
+  "",
+  "## CLI Reference",
+  "",
+  "Read `.agents/skills/kolshek-init/references/cli-reference.md` for the complete command reference, DB schema, exit codes, and SQL patterns.",
+  "",
+].join("\n");
+
+// --- OpenClaw: same as Codex layout (agentskills.io standard) ---
+// OpenClaw reads .agents/skills/ natively, same file layout as Codex
+const openclawFiles: ToolFiles = { ...codexFiles };
+
+// Build the bundle
+const bundle: PluginBundle = {
+  "claude-code": claudeFiles,
+  "opencode": opencodeFiles,
+  "codex": codexFiles,
+  "openclaw": openclawFiles,
+};
 
 // Generate TypeScript
 const lines: string[] = [
@@ -78,6 +144,9 @@ const lines: string[] = [
   "export interface PluginBundle {",
   "  [tool: string]: { [path: string]: string };",
   "}",
+  "",
+  "// AGENTS.md content for Codex installs",
+  `export const AGENTS_MD: string = ${JSON.stringify(agentsMd)};`,
   "",
   "export const PLUGIN_FILES: PluginBundle = {",
 ];

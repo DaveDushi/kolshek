@@ -12,6 +12,10 @@ allowed-tools: Bash Read Write AskUserQuestion
 
 You are running the KolShek initialization skill. Your job is to get the user's financial data flowing — providers connected, transactions fetched, translated, and categorized. No project setup here — that happens in dedicated skills like `/kolshek:budget-app`.
 
+## Before You Start
+
+Read `references/cli-reference.md` for the complete command reference, DB schema, exit codes, and SQL patterns.
+
 ## Step 1: Check CLI
 
 Run `command -v kolshek` (or `which kolshek`) to verify the CLI is installed. If not found:

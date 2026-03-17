@@ -5,12 +5,32 @@ KolShek is built for AI agents. Every command supports `--json` for structured o
 ## Install a Plugin
 
 ```bash
-kolshek plugin install claude-code
-kolshek plugin install cursor
-kolshek plugin install gemini-cli
+kolshek plugin install claude-code   # Claude Code
+kolshek plugin install opencode      # OpenCode
+kolshek plugin install codex         # Codex (OpenAI)
+kolshek plugin install openclaw      # OpenClaw
 ```
 
-Run `kolshek plugin list` to see all available integrations.
+Run `kolshek plugin list` to see all available integrations and their install status.
+
+### What Gets Installed
+
+| Tool | Location | Contents |
+|------|----------|----------|
+| Claude Code | `~/.claude/plugins/kolshek/` | Full plugin (skills, hooks, references) |
+| OpenCode | `.opencode/skills/kolshek-*/` | Skills with embedded CLI reference |
+| Codex | `.agents/skills/kolshek-*/` + `AGENTS.md` | Skills + agent discovery index |
+| OpenClaw | `.agents/skills/kolshek-*/` | Skills (agentskills.io format) |
+
+### Skills Included
+
+| Skill | Description |
+|-------|-------------|
+| `init` | Set up KolShek — connect providers, fetch transactions, translate, categorize |
+| `translate` | Translate Hebrew transaction descriptions to English |
+| `categorize` | Analyze transactions and create auto-categorization rules |
+| `analyze` | Deep-dive financial analysis with savings opportunities and action plans |
+| `review` | Monthly financial review — budget compliance, anomalies, report card |
 
 ## Structured Output
 
@@ -52,7 +72,7 @@ kolshek db schema transactions --json  # Column details
 The `query` command gives read-only SQL access:
 
 ```bash
-kolshek query "SELECT description, SUM(chargedAmount) as total FROM transactions GROUP BY description ORDER BY total LIMIT 10" --json
+kolshek query "SELECT description, SUM(charged_amount) as total FROM transactions GROUP BY description ORDER BY total LIMIT 10" --json
 ```
 
 Only `SELECT`, `WITH`, `EXPLAIN`, and safe `PRAGMA` statements are allowed.
