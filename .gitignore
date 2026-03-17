@@ -1,6 +1,7 @@
 node_modules/
 dist/
 package-lock.json
+!site/package-lock.json
 
 # Claude Code local settings
 .claude/settings.local.json
@@ -29,3 +30,6 @@ src/cli/plugin-files.ts
 bun.lock
 
 !.env.schema
+
+.dev.vars
+.wrangler/

@@ -17,7 +17,10 @@ Create a new release for KolShek. Steps:
    - **Other** (refactors, docs, etc.) — omit if empty
    Write concise, user-facing descriptions (not raw commit messages). Skip version bump commits.
 5. Update the `"version"` field in `package.json`
-6. Commit both files with message: `Bump version to vX.Y.Z`
-7. Show me the release notes and new version and ask for confirmation before pushing
-8. After confirmation: push the commit, create tag `vX.Y.Z`, push the tag
-9. Show the GitHub Actions URL so I can monitor the release workflow
+6. Update the `version` field in all skill and plugin files:
+   - `plugin/.claude-plugin/plugin.json`
+   - All `plugin/skills/*/SKILL.md` (the `version` field in YAML frontmatter)
+7. Commit all updated files with message: `Bump version to vX.Y.Z`
+8. Show me the release notes and new version and ask for confirmation before pushing
+9. After confirmation: push the commit, create tag `vX.Y.Z`, push the tag
+10. Show the GitHub Actions URL so I can monitor the release workflow

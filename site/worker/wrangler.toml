@@ -1,0 +1,6 @@
+name = "kolshek-feedback"
+main = "worker.js"
+compatibility_date = "2024-12-01"
+
+# Secret (set via `wrangler secret put GITHUB_TOKEN`):
+# Fine-grained PAT with issues:write scope on DaveDushi/kolshek

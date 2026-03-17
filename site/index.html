@@ -1,0 +1,1938 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <!-- FOUC prevention: apply saved theme before any rendering -->
+        <script>
+            (function () {
+                var t = localStorage.getItem("kolshek-theme");
+                if (t === "light" || t === "dark") {
+                    document.documentElement.setAttribute("data-theme", t);
+                } else if (
+                    window.matchMedia("(prefers-color-scheme: light)").matches
+                ) {
+                    document.documentElement.setAttribute(
+                        "data-theme",
+                        "light",
+                    );
+                }
+            })();
+        </script>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>KolShek (כל שקל) — Your Israeli Finances, Locally</title>
+        <meta
+            name="description"
+            content="Open-source CLI for Israeli bank and credit card finance tracking. 100% local, no cloud, no telemetry. Built for AI agents."
+        />
+        <meta
+            property="og:title"
+            content="KolShek — Your Israeli Finances, Locally"
+        />
+        <meta
+            property="og:description"
+            content="Pull transactions from 17 Israeli banks and credit cards into a local SQLite database. Privacy-first, AI-ready, open source."
+        />
+        <meta property="og:image" content="logo.png" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary" />
+        <link rel="icon" type="image/png" href="logo.png" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="/src/main.css" />
+    </head>
+    <body class="min-h-screen">
+        <!-- ════════════════════════════════════════════════════════
+       A. NAVIGATION
+       ════════════════════════════════════════════════════════ -->
+        <header id="nav" class="nav-glass fixed top-0 left-0 right-0 z-50">
+            <nav
+                class="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14"
+            >
+                <!-- Brand -->
+                <a
+                    href="#"
+                    class="flex items-center gap-2.5 text-heading font-semibold text-lg no-underline"
+                >
+                    <img
+                        src="logo.png"
+                        alt="KolShek"
+                        class="w-12 h-12 rounded-lg"
+                    />
+                    <!--<span>KolShek</span>-->
+                </a>
+
+                <!-- Desktop nav pills -->
+                <div class="hidden md:flex items-center gap-1">
+                    <a href="#features" class="nav-pill">Features</a>
+                    <a href="#security" class="nav-pill">Security</a>
+                    <a href="#providers" class="nav-pill">Providers</a>
+                    <a href="#get-started" class="nav-pill">Get Started</a>
+                </div>
+
+                <!-- Desktop right group -->
+                <div class="hidden md:flex items-center gap-2">
+                    <a href="#feedback" class="btn btn-outline btn-sm"
+                        >Feedback</a
+                    >
+                    <div class="h-5 border-l border-theme-strong"></div>
+                    <a
+                        href="https://github.com/DaveDushi/kolshek"
+                        target="_blank"
+                        rel="noopener"
+                        class="btn-ghost p-2 rounded-lg"
+                        title="GitHub"
+                    >
+                        <svg
+                            class="w-5 h-5"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
+                            />
+                        </svg>
+                    </a>
+                    <div
+                        class="theme-toggle"
+                        role="radiogroup"
+                        aria-label="Theme"
+                    >
+                        <button
+                            class="theme-toggle-btn"
+                            data-theme-value="light"
+                            aria-label="Light theme"
+                            title="Light theme"
+                        >
+                            <svg
+                                class="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+                                />
+                            </svg>
+                        </button>
+                        <button
+                            class="theme-toggle-btn"
+                            data-theme-value="dark"
+                            aria-label="Dark theme"
+                            title="Dark theme"
+                        >
+                            <svg
+                                class="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                                />
+                            </svg>
+                        </button>
+                        <button
+                            class="theme-toggle-btn"
+                            data-theme-value="system"
+                            aria-label="System theme"
+                            title="System theme"
+                        >
+                            <svg
+                                class="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Mobile right -->
+                <div class="flex md:hidden items-center gap-1">
+                    <div
+                        class="theme-toggle"
+                        role="radiogroup"
+                        aria-label="Theme"
+                    >
+                        <button
+                            class="theme-toggle-btn"
+                            data-theme-value="light"
+                            aria-label="Light theme"
+                        >
+                            <svg
+                                class="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+                                />
+                            </svg>
+                        </button>
+                        <button
+                            class="theme-toggle-btn"
+                            data-theme-value="dark"
+                            aria-label="Dark theme"
+                        >
+                            <svg
+                                class="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                                />
+                            </svg>
+                        </button>
+                        <button
+                            class="theme-toggle-btn"
+                            data-theme-value="system"
+                            aria-label="System theme"
+                        >
+                            <svg
+                                class="w-3.5 h-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                />
+                            </svg>
+                        </button>
+                    </div>
+                    <button
+                        id="hamburger"
+                        class="hamburger btn-ghost p-2 rounded-lg"
+                        aria-label="Menu"
+                        aria-expanded="false"
+                    >
+                        <span class="flex flex-col gap-1">
+                            <span class="hamburger-line"></span>
+                            <span class="hamburger-line"></span>
+                            <span class="hamburger-line"></span>
+                        </span>
+                    </button>
+                </div>
+            </nav>
+
+            <!-- Mobile menu -->
+            <div id="mobile-menu" class="mobile-menu md:hidden">
+                <div
+                    class="px-4 py-3 flex flex-col gap-1 border-t border-theme"
+                >
+                    <a
+                        href="#features"
+                        class="nav-pill block py-3 px-4 rounded-lg"
+                        >Features</a
+                    >
+                    <a
+                        href="#security"
+                        class="nav-pill block py-3 px-4 rounded-lg"
+                        >Security</a
+                    >
+                    <a
+                        href="#providers"
+                        class="nav-pill block py-3 px-4 rounded-lg"
+                        >Providers</a
+                    >
+                    <a
+                        href="#get-started"
+                        class="nav-pill block py-3 px-4 rounded-lg"
+                        >Get Started</a
+                    >
+                    <a href="#feedback" class="btn btn-outline w-full mt-2"
+                        >Feedback</a
+                    >
+                    <a
+                        href="https://github.com/DaveDushi/kolshek"
+                        target="_blank"
+                        rel="noopener"
+                        class="btn btn-outline w-full flex items-center justify-center gap-2"
+                    >
+                        <svg
+                            class="w-4 h-4"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
+                            />
+                        </svg>
+                        GitHub
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- ════════════════════════════════════════════════════════
+       B. HERO
+       ════════════════════════════════════════════════════════ -->
+        <section class="hero-bg pt-28 pb-16 md:pt-36 md:pb-20 px-4 sm:px-6">
+            <div class="hero-split max-w-7xl mx-auto">
+                <!-- Left: text content -->
+                <div class="hero-left">
+                    <!-- Logo + Badge -->
+                    <div
+                        class="flex items-center gap-3 mb-6 font-bold text-2xl"
+                    >
+                        <span>KolShek</span>
+                        <img
+                            src="logo.png"
+                            alt="KolShek logo"
+                            class="w-14 h-14 md:w-16 md:h-16 rounded-xl logo-glow"
+                        />
+                        <span class="badge" id="hero-version"></span>
+                    </div>
+
+                    <!-- Headline -->
+                    <h1
+                        class="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-4"
+                    >
+                        <span class="gradient-text"
+                            >Your Israeli finances, locally,</span
+                        ><br />
+                        <span class="text-heading">on your terms.</span>
+                    </h1>
+
+                    <!-- Subheadline -->
+                    <p
+                        class="text-base md:text-lg text-body mb-8 leading-relaxed max-w-lg"
+                    >
+                        Open-source CLI that pulls transactions from 17 Israeli
+                        banks and credit cards into a local SQLite database. No
+                        cloud. No telemetry.
+                    </p>
+
+                    <!-- Stat counters -->
+                    <div class="flex items-center gap-8 md:gap-10 mb-8">
+                        <div>
+                            <div
+                                class="text-2xl md:text-3xl font-bold text-heading tabular-nums"
+                            >
+                                17
+                            </div>
+                            <div class="text-xs text-faint mt-0.5">
+                                Providers
+                            </div>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <div>
+                            <div
+                                class="text-2xl md:text-3xl font-bold text-heading tabular-nums"
+                            >
+                                100%
+                            </div>
+                            <div class="text-xs text-faint mt-0.5">Local</div>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <div>
+                            <div
+                                class="text-2xl md:text-3xl font-bold text-heading tabular-nums"
+                            >
+                                0
+                            </div>
+                            <div class="text-xs text-faint mt-0.5">
+                                Data sent
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CTAs -->
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <a
+                            href="#get-started"
+                            class="btn btn-primary text-base px-6 py-3 w-full sm:w-auto"
+                        >
+                            Get Started
+                            <svg
+                                class="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M19 9l-7 7-7-7"
+                                />
+                            </svg>
+                        </a>
+                        <a
+                            href="https://github.com/DaveDushi/kolshek"
+                            target="_blank"
+                            rel="noopener"
+                            class="btn btn-outline text-base px-6 py-3 w-full sm:w-auto"
+                        >
+                            <svg
+                                class="w-4 h-4"
+                                fill="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
+                                />
+                            </svg>
+                            View on GitHub
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Right: demo -->
+                <div class="hero-right">
+                    <!-- Tab switcher -->
+                    <div class="hero-demo-tabs">
+                        <button
+                            class="hero-demo-tab active"
+                            data-demo="terminal"
+                        >
+                            <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <polyline points="4 17 10 11 4 5" />
+                                <line x1="12" y1="19" x2="20" y2="19" />
+                            </svg>
+                            Command Line
+                        </button>
+                        <button class="hero-demo-tab" data-demo="chat">
+                            <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path
+                                    d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                                />
+                            </svg>
+                            AI Agent
+                        </button>
+                    </div>
+
+                    <!-- Terminal demo panel -->
+                    <div class="hero-demo-panel active" id="demo-terminal">
+                        <div class="terminal">
+                            <div class="terminal-header">
+                                <span class="terminal-dot bg-red-500/80"></span>
+                                <span
+                                    class="terminal-dot bg-yellow-500/80"
+                                ></span>
+                                <span
+                                    class="terminal-dot bg-green-500/80"
+                                ></span>
+                                <span class="flex-1"></span>
+                                <span class="text-xs text-faint">terminal</span>
+                            </div>
+                            <div class="terminal-body scroll-hint">
+                                <div class="min-w-[440px]">
+                                    <div class="terminal-line">
+                                        <span class="terminal-comment"
+                                            ># Setup wizard</span
+                                        >
+                                    </div>
+                                    <div class="terminal-line">
+                                        <span class="terminal-prompt">$ </span
+                                        ><span class="terminal-command"
+                                            >kolshek init</span
+                                        >
+                                    </div>
+                                    <div class="terminal-line">
+                                        <span class="terminal-output"
+                                            >? Select provider: Bank
+                                            Hapoalim</span
+                                        >
+                                    </div>
+                                    <div class="terminal-line">
+                                        <span class="terminal-output"
+                                            >&#10003; Connected! Fetched 342
+                                            transactions.</span
+                                        >
+                                    </div>
+                                    <div class="terminal-line">&nbsp;</div>
+                                    <div class="terminal-line">
+                                        <span class="terminal-comment"
+                                            ># Monthly report</span
+                                        >
+                                    </div>
+                                    <div class="terminal-line">
+                                        <span class="terminal-prompt">$ </span
+                                        ><span class="terminal-command"
+                                            >kolshek report monthly</span
+                                        >
+                                    </div>
+                                    <div class="terminal-line">
+                                        <span class="terminal-output"
+                                            >Income: &#8362;18,500 | Expenses:
+                                            &#8362;12,340 | Net:
+                                            +&#8362;6,160</span
+                                        >
+                                    </div>
+                                    <div class="terminal-line">&nbsp;</div>
+                                    <div class="terminal-line">
+                                        <span class="terminal-comment"
+                                            ># Query with SQL</span
+                                        >
+                                    </div>
+                                    <div class="terminal-line">
+                                        <span class="terminal-prompt">$ </span
+                                        ><span class="terminal-command"
+                                            >kolshek query "SELECT description,
+                                            SUM(chargedAmount) FROM transactions
+                                            GROUP BY 1 ORDER BY 2 LIMIT 3"</span
+                                        >
+                                    </div>
+                                    <div class="terminal-line">
+                                        <span class="terminal-output"
+                                            >Shufersal -&#8362;2,340 | HOT
+                                            -&#8362;189 | Cellcom
+                                            -&#8362;149</span
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat demo panel -->
+                    <div class="hero-demo-panel" id="demo-chat">
+                        <div class="chat-window">
+                            <div class="chat-header">
+                                <div class="flex items-center gap-3">
+                                    <div class="chat-header-avatar">
+                                        <svg
+                                            width="18"
+                                            height="18"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                        >
+                                            <path d="M12 8V4H8" />
+                                            <rect
+                                                width="16"
+                                                height="12"
+                                                x="4"
+                                                y="8"
+                                                rx="2"
+                                            />
+                                            <path d="M2 14h2" />
+                                            <path d="M20 14h2" />
+                                            <path d="M15 13v2" />
+                                            <path d="M9 13v2" />
+                                        </svg>
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span
+                                            class="text-sm font-semibold leading-tight"
+                                            style="color: #fff"
+                                            >KolShek Agent</span
+                                        >
+                                        <span class="chat-header-status"
+                                            >online</span
+                                        >
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button
+                                        class="chat-header-icon"
+                                        aria-label="Search"
+                                    >
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                        >
+                                            <circle cx="11" cy="11" r="8" />
+                                            <path d="m21 21-4.3-4.3" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        class="chat-header-icon"
+                                        aria-label="More"
+                                    >
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                        >
+                                            <circle cx="12" cy="5" r="1" />
+                                            <circle cx="12" cy="12" r="1" />
+                                            <circle cx="12" cy="19" r="1" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="chat-body">
+                                <div
+                                    class="chat-msg chat-msg-user chat-anim-trigger"
+                                    style="--chat-delay: 0.5s"
+                                >
+                                    <div class="chat-bubble chat-bubble-user">
+                                        <span
+                                            >What's my spending for the
+                                            month?</span
+                                        >
+                                        <span class="chat-meta chat-meta-user">
+                                            <span>09:41</span>
+                                            <svg
+                                                class="chat-read"
+                                                width="16"
+                                                height="10"
+                                                viewBox="0 0 16 10"
+                                            >
+                                                <path
+                                                    d="M1 5l3 3L11 1"
+                                                    stroke="currentColor"
+                                                    stroke-width="1.5"
+                                                    fill="none"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                />
+                                                <path
+                                                    d="M5 5l3 3L15 1"
+                                                    stroke="currentColor"
+                                                    stroke-width="1.5"
+                                                    fill="none"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                />
+                                            </svg>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="chat-msg chat-msg-agent chat-anim-trigger"
+                                    style="--chat-delay: 1.8s"
+                                >
+                                    <div class="chat-avatar-sm">
+                                        <svg
+                                            width="14"
+                                            height="14"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                        >
+                                            <path d="M12 8V4H8" />
+                                            <rect
+                                                width="16"
+                                                height="12"
+                                                x="4"
+                                                y="8"
+                                                rx="2"
+                                            />
+                                            <path d="M15 13v2" />
+                                            <path d="M9 13v2" />
+                                        </svg>
+                                    </div>
+                                    <div class="chat-typing">
+                                        <span class="chat-typing-dot"></span>
+                                        <span class="chat-typing-dot"></span>
+                                        <span class="chat-typing-dot"></span>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="chat-msg chat-msg-agent chat-anim-trigger"
+                                    style="--chat-delay: 3.2s"
+                                >
+                                    <div class="chat-avatar-sm">
+                                        <svg
+                                            width="14"
+                                            height="14"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                        >
+                                            <path d="M12 8V4H8" />
+                                            <rect
+                                                width="16"
+                                                height="12"
+                                                x="4"
+                                                y="8"
+                                                rx="2"
+                                            />
+                                            <path d="M15 13v2" />
+                                            <path d="M9 13v2" />
+                                        </svg>
+                                    </div>
+                                    <div class="chat-bubble chat-bubble-agent">
+                                        <p class="chat-agent-intro">
+                                            Spending for March 2026:
+                                        </p>
+                                        <div class="chat-table">
+                                            <div class="chat-row">
+                                                <span class="chat-cat"
+                                                    >Groceries</span
+                                                ><span class="chat-amount"
+                                                    >&#8362;2,340</span
+                                                >
+                                            </div>
+                                            <div class="chat-row">
+                                                <span class="chat-cat"
+                                                    >Dining</span
+                                                ><span class="chat-amount"
+                                                    >&#8362;1,870</span
+                                                >
+                                            </div>
+                                            <div class="chat-row">
+                                                <span class="chat-cat"
+                                                    >Transportation</span
+                                                ><span class="chat-amount"
+                                                    >&#8362;980</span
+                                                >
+                                            </div>
+                                            <div class="chat-row">
+                                                <span class="chat-cat"
+                                                    >Subscriptions</span
+                                                ><span class="chat-amount"
+                                                    >&#8362;450</span
+                                                >
+                                            </div>
+                                            <div class="chat-row">
+                                                <span class="chat-cat"
+                                                    >Utilities</span
+                                                ><span class="chat-amount"
+                                                    >&#8362;620</span
+                                                >
+                                            </div>
+                                            <div
+                                                class="chat-row chat-row-total"
+                                            >
+                                                <span class="chat-cat"
+                                                    >Total</span
+                                                ><span class="chat-amount"
+                                                    >&#8362;6,260</span
+                                                >
+                                            </div>
+                                        </div>
+                                        <p class="chat-agent-note">
+                                            Groceries up 12% vs last month.
+                                        </p>
+                                        <span class="chat-meta chat-meta-agent"
+                                            >09:41</span
+                                        >
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="chat-msg chat-msg-user chat-anim-trigger"
+                                    style="--chat-delay: 5.8s"
+                                >
+                                    <div class="chat-bubble chat-bubble-user">
+                                        <span>Top grocery charges?</span>
+                                        <span class="chat-meta chat-meta-user">
+                                            <span>09:42</span>
+                                            <svg
+                                                class="chat-read"
+                                                width="16"
+                                                height="10"
+                                                viewBox="0 0 16 10"
+                                            >
+                                                <path
+                                                    d="M1 5l3 3L11 1"
+                                                    stroke="currentColor"
+                                                    stroke-width="1.5"
+                                                    fill="none"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                />
+                                                <path
+                                                    d="M5 5l3 3L15 1"
+                                                    stroke="currentColor"
+                                                    stroke-width="1.5"
+                                                    fill="none"
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                />
+                                            </svg>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="chat-msg chat-msg-agent chat-anim-trigger"
+                                    style="--chat-delay: 7.4s"
+                                >
+                                    <div class="chat-avatar-sm">
+                                        <svg
+                                            width="14"
+                                            height="14"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                        >
+                                            <path d="M12 8V4H8" />
+                                            <rect
+                                                width="16"
+                                                height="12"
+                                                x="4"
+                                                y="8"
+                                                rx="2"
+                                            />
+                                            <path d="M15 13v2" />
+                                            <path d="M9 13v2" />
+                                        </svg>
+                                    </div>
+                                    <div class="chat-bubble chat-bubble-agent">
+                                        <div class="chat-table">
+                                            <div class="chat-row">
+                                                <span class="chat-cat"
+                                                    >Shufersal</span
+                                                ><span class="chat-amount"
+                                                    >&#8362;487</span
+                                                >
+                                            </div>
+                                            <div class="chat-row">
+                                                <span class="chat-cat"
+                                                    >Rami Levy</span
+                                                ><span class="chat-amount"
+                                                    >&#8362;412</span
+                                                >
+                                            </div>
+                                            <div class="chat-row">
+                                                <span class="chat-cat"
+                                                    >Yochananof</span
+                                                ><span class="chat-amount"
+                                                    >&#8362;389</span
+                                                >
+                                            </div>
+                                        </div>
+                                        <p class="chat-agent-note">
+                                            All from your local SQLite DB.
+                                        </p>
+                                        <span class="chat-meta chat-meta-agent"
+                                            >09:42</span
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="chat-input-bar">
+                                <div class="chat-input-field">
+                                    <span>Message</span>
+                                </div>
+                                <div class="chat-input-send">
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="M12 19V5" />
+                                        <path d="m5 12 7-7 7 7" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- ════════════════════════════════════════════════════════
+       C. PHILOSOPHY
+       ════════════════════════════════════════════════════════ -->
+        <section class="py-12 md:py-20 px-4 sm:px-6">
+            <div class="max-w-4xl mx-auto">
+                <p
+                    class="text-center text-base md:text-lg text-body leading-relaxed mb-14 max-w-2xl mx-auto fade-up"
+                >
+                    <strong class="text-emphasis"
+                        >Personal finance is personal.</strong
+                    >
+                    Every budgeting app forces you into someone else's system.
+                    KolShek doesn't. It fetches your data, stores it locally,
+                    and gives your AI agent full access to it. Your data, your
+                    rules.
+                </p>
+
+                <div
+                    class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 stagger"
+                >
+                    <!-- Fetch -->
+                    <div class="text-center fade-up">
+                        <div class="feature-icon mx-auto mb-4">
+                            <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-heading mb-2">
+                            Fetch
+                        </h3>
+                        <p class="text-sm text-body">
+                            Pull transactions from all your banks and credit
+                            cards automatically.
+                        </p>
+                    </div>
+
+                    <!-- Analyze -->
+                    <div class="text-center fade-up">
+                        <div class="feature-icon mx-auto mb-4">
+                            <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                                />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-heading mb-2">
+                            Analyze
+                        </h3>
+                        <p class="text-sm text-body">
+                            Monthly reports, category breakdowns, spending
+                            trends, and AI-powered insights.
+                        </p>
+                    </div>
+
+                    <!-- Own -->
+                    <div class="text-center fade-up">
+                        <div class="feature-icon mx-auto mb-4">
+                            <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                />
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-heading mb-2">
+                            Own
+                        </h3>
+                        <p class="text-sm text-body">
+                            Everything stays on your machine. Your data, your
+                            rules.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- ════════════════════════════════════════════════════════
+       D. FEATURES
+       ════════════════════════════════════════════════════════ -->
+        <section id="features" class="py-12 md:py-20 px-4 sm:px-6">
+            <div class="max-w-6xl mx-auto">
+                <div class="text-center mb-12 fade-up">
+                    <h2
+                        class="text-2xl md:text-3xl font-bold text-heading mb-3"
+                    >
+                        Everything you need
+                    </h2>
+                    <p class="text-body">
+                        A complete toolkit for managing your Israeli finances.
+                    </p>
+                </div>
+
+                <div
+                    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 md:gap-5 stagger"
+                >
+                    <!-- 17 Providers (wide) -->
+                    <div class="card fade-up lg:col-span-4 bento-wide">
+                        <div class="feature-icon mb-4">
+                            <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                                />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3
+                                class="text-base font-semibold text-heading mb-1.5"
+                            >
+                                17 Banks & Credit Cards
+                            </h3>
+                            <p class="text-sm text-body">
+                                All major Israeli institutions — Hapoalim,
+                                Leumi, Discount, Mizrahi, Max, Visa Cal,
+                                Isracard, and more. Powered by
+                                israeli-bank-scrapers.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- AI Agents -->
+                    <div class="card fade-up lg:col-span-2">
+                        <div class="feature-icon mb-4">
+                            <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                />
+                            </svg>
+                        </div>
+                        <h3 class="text-base font-semibold text-heading mb-1.5">
+                            Built for AI Agents
+                        </h3>
+                        <p class="text-sm text-body">
+                            First-class plugins for Claude Code, Cursor, Gemini
+                            CLI, and more.
+                        </p>
+                    </div>
+
+                    <!-- Web Dashboard -->
+                    <div class="card fade-up lg:col-span-2">
+                        <div class="feature-icon mb-4">
+                            <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z"
+                                />
+                            </svg>
+                        </div>
+                        <h3 class="text-base font-semibold text-heading mb-1.5">
+                            Web Dashboard
+                        </h3>
+                        <p class="text-sm text-body">
+                            HTMX-powered settings UI with real-time fetch
+                            progress via SSE.
+                        </p>
+                    </div>
+
+                    <!-- Smart Categorization -->
+                    <div class="card fade-up lg:col-span-2">
+                        <div class="feature-icon mb-4">
+                            <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                                />
+                            </svg>
+                        </div>
+                        <h3 class="text-base font-semibold text-heading mb-1.5">
+                            Smart Categorization
+                        </h3>
+                        <p class="text-sm text-body">
+                            Auto-tag transactions. Rename, merge, or
+                            bulk-migrate categories. Hebrew translation.
+                        </p>
+                    </div>
+
+                    <!-- SQL Access -->
+                    <div class="card fade-up lg:col-span-2">
+                        <div class="feature-icon mb-4">
+                            <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+                                />
+                            </svg>
+                        </div>
+                        <h3 class="text-base font-semibold text-heading mb-1.5">
+                            SQL Access
+                        </h3>
+                        <p class="text-sm text-body">
+                            Read-only
+                            <code
+                                class="text-xs bg-code-inline px-1.5 py-0.5 rounded"
+                                >kolshek query</code
+                            >. Schema introspection for agents.
+                        </p>
+                    </div>
+
+                    <!-- Structured JSON -->
+                    <div class="card fade-up lg:col-span-3">
+                        <div class="feature-icon mb-4">
+                            <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                                />
+                            </svg>
+                        </div>
+                        <h3 class="text-base font-semibold text-heading mb-1.5">
+                            Structured JSON
+                        </h3>
+                        <p class="text-sm text-body">
+                            <code
+                                class="text-xs bg-code-inline px-1.5 py-0.5 rounded"
+                                >--json</code
+                            >
+                            on every command. Consistent envelope format that AI
+                            agents and scripts can parse.
+                        </p>
+                    </div>
+
+                    <!-- Scheduled Sync -->
+                    <div class="card fade-up lg:col-span-3">
+                        <div class="feature-icon mb-4">
+                            <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                            </svg>
+                        </div>
+                        <h3 class="text-base font-semibold text-heading mb-1.5">
+                            Scheduled Sync
+                        </h3>
+                        <p class="text-sm text-body">
+                            Automatic fetching via Task Scheduler, launchd, or
+                            cron. Set it and forget it.
+                        </p>
+                    </div>
+
+                    <!-- Reports & Trends (full width) -->
+                    <div class="card fade-up lg:col-span-6 bento-wide">
+                        <div class="feature-icon mb-4">
+                            <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                                />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3
+                                class="text-base font-semibold text-heading mb-1.5"
+                            >
+                                Reports & Trends
+                            </h3>
+                            <p class="text-sm text-body">
+                                Monthly summaries, category breakdowns, balance
+                                history, merchant insights, and multi-month
+                                trend analysis. Lifestyle spending mode excludes
+                                non-spending categories for a clearer picture.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- ════════════════════════════════════════════════════════
+       E. SUPPORTED PROVIDERS
+       ════════════════════════════════════════════════════════ -->
+        <section id="providers" class="py-12 md:py-20 px-4 sm:px-6">
+            <div class="max-w-4xl mx-auto">
+                <div class="text-center mb-12 fade-up">
+                    <h2
+                        class="text-2xl md:text-3xl font-bold text-heading mb-3"
+                    >
+                        Supported Providers
+                    </h2>
+                    <p class="text-body">
+                        All major Israeli banks and credit card companies.
+                    </p>
+                </div>
+
+                <!-- Banks -->
+                <h3 class="text-sm font-semibold text-faint uppercase tracking-wider mb-4 fade-up flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                  Banks
+                </h3>
+                <div class="provider-grid fade-up">
+                  <div class="provider-chip"><img class="provider-logo" src="logos/hapoalim.png" alt="Hapoalim" /><span class="provider-name">Hapoalim</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/leumi.png" alt="Leumi" /><span class="provider-name">Leumi</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/discount.png" alt="Discount" /><span class="provider-name">Discount</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/mizrahi.png" alt="Mizrahi-Tefahot" /><span class="provider-name">Mizrahi-Tefahot</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/mercantile.png" alt="Mercantile" /><span class="provider-name">Mercantile</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/otsar.png" alt="Otsar Hahayal" /><span class="provider-name">Otsar Hahayal</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/union.svg" alt="Union" /><span class="provider-name">Union</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/beinleumi.png" alt="Beinleumi" /><span class="provider-name">Beinleumi</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/massad.svg" alt="Massad" /><span class="provider-name">Massad</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/yahav.png" alt="Yahav" /><span class="provider-name">Yahav</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/onezero.png" alt="One Zero" /><span class="provider-name">One Zero</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/pagi.svg" alt="Pagi" /><span class="provider-name">Pagi</span></div>
+                </div>
+
+                <!-- Credit Cards -->
+                <h3 class="text-sm font-semibold text-faint uppercase tracking-wider mb-4 mt-10 fade-up flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                  Credit Cards
+                </h3>
+                <div class="provider-grid fade-up">
+                  <div class="provider-chip"><img class="provider-logo" src="logos/visacal.png" alt="Visa Cal" /><span class="provider-name">Visa Cal</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/max.png" alt="Max" /><span class="provider-name">Max</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/isracard.png" alt="Isracard" /><span class="provider-name">Isracard</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/amex.png" alt="Amex" /><span class="provider-name">Amex</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/beyahad.svg" alt="Beyahad Bishvilha" /><span class="provider-name">Beyahad Bishvilha</span></div>
+                  <div class="provider-chip"><img class="provider-logo" src="logos/behatsdaa.svg" alt="Behatsdaa" /><span class="provider-name">Behatsdaa</span></div>
+                </div>
+
+                <p class="text-center text-sm text-faint mt-6 fade-up">
+                    Powered by
+                    <a
+                        href="https://github.com/eshaham/israeli-bank-scrapers"
+                        target="_blank"
+                        rel="noopener"
+                        class="text-primary-400 hover:text-primary-300 underline underline-offset-2"
+                        >israeli-bank-scrapers</a
+                    >
+                </p>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- ════════════════════════════════════════════════════════
+       F. SECURITY
+       ════════════════════════════════════════════════════════ -->
+        <section id="security" class="py-12 md:py-20 px-4 sm:px-6">
+            <div class="max-w-4xl mx-auto">
+                <div class="text-center mb-12 fade-up">
+                    <h2
+                        class="text-2xl md:text-3xl font-bold text-heading mb-3"
+                    >
+                        Security first
+                    </h2>
+                    <p class="text-body">
+                        Your financial data deserves the highest level of
+                        protection.
+                    </p>
+                </div>
+
+                <div class="card card-accent fade-up">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 p-2">
+                        <!-- 100% Local -->
+                        <div class="security-pillar">
+                            <div class="security-icon">
+                                <svg
+                                    class="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                                    />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3
+                                    class="text-sm font-semibold text-heading mb-1"
+                                >
+                                    100% Local
+                                </h3>
+                                <p class="text-sm text-body">
+                                    No cloud sync, no telemetry, no analytics.
+                                    All data stays on your machine. No account
+                                    required.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- OS Keychain -->
+                        <div class="security-pillar">
+                            <div class="security-icon">
+                                <svg
+                                    class="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                                    />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3
+                                    class="text-sm font-semibold text-heading mb-1"
+                                >
+                                    OS Keychain
+                                </h3>
+                                <p class="text-sm text-body">
+                                    Credentials stored in Windows Credential
+                                    Manager, macOS Keychain, or Linux
+                                    secret-tool. Never logged, zeroed after use.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- AES-256-GCM -->
+                        <div class="security-pillar">
+                            <div class="security-icon">
+                                <svg
+                                    class="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                                    />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3
+                                    class="text-sm font-semibold text-heading mb-1"
+                                >
+                                    AES-256-GCM Encryption
+                                </h3>
+                                <p class="text-sm text-body">
+                                    Fallback encrypted storage when keychain is
+                                    unavailable. Database and config files
+                                    restricted to owner-only permissions.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Read-Only SQL -->
+                        <div class="security-pillar">
+                            <div class="security-icon">
+                                <svg
+                                    class="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                    />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3
+                                    class="text-sm font-semibold text-heading mb-1"
+                                >
+                                    Read-Only SQL
+                                </h3>
+                                <p class="text-sm text-body">
+                                    Query command whitelists SELECT and safe
+                                    PRAGMA only. Parameterized queries
+                                    throughout. CSRF & XSS protection on
+                                    dashboard.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center mt-6 fade-up">
+                    <a
+                        href="https://github.com/DaveDushi/kolshek/blob/master/docs/security.md"
+                        target="_blank"
+                        rel="noopener"
+                        class="text-sm text-primary-400 hover:text-primary-300 underline underline-offset-2"
+                    >
+                        Read the full security documentation &rarr;
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- ════════════════════════════════════════════════════════
+       H. GET STARTED
+       ════════════════════════════════════════════════════════ -->
+        <section id="get-started" class="py-12 md:py-20 px-4 sm:px-6">
+            <div class="max-w-2xl mx-auto">
+                <div class="text-center mb-12 fade-up">
+                    <h2
+                        class="text-2xl md:text-3xl font-bold text-heading mb-3"
+                    >
+                        Get started in 4 steps
+                    </h2>
+                    <p class="text-body">
+                        No account needed. Everything runs on your computer.
+                    </p>
+                </div>
+
+                <div class="gs-steps fade-up">
+                    <!-- Step 1: Download -->
+                    <div class="gs-step">
+                        <div class="gs-num">1</div>
+                        <div class="gs-content">
+                            <h3 class="gs-title">Download KolShek</h3>
+                            <p class="gs-desc">
+                                Click the button for your system. The download
+                                starts immediately.
+                            </p>
+
+                            <!-- Auto-detected big button -->
+                            <a
+                                id="dl-auto"
+                                href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-windows-x64.exe"
+                                class="gs-download-btn"
+                            >
+                                <svg
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path
+                                        d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                                    />
+                                    <polyline points="7 10 12 15 17 10" />
+                                    <line x1="12" y1="15" x2="12" y2="3" />
+                                </svg>
+                                <span>
+                                    <span
+                                        class="gs-download-label"
+                                        id="dl-auto-label"
+                                        >Download for Windows</span
+                                    >
+                                    <span
+                                        class="gs-download-meta"
+                                        id="dl-auto-meta"
+                                        ></span
+                                    >
+                                </span>
+                            </a>
+
+                            <!-- Other platforms -->
+                            <div class="gs-other-platforms">
+                                <span class="text-xs text-faint"
+                                    >Other platforms:</span
+                                >
+                                <a
+                                    href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-macos-arm64"
+                                    class="gs-alt-link"
+                                    >macOS (Apple Silicon)</a
+                                >
+                                <a
+                                    href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-macos-x64"
+                                    class="gs-alt-link"
+                                    >macOS (Intel)</a
+                                >
+                                <a
+                                    href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-linux-x64"
+                                    class="gs-alt-link"
+                                    >Linux x64</a
+                                >
+                                <a
+                                    href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-linux-arm64"
+                                    class="gs-alt-link"
+                                    >Linux ARM</a
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Connect your bank -->
+                    <div class="gs-step">
+                        <div class="gs-num">2</div>
+                        <div class="gs-content">
+                            <h3 class="gs-title">Connect your bank</h3>
+                            <p class="gs-desc">
+                                Open a terminal and run this command. A
+                                step-by-step wizard will guide you through
+                                connecting your bank or credit card.
+                            </p>
+                            <div class="gs-cmd-block">
+                                <code>kolshek init</code>
+                                <button
+                                    class="copy-btn"
+                                    onclick="copyText(this, 'kolshek init')"
+                                    title="Copy"
+                                >
+                                    <svg
+                                        class="w-4 h-4 copy-icon"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                        />
+                                    </svg>
+                                    <svg
+                                        class="w-4 h-4 check-icon hidden"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            d="M5 13l4 4L19 7"
+                                        />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: See your finances -->
+                    <div class="gs-step">
+                        <div class="gs-num">3</div>
+                        <div class="gs-content">
+                            <h3 class="gs-title">See your finances</h3>
+                            <p class="gs-desc">
+                                Open a visual dashboard in your browser, or get a quick summary in the terminal.
+                            </p>
+                            <div class="gs-cmd-block">
+                                <code>kolshek dashboard</code>
+                                <button
+                                    class="copy-btn"
+                                    onclick="copyText(this, 'kolshek dashboard')"
+                                    title="Copy"
+                                >
+                                    <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                    <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                </button>
+                            </div>
+                            <p class="text-xs text-faint mt-2">Or use the CLI: <code class="text-xs bg-code-inline px-1.5 py-0.5 rounded font-mono">kolshek report monthly</code></p>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Connect your AI tool -->
+                    <div class="gs-step">
+                        <div class="gs-num">4</div>
+                        <div class="gs-content">
+                            <h3 class="gs-title">Connect your AI tool</h3>
+                            <p class="gs-desc">
+                                Let your AI assistant query your finances directly. Pick your tool:
+                            </p>
+                            <div class="gs-plugin-pills" id="gs-plugin-pills">
+                                <button class="gs-plugin-pill active" data-plugin="claude-code">Claude Code</button>
+                                <button class="gs-plugin-pill" data-plugin="cursor">Cursor</button>
+                                <button class="gs-plugin-pill" data-plugin="gemini-cli">Gemini CLI</button>
+                                <button class="gs-plugin-pill" data-plugin="windsurf">Windsurf</button>
+                                <button class="gs-plugin-pill" data-plugin="aider">Aider</button>
+                                <button class="gs-plugin-pill" data-plugin="opencode">OpenCode</button>
+                            </div>
+                            <div class="gs-cmd-block mt-3">
+                                <code id="gs-plugin-cmd">kolshek plugin install claude-code</code>
+                                <button
+                                    class="copy-btn"
+                                    id="gs-plugin-copy"
+                                    onclick="copyText(this, document.getElementById('gs-plugin-cmd').textContent)"
+                                    title="Copy"
+                                >
+                                    <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                    <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center mt-8 fade-up">
+                    <a href="/docs.html" class="gs-docs-link">
+                        Want to do more? Read the full documentation
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- ════════════════════════════════════════════════════════
+       I. FEEDBACK
+       ════════════════════════════════════════════════════════ -->
+        <section id="feedback" class="py-12 md:py-20 px-4 sm:px-6">
+            <div class="max-w-2xl mx-auto">
+                <div class="text-center mb-10 fade-up">
+                    <h2
+                        class="text-2xl md:text-3xl font-bold text-heading mb-3"
+                    >
+                        Share your feedback
+                    </h2>
+                    <p class="text-body">
+                        Help shape the future of KolShek. Submitted as a GitHub
+                        issue.
+                    </p>
+                </div>
+
+                <div class="feedback-card fade-up">
+                    <form id="feedback-form" onsubmit="submitFeedback(event)">
+                        <!-- Type selector pills -->
+                        <fieldset class="mb-6">
+                            <legend
+                                class="block text-sm font-medium text-label mb-3"
+                            >
+                                What kind of feedback?
+                            </legend>
+                            <div class="fb-type-grid">
+                                <label class="fb-type-pill">
+                                    <input
+                                        type="radio"
+                                        name="type"
+                                        value="feature"
+                                        checked
+                                        class="sr-only"
+                                    />
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="M12 2v8l4-2" />
+                                        <path d="M20.49 9A9 9 0 1 1 12 2" />
+                                    </svg>
+                                    <span>Feature</span>
+                                </label>
+                                <label class="fb-type-pill">
+                                    <input
+                                        type="radio"
+                                        name="type"
+                                        value="bug"
+                                        class="sr-only"
+                                    />
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="12" y1="8" x2="12" y2="12" />
+                                        <line
+                                            x1="12"
+                                            y1="16"
+                                            x2="12.01"
+                                            y2="16"
+                                        />
+                                    </svg>
+                                    <span>Bug</span>
+                                </label>
+                                <label class="fb-type-pill">
+                                    <input
+                                        type="radio"
+                                        name="type"
+                                        value="question"
+                                        class="sr-only"
+                                    />
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <circle cx="12" cy="12" r="10" />
+                                        <path
+                                            d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"
+                                        />
+                                        <line
+                                            x1="12"
+                                            y1="17"
+                                            x2="12.01"
+                                            y2="17"
+                                        />
+                                    </svg>
+                                    <span>Question</span>
+                                </label>
+                                <label class="fb-type-pill">
+                                    <input
+                                        type="radio"
+                                        name="type"
+                                        value="other"
+                                        class="sr-only"
+                                    />
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path
+                                            d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                                        />
+                                    </svg>
+                                    <span>Other</span>
+                                </label>
+                            </div>
+                        </fieldset>
+
+                        <!-- Title -->
+                        <div class="mb-4">
+                            <label
+                                for="fb-title"
+                                class="block text-sm font-medium text-label mb-1.5"
+                                >Title</label
+                            >
+                            <input
+                                type="text"
+                                id="fb-title"
+                                name="title"
+                                class="form-input"
+                                placeholder="Brief summary of your feedback..."
+                                required
+                                maxlength="200"
+                            />
+                        </div>
+
+                        <!-- Details -->
+                        <div class="mb-6">
+                            <label
+                                for="fb-details"
+                                class="block text-sm font-medium text-label mb-1.5"
+                                >Details</label
+                            >
+                            <textarea
+                                id="fb-details"
+                                name="details"
+                                class="form-input"
+                                rows="4"
+                                placeholder="Describe your idea, issue, or question in detail..."
+                                required
+                                maxlength="2000"
+                            ></textarea>
+                            <p
+                                class="text-xs text-faint mt-1.5"
+                                id="fb-char-count"
+                            >
+                                0 / 2,000
+                            </p>
+                        </div>
+
+                        <!-- Submit row -->
+                        <div class="flex items-center gap-4 flex-wrap">
+                            <button
+                                type="submit"
+                                id="fb-submit"
+                                class="btn btn-primary"
+                            >
+                                <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <line x1="22" y1="2" x2="11" y2="13" />
+                                    <polygon
+                                        points="22 2 15 22 11 13 2 9 22 2"
+                                    />
+                                </svg>
+                                Submit Feedback
+                            </button>
+                            <span class="text-xs text-faint"
+                                >Creates a GitHub issue on your behalf</span
+                            >
+                        </div>
+
+                        <div id="fb-status" class="text-sm hidden mt-4"></div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- ════════════════════════════════════════════════════════
+       J. FOOTER
+       ════════════════════════════════════════════════════════ -->
+        <footer class="border-t border-theme py-8 px-4 sm:px-6">
+            <div
+                class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-faint"
+            >
+                <div class="flex items-center gap-2">
+                    <img src="logo.png" alt="KolShek" class="w-5 h-5 rounded" />
+                    <span id="footer-version">KolShek</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a
+                        href="https://github.com/DaveDushi/kolshek"
+                        target="_blank"
+                        rel="noopener"
+                        class="hover:text-label transition-colors"
+                        >GitHub</a
+                    >
+                    <a
+                        href="/docs.html"
+                        class="hover:text-label transition-colors"
+                        >Docs</a
+                    >
+                    <a
+                        href="https://github.com/DaveDushi/kolshek/blob/master/LICENSE"
+                        target="_blank"
+                        rel="noopener"
+                        class="hover:text-label transition-colors"
+                        >MIT License</a
+                    >
+                </div>
+            </div>
+        </footer>
+
+        <!-- Toast notification -->
+        <div id="toast" class="toast"></div>
+
+        <script type="module" src="/src/main.js"></script>
+    </body>
+</html>

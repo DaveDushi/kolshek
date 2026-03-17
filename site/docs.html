@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    (function() {
+      var t = localStorage.getItem('kolshek-theme');
+      if (t === 'light' || t === 'dark') {
+        document.documentElement.setAttribute('data-theme', t);
+      } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Documentation — KolShek (כל שקל)</title>
+  <meta name="description" content="KolShek CLI documentation — commands, security, AI agent integration, and web dashboard." />
+  <link rel="icon" type="image/png" href="logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/main.css" />
+</head>
+<body class="min-h-screen">
+
+  <!-- ── NAV ─────────────────────────────────────────────────── -->
+  <header id="nav" class="nav-glass fixed top-0 left-0 right-0 z-50 scrolled">
+    <nav class="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
+      <a href="/" class="flex items-center gap-2.5 text-heading font-semibold text-lg no-underline">
+        <img src="logo.png" alt="KolShek" class="w-8 h-8 rounded-lg" />
+        <span>KolShek</span>
+      </a>
+
+      <div class="hidden md:flex items-center gap-1">
+        <a href="/" class="nav-pill">Home</a>
+        <a href="/docs.html" class="nav-pill active">Docs</a>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <a href="https://github.com/DaveDushi/kolshek" target="_blank" rel="noopener" class="btn-ghost p-2 rounded-lg" title="GitHub">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        </a>
+        <div class="theme-toggle" role="radiogroup" aria-label="Theme">
+          <button class="theme-toggle-btn" data-theme-value="light" aria-label="Light theme" title="Light theme">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          </button>
+          <button class="theme-toggle-btn" data-theme-value="dark" aria-label="Dark theme" title="Dark theme">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+          </button>
+          <button class="theme-toggle-btn" data-theme-value="system" aria-label="System theme" title="System theme">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          </button>
+        </div>
+
+        <!-- Mobile sidebar toggle -->
+        <button id="docs-menu-toggle" class="md:hidden btn-ghost p-2 rounded-lg" aria-label="Toggle sidebar">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ── DOCS LAYOUT ─────────────────────────────────────────── -->
+  <div class="docs-layout max-w-7xl mx-auto pt-20 px-4 sm:px-6">
+
+    <!-- Sidebar -->
+    <aside id="docs-sidebar" class="docs-sidebar">
+      <nav class="docs-sidebar-nav">
+        <div class="docs-sidebar-group">
+          <h3 class="docs-sidebar-heading">Getting Started</h3>
+          <a href="#overview" class="docs-sidebar-link active">Overview</a>
+          <a href="#global-options" class="docs-sidebar-link">Global Options</a>
+        </div>
+        <div class="docs-sidebar-group">
+          <h3 class="docs-sidebar-heading">Commands</h3>
+          <a href="#init" class="docs-sidebar-link">init</a>
+          <a href="#providers" class="docs-sidebar-link">providers</a>
+          <a href="#fetch" class="docs-sidebar-link">fetch</a>
+          <a href="#accounts" class="docs-sidebar-link">accounts</a>
+          <a href="#transactions" class="docs-sidebar-link">transactions</a>
+          <a href="#db" class="docs-sidebar-link">db</a>
+          <a href="#query" class="docs-sidebar-link">query</a>
+          <a href="#reports" class="docs-sidebar-link">reports</a>
+          <a href="#categorize" class="docs-sidebar-link">categorize</a>
+          <a href="#translate" class="docs-sidebar-link">translate</a>
+          <a href="#schedule" class="docs-sidebar-link">schedule</a>
+          <a href="#plugin" class="docs-sidebar-link">plugin</a>
+          <a href="#spending" class="docs-sidebar-link">spending</a>
+          <a href="#income" class="docs-sidebar-link">income</a>
+          <a href="#trends" class="docs-sidebar-link">trends</a>
+          <a href="#insights" class="docs-sidebar-link">insights</a>
+        </div>
+        <div class="docs-sidebar-group">
+          <h3 class="docs-sidebar-heading">Guides</h3>
+          <a href="#security" class="docs-sidebar-link">Security Model</a>
+          <a href="#ai-agents" class="docs-sidebar-link">AI Agent Integration</a>
+          <a href="#dashboard" class="docs-sidebar-link">Web Dashboard</a>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="docs-content">
+
+      <!-- ── Overview ──────────────────────────────────────────── -->
+      <section id="overview" class="docs-section">
+        <h1 class="docs-h1">KolShek CLI Documentation</h1>
+        <p class="docs-lead">Complete reference for every command, flag, and integration in KolShek.</p>
+        <div class="docs-callout">
+          <strong>Quick start:</strong> Download KolShek from the <a href="/" class="text-primary-400 underline underline-offset-2">homepage</a>, then run <code>kolshek init</code> to set up your first provider.
+        </div>
+      </section>
+
+      <!-- ── Global Options ────────────────────────────────────── -->
+      <section id="global-options" class="docs-section">
+        <h2 class="docs-h2">Global Options</h2>
+        <p class="docs-p">All commands support these flags:</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Flag</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--json</code></td><td>Output structured JSON</td></tr>
+              <tr><td><code>-q, --quiet</code></td><td>Suppress non-essential output</td></tr>
+              <tr><td><code>--no-color</code></td><td>Disable ANSI colors</td></tr>
+              <tr><td><code>--no-progress</code></td><td>Disable spinners and progress bars</td></tr>
+              <tr><td><code>--non-interactive</code></td><td>Never prompt; fail if input needed</td></tr>
+              <tr><td><code>--no-auto-fetch</code></td><td>Skip automatic fetch on stale data</td></tr>
+              <tr><td><code>--version</code></td><td>Show version</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── init ──────────────────────────────────────────────── -->
+      <section id="init" class="docs-section">
+        <h2 class="docs-h2">init</h2>
+        <p class="docs-p">First-run setup wizard — configure your first provider.</p>
+        <div class="docs-code"><pre><code>kolshek init</code></pre></div>
+      </section>
+
+      <!-- ── providers ─────────────────────────────────────────── -->
+      <section id="providers" class="docs-section">
+        <h2 class="docs-h2">providers</h2>
+        <p class="docs-p">Manage bank and credit card providers.</p>
+
+        <h3 class="docs-h3">providers list</h3>
+        <p class="docs-p">List configured providers.</p>
+
+        <h3 class="docs-h3">providers add</h3>
+        <p class="docs-p">Add a new bank or credit card provider.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--visible</code></td><td>Show the browser window (needed for OTP / 2FA)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">providers auth &lt;id&gt;</h3>
+        <p class="docs-p">Set or update credentials for an existing provider.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--visible</code></td><td>Show the browser window (needed for OTP / 2FA)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">providers remove &lt;id&gt;</h3>
+        <p class="docs-p">Remove a configured provider.</p>
+
+        <h3 class="docs-h3">providers test &lt;id&gt;</h3>
+        <p class="docs-p">Test provider credentials.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--visible</code></td><td>Show the browser window (needed for OTP / 2FA)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── fetch ─────────────────────────────────────────────── -->
+      <section id="fetch" class="docs-section">
+        <h2 class="docs-h2">fetch [providers...]</h2>
+        <p class="docs-p">Fetch transactions from all or specific providers.</p>
+        <div class="docs-code"><pre><code>kolshek fetch                    # all providers
+kolshek fetch leumi visa-cal     # specific providers
+kolshek fetch --from 30d         # last 30 days</code></pre></div>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--from &lt;date&gt;</code></td><td>Start date (YYYY-MM-DD, DD/MM/YYYY, or 30d)</td></tr>
+              <tr><td><code>--to &lt;date&gt;</code></td><td>End date</td></tr>
+              <tr><td><code>--force</code></td><td>Re-fetch even if recently synced</td></tr>
+              <tr><td><code>--type &lt;type&gt;</code></td><td>Fetch only <code>bank</code> or <code>credit_card</code></td></tr>
+              <tr><td><code>--stealth</code></td><td>Use stealth browser to avoid bot detection</td></tr>
+              <tr><td><code>--visible</code></td><td>Show the browser window (helps bypass bot detection)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── accounts ──────────────────────────────────────────── -->
+      <section id="accounts" class="docs-section">
+        <h2 class="docs-h2">accounts <span class="docs-alias">alias: bal</span></h2>
+        <p class="docs-p">Show accounts and balances.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--provider &lt;name&gt;</code></td><td>Filter by provider company ID</td></tr>
+              <tr><td><code>--type &lt;type&gt;</code></td><td>Filter by provider type (<code>bank</code> | <code>credit_card</code>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── transactions ──────────────────────────────────────── -->
+      <section id="transactions" class="docs-section">
+        <h2 class="docs-h2">transactions <span class="docs-alias">alias: tx</span></h2>
+        <p class="docs-p">List, search, and export transactions.</p>
+
+        <h3 class="docs-h3">transactions list</h3>
+        <p class="docs-p">List transactions with filters.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--from &lt;date&gt;</code></td><td>Start date</td></tr>
+              <tr><td><code>--to &lt;date&gt;</code></td><td>End date</td></tr>
+              <tr><td><code>--provider &lt;name&gt;</code></td><td>Filter by provider company ID</td></tr>
+              <tr><td><code>--type &lt;type&gt;</code></td><td>Filter by provider type (<code>bank</code> | <code>credit_card</code>)</td></tr>
+              <tr><td><code>--account &lt;number&gt;</code></td><td>Filter by account number</td></tr>
+              <tr><td><code>--min &lt;amount&gt;</code></td><td>Minimum charged amount</td></tr>
+              <tr><td><code>--max &lt;amount&gt;</code></td><td>Maximum charged amount</td></tr>
+              <tr><td><code>--status &lt;status&gt;</code></td><td>Filter by status (<code>pending</code> | <code>completed</code>)</td></tr>
+              <tr><td><code>--sort &lt;field&gt;</code></td><td>Sort by <code>date</code> or <code>amount</code> (default: <code>date</code>)</td></tr>
+              <tr><td><code>--limit &lt;n&gt;</code></td><td>Maximum rows to return</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">transactions search &lt;query&gt;</h3>
+        <p class="docs-p">Search transactions by description.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--from &lt;date&gt;</code></td><td>Start date</td></tr>
+              <tr><td><code>--to &lt;date&gt;</code></td><td>End date</td></tr>
+              <tr><td><code>--provider &lt;name&gt;</code></td><td>Filter by provider</td></tr>
+              <tr><td><code>--limit &lt;n&gt;</code></td><td>Maximum results</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">transactions delete &lt;id&gt;</h3>
+        <p class="docs-p">Delete a transaction by ID. Use only for duplicates or erroneous records.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--yes</code></td><td>Skip confirmation prompt</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">transactions export &lt;format&gt;</h3>
+        <p class="docs-p">Export transactions to CSV or JSON.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--from &lt;date&gt;</code></td><td>Start date</td></tr>
+              <tr><td><code>--to &lt;date&gt;</code></td><td>End date</td></tr>
+              <tr><td><code>--provider &lt;name&gt;</code></td><td>Filter by provider</td></tr>
+              <tr><td><code>--type &lt;type&gt;</code></td><td>Filter by provider type</td></tr>
+              <tr><td><code>--output &lt;path&gt;</code></td><td>Write to file instead of stdout</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── db ────────────────────────────────────────────────── -->
+      <section id="db" class="docs-section">
+        <h2 class="docs-h2">db</h2>
+        <p class="docs-p">Inspect database schema (tables and columns).</p>
+
+        <h3 class="docs-h3">db tables</h3>
+        <p class="docs-p">List available tables.</p>
+
+        <h3 class="docs-h3">db schema &lt;table&gt;</h3>
+        <p class="docs-p">Show column details for a table.</p>
+      </section>
+
+      <!-- ── query ─────────────────────────────────────────────── -->
+      <section id="query" class="docs-section">
+        <h2 class="docs-h2">query &lt;sql&gt; <span class="docs-alias">alias: sql</span></h2>
+        <p class="docs-p">Run a read-only SQL query. Supports <code>SELECT</code>, <code>WITH</code>, <code>EXPLAIN</code>, <code>PRAGMA</code>, and <code>VALUES</code>.</p>
+        <div class="docs-code"><pre><code>kolshek query "SELECT * FROM transactions ORDER BY date DESC LIMIT 10"
+kolshek sql "SELECT category, SUM(chargedAmount) FROM transactions GROUP BY category"</code></pre></div>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--limit &lt;n&gt;</code></td><td>Maximum rows to return</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── reports ───────────────────────────────────────────── -->
+      <section id="reports" class="docs-section">
+        <h2 class="docs-h2">reports <span class="docs-alias">alias: report</span></h2>
+        <p class="docs-p">Financial analysis reports.</p>
+
+        <h3 class="docs-h3">reports monthly</h3>
+        <p class="docs-p">Monthly income/expenses/net breakdown.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--from &lt;date&gt;</code></td><td>Start date</td></tr>
+              <tr><td><code>--to &lt;date&gt;</code></td><td>End date</td></tr>
+              <tr><td><code>--type &lt;type&gt;</code></td><td>Filter by provider type (<code>bank</code> | <code>credit_card</code>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">reports categories</h3>
+        <p class="docs-p">Expense breakdown by category.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--from &lt;date&gt;</code></td><td>Start date</td></tr>
+              <tr><td><code>--to &lt;date&gt;</code></td><td>End date</td></tr>
+              <tr><td><code>--type &lt;type&gt;</code></td><td>Filter by provider type (<code>bank</code> | <code>credit_card</code>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">reports merchants</h3>
+        <p class="docs-p">Top merchants by spend.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--from &lt;date&gt;</code></td><td>Start date</td></tr>
+              <tr><td><code>--to &lt;date&gt;</code></td><td>End date</td></tr>
+              <tr><td><code>--type &lt;type&gt;</code></td><td>Filter by provider type (<code>bank</code> | <code>credit_card</code>)</td></tr>
+              <tr><td><code>--limit &lt;n&gt;</code></td><td>Number of merchants to show (default: 20)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">reports balance</h3>
+        <p class="docs-p">Account balances with 30-day activity summary.</p>
+      </section>
+
+      <!-- ── categorize ────────────────────────────────────────── -->
+      <section id="categorize" class="docs-section">
+        <h2 class="docs-h2">categorize <span class="docs-alias">alias: cat</span></h2>
+        <p class="docs-p">Manage category rules and apply them to transactions.</p>
+
+        <h3 class="docs-h3">categorize rule add &lt;category&gt;</h3>
+        <p class="docs-p">Create a category rule.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--match &lt;pattern&gt;</code></td><td>Substring match on description</td></tr>
+              <tr><td><code>--match-exact &lt;pattern&gt;</code></td><td>Exact match on description</td></tr>
+              <tr><td><code>--match-regex &lt;pattern&gt;</code></td><td>Regex match on description</td></tr>
+              <tr><td><code>--memo &lt;pattern&gt;</code></td><td>Substring match on memo</td></tr>
+              <tr><td><code>--account &lt;account&gt;</code></td><td>Account filter (e.g. <code>leumi:12345</code>)</td></tr>
+              <tr><td><code>--amount &lt;number&gt;</code></td><td>Exact amount match</td></tr>
+              <tr><td><code>--amount-min &lt;number&gt;</code></td><td>Minimum amount (inclusive)</td></tr>
+              <tr><td><code>--amount-max &lt;number&gt;</code></td><td>Maximum amount (inclusive)</td></tr>
+              <tr><td><code>--direction &lt;dir&gt;</code></td><td>Direction filter: <code>debit</code> or <code>credit</code></td></tr>
+              <tr><td><code>--priority &lt;number&gt;</code></td><td>Rule priority (higher = evaluated first, default: 0)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">categorize rule list</h3>
+        <p class="docs-p">List all category rules.</p>
+
+        <h3 class="docs-h3">categorize rule remove &lt;id&gt;</h3>
+        <p class="docs-p">Delete a category rule.</p>
+
+        <h3 class="docs-h3">categorize rule import [file]</h3>
+        <p class="docs-p">Bulk-import category rules from JSON file or stdin.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--dry-run</code></td><td>Validate and preview rules without importing</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">categorize apply</h3>
+        <p class="docs-p">Run category rules on transactions.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--all</code></td><td>Re-apply rules to all transactions, not just uncategorized</td></tr>
+              <tr><td><code>--from-category &lt;name&gt;</code></td><td>Re-apply only to transactions in this category</td></tr>
+              <tr><td><code>--dry-run</code></td><td>Preview changes without modifying data</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">categorize rename &lt;old&gt; &lt;new&gt;</h3>
+        <p class="docs-p">Rename or merge a category (updates transactions and rules).</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--dry-run</code></td><td>Show what would change without modifying data</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">categorize migrate</h3>
+        <p class="docs-p">Bulk rename/merge categories from a JSON mapping file.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--file &lt;path&gt;</code></td><td><strong>(required)</strong> JSON file with <code>{ oldName: newName }</code> mapping</td></tr>
+              <tr><td><code>--dry-run</code></td><td>Preview changes without modifying data</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">categorize reassign</h3>
+        <p class="docs-p">Force-reassign transactions matching a pattern to a new category.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--match &lt;pattern&gt;</code></td><td>Substring to match against description</td></tr>
+              <tr><td><code>--to &lt;category&gt;</code></td><td>Target category</td></tr>
+              <tr><td><code>--file &lt;path&gt;</code></td><td>JSON file with reassignment mappings</td></tr>
+              <tr><td><code>--dry-run</code></td><td>Preview changes without modifying data</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">categorize list</h3>
+        <p class="docs-p">Show categories with transaction counts, totals, and source.</p>
+      </section>
+
+      <!-- ── translate ─────────────────────────────────────────── -->
+      <section id="translate" class="docs-section">
+        <h2 class="docs-h2">translate <span class="docs-alias">alias: tr</span></h2>
+        <p class="docs-p">Manage Hebrew-to-English translation rules for transaction descriptions.</p>
+
+        <h3 class="docs-h3">translate rule add &lt;english&gt;</h3>
+        <p class="docs-p">Create a translation rule.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--match &lt;pattern&gt;</code></td><td><strong>(required)</strong> Hebrew substring pattern to match</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">translate rule list</h3>
+        <p class="docs-p">List all translation rules.</p>
+
+        <h3 class="docs-h3">translate rule remove &lt;id&gt;</h3>
+        <p class="docs-p">Delete a translation rule.</p>
+
+        <h3 class="docs-h3">translate rule import [file]</h3>
+        <p class="docs-p">Bulk-import translation rules from JSON file or stdin.</p>
+
+        <h3 class="docs-h3">translate apply</h3>
+        <p class="docs-p">Run translation rules on transactions with NULL <code>description_en</code>.</p>
+      </section>
+
+      <!-- ── schedule ──────────────────────────────────────────── -->
+      <section id="schedule" class="docs-section">
+        <h2 class="docs-h2">schedule</h2>
+        <p class="docs-p">Manage automatic fetch scheduling.</p>
+
+        <h3 class="docs-h3">schedule set</h3>
+        <p class="docs-p">Register a recurring fetch task with the OS scheduler.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--every &lt;interval&gt;</code></td><td><strong>(required)</strong> Fetch interval (e.g. <code>6h</code>, <code>12h</code>, <code>24h</code>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">schedule remove</h3>
+        <p class="docs-p">Unregister the recurring fetch task.</p>
+
+        <h3 class="docs-h3">schedule status</h3>
+        <p class="docs-p">Show current schedule status.</p>
+      </section>
+
+      <!-- ── plugin ────────────────────────────────────────────── -->
+      <section id="plugin" class="docs-section">
+        <h2 class="docs-h2">plugin</h2>
+        <p class="docs-p">Manage AI agent integrations.</p>
+
+        <h3 class="docs-h3">plugin install &lt;tool&gt;</h3>
+        <p class="docs-p">Install AI plugin for a tool.</p>
+        <div class="docs-code"><pre><code>kolshek plugin install claude-code
+kolshek plugin install cursor
+kolshek plugin install gemini-cli</code></pre></div>
+        <p class="docs-p">Supported tools: <code>claude-code</code>, <code>openclaw</code>, <code>cursor</code>, <code>gemini-cli</code>, <code>antigravity</code>, <code>opencode</code>, <code>aider</code>, <code>windsurf</code>.</p>
+
+        <h3 class="docs-h3">plugin list</h3>
+        <p class="docs-p">List available tool integrations.</p>
+      </section>
+
+      <!-- ── spending ──────────────────────────────────────────── -->
+      <section id="spending" class="docs-section">
+        <h2 class="docs-h2">spending [month]</h2>
+        <p class="docs-p">Spending breakdown by category, merchant, or provider.</p>
+        <div class="docs-code"><pre><code>kolshek spending              # current month
+kolshek spending 2026-01      # specific month
+kolshek spending -m 3         # 3 months ago</code></pre></div>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--group-by &lt;field&gt;</code></td><td>Group by: <code>category</code> (default), <code>merchant</code>, <code>provider</code></td></tr>
+              <tr><td><code>--category &lt;name&gt;</code></td><td>Filter to a specific category</td></tr>
+              <tr><td><code>--top &lt;n&gt;</code></td><td>Limit to top N groups</td></tr>
+              <tr><td><code>--type &lt;type&gt;</code></td><td>Filter by provider type (<code>bank</code> | <code>credit_card</code>)</td></tr>
+              <tr><td><code>--lifestyle</code></td><td>Exclude categories marked as non-spending</td></tr>
+              <tr><td><code>-m, --month-offset &lt;n&gt;</code></td><td>Months ago (e.g. <code>-m 3</code>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">spending exclude add &lt;category&gt;</h3>
+        <p class="docs-p">Mark a category as non-spending.</p>
+
+        <h3 class="docs-h3">spending exclude remove &lt;category&gt;</h3>
+        <p class="docs-p">Remove a category from the exclusion list.</p>
+
+        <h3 class="docs-h3">spending exclude list</h3>
+        <p class="docs-p">Show all excluded categories.</p>
+      </section>
+
+      <!-- ── income ────────────────────────────────────────────── -->
+      <section id="income" class="docs-section">
+        <h2 class="docs-h2">income [month]</h2>
+        <p class="docs-p">Income breakdown with salary detection (bank accounts only by default).</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--salary-only</code></td><td>Show only salary/wage transactions</td></tr>
+              <tr><td><code>--include-refunds</code></td><td>Also show CC refunds (separate section)</td></tr>
+              <tr><td><code>-m, --month-offset &lt;n&gt;</code></td><td>Months ago (e.g. <code>-m 3</code>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── trends ────────────────────────────────────────────── -->
+      <section id="trends" class="docs-section">
+        <h2 class="docs-h2">trends [months]</h2>
+        <p class="docs-p">Multi-month cashflow and spending trend analysis. Default: 6 months.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--mode &lt;mode&gt;</code></td><td>Analysis mode: <code>total</code> (default), <code>category</code>, <code>fixed-variable</code></td></tr>
+              <tr><td><code>--category &lt;name&gt;</code></td><td>Track specific category (implies <code>--mode category</code>)</td></tr>
+              <tr><td><code>--type &lt;type&gt;</code></td><td>Filter by provider type (<code>bank</code> | <code>credit_card</code>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── insights ──────────────────────────────────────────── -->
+      <section id="insights" class="docs-section">
+        <h2 class="docs-h2">insights</h2>
+        <p class="docs-p">Financial alerts and recommendations based on spending patterns.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--months &lt;n&gt;</code></td><td>Lookback period in months (default: 3)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════════
+           GUIDES
+           ══════════════════════════════════════════════════════════ -->
+
+      <div class="docs-divider"></div>
+
+      <!-- ── Security Model ────────────────────────────────────── -->
+      <section id="security" class="docs-section">
+        <h2 class="docs-h2">Security Model</h2>
+        <p class="docs-lead">KolShek handles real bank credentials. Security is not optional.</p>
+
+        <h3 class="docs-h3">Credential Storage</h3>
+        <p class="docs-p">Credentials are stored using a layered strategy:</p>
+        <ol class="docs-ol">
+          <li><strong>Environment variables</strong> (CI/automation) — checked first via <code>KOLSHEK_CREDENTIALS_JSON</code></li>
+          <li><strong>OS keychain</strong> (primary) — Windows Credential Manager, macOS Keychain, or Linux <code>secret-tool</code></li>
+          <li><strong>Encrypted file</strong> (fallback) — AES-256-GCM encrypted local file when no keychain is available</li>
+        </ol>
+        <p class="docs-p">Credentials are <strong>never logged</strong>, never included in error messages, and zeroed from memory after use.</p>
+
+        <h3 class="docs-h3">File Permissions</h3>
+        <p class="docs-p">Database and config files are restricted to owner-only access:</p>
+        <ul class="docs-ul">
+          <li><strong>Windows</strong>: <code>icacls</code> removes inherited permissions, grants full control only to the current user</li>
+          <li><strong>Unix</strong>: <code>chmod 600</code> for files, <code>chmod 700</code> for directories</li>
+        </ul>
+
+        <h3 class="docs-h3">Read-Only Query Command</h3>
+        <p class="docs-p">The <code>kolshek query</code> command enforces read-only access:</p>
+        <ul class="docs-ul">
+          <li>Only <code>SELECT</code>, <code>WITH</code>, <code>EXPLAIN</code>, <code>PRAGMA</code>, and <code>VALUES</code> are allowed</li>
+          <li><code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>DROP</code>, <code>ALTER</code>, <code>CREATE</code> are blocked</li>
+          <li>PRAGMA restricted to a whitelist of read-only pragmas</li>
+          <li>Table names in <code>db schema</code> validated against <code>[a-z_]+</code></li>
+        </ul>
+
+        <h3 class="docs-h3">Web Dashboard Security</h3>
+        <ul class="docs-ul">
+          <li><strong>Localhost only</strong> — <code>Bun.serve()</code> binds to <code>hostname: "localhost"</code></li>
+          <li><strong>CSRF protection</strong> — Origin header checked on all non-GET/HEAD requests</li>
+          <li><strong>Security headers</strong> — <code>X-Content-Type-Options: nosniff</code> and <code>X-Frame-Options: DENY</code></li>
+          <li><strong>XSS prevention</strong> — all user-controlled content is HTML-escaped</li>
+          <li><strong>Parameterized SQL</strong> — all operations use prepared statements</li>
+        </ul>
+
+        <h3 class="docs-h3">Dependency Pinning</h3>
+        <p class="docs-p">Critical dependencies are pinned to exact versions to prevent supply-chain attacks. <code>israeli-bank-scrapers-core</code> is pinned to <code>6.7.1</code> (no caret).</p>
+      </section>
+
+      <!-- ── AI Agent Integration ──────────────────────────────── -->
+      <section id="ai-agents" class="docs-section">
+        <h2 class="docs-h2">AI Agent Integration</h2>
+        <p class="docs-lead">KolShek is built for AI agents. Every command supports <code>--json</code> for structured output, and the <code>query</code> and <code>db</code> commands give agents direct SQL access.</p>
+
+        <h3 class="docs-h3">Install a Plugin</h3>
+        <div class="docs-code"><pre><code>kolshek plugin install claude-code
+kolshek plugin install cursor
+kolshek plugin install gemini-cli</code></pre></div>
+        <p class="docs-p">Run <code>kolshek plugin list</code> to see all available integrations.</p>
+
+        <h3 class="docs-h3">Structured Output</h3>
+        <p class="docs-p">Every command supports <code>--json</code>, returning a consistent envelope:</p>
+        <div class="docs-code"><pre><code>{
+  "success": true,
+  "data": { ... },
+  "metadata": { "count": 42, "from": "2026-01-01", "to": "2026-03-16" }
+}</code></pre></div>
+        <p class="docs-p">Errors follow the same pattern:</p>
+        <div class="docs-code"><pre><code>{
+  "success": false,
+  "error": {
+    "code": "AUTH_FAILED",
+    "message": "Authentication failed for provider hapoalim",
+    "retryable": false,
+    "suggestions": ["Run 'kolshek providers test hapoalim'"]
+  }
+}</code></pre></div>
+
+        <h3 class="docs-h3">Schema Discovery</h3>
+        <p class="docs-p">Agents can discover the database schema without prior knowledge:</p>
+        <div class="docs-code"><pre><code>kolshek db tables --json
+kolshek db schema transactions --json</code></pre></div>
+
+        <h3 class="docs-h3">Exit Codes</h3>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><code>0</code></td><td>Success</td></tr>
+              <tr><td><code>1</code></td><td>General error</td></tr>
+              <tr><td><code>2</code></td><td>Bad arguments</td></tr>
+              <tr><td><code>3</code></td><td>Auth failure</td></tr>
+              <tr><td><code>4</code></td><td>Timeout</td></tr>
+              <tr><td><code>5</code></td><td>Blocked by provider</td></tr>
+              <tr><td><code>10</code></td><td>Partial success (some providers failed)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">Non-Interactive Mode</h3>
+        <div class="docs-code"><pre><code>kolshek fetch --non-interactive --json</code></pre></div>
+        <p class="docs-p">If input is required (e.g., OTP), the command fails with exit code 3 instead of hanging.</p>
+      </section>
+
+      <!-- ── Web Dashboard ─────────────────────────────────────── -->
+      <section id="dashboard" class="docs-section">
+        <h2 class="docs-h2">Web Dashboard</h2>
+        <p class="docs-lead">Browser UI for managing providers, categories, and translations.</p>
+
+        <h3 class="docs-h3">Quick Start</h3>
+        <div class="docs-code"><pre><code>kolshek dashboard</code></pre></div>
+        <p class="docs-p">Opens a local web server (default: <code>http://localhost:5556</code>) with three pages:</p>
+        <ul class="docs-ul">
+          <li><strong>Providers</strong> — add, edit, remove, and test bank/credit card connections; fetch with real-time progress</li>
+          <li><strong>Categories</strong> — create category rules, view spending breakdowns, reassign transactions</li>
+          <li><strong>Translations</strong> — manage Hebrew-to-English merchant name mappings</li>
+        </ul>
+
+        <h3 class="docs-h3">Provider Management</h3>
+        <ul class="docs-ul">
+          <li>Add providers by selecting a bank/credit card and entering credentials</li>
+          <li>Test connections before saving</li>
+          <li>Fetch transactions with real-time SSE progress</li>
+        </ul>
+
+        <h3 class="docs-h3">Category Rules</h3>
+        <ul class="docs-ul">
+          <li>Match on description, memo, amount, account, or direction</li>
+          <li>Substring, exact, and regex matching</li>
+          <li>Priority-based rule evaluation</li>
+          <li>Apply to uncategorized or re-apply to all</li>
+        </ul>
+
+        <h3 class="docs-h3">Translation Rules</h3>
+        <ul class="docs-ul">
+          <li>Map Hebrew merchant names to English</li>
+          <li>View untranslated descriptions grouped by frequency</li>
+          <li>One-click rule creation from untranslated list</li>
+        </ul>
+
+        <h3 class="docs-h3">Architecture</h3>
+        <p class="docs-p">Built with <strong>Bun.serve()</strong> (localhost-only HTTP server), <strong>HTMX</strong> (dynamic updates without a JS framework), <strong>Tailwind CSS v4</strong>, and <strong>SSE</strong> for real-time fetch progress. All data stays local.</p>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ── FOOTER ──────────────────────────────────────────────── -->
+  <footer class="border-t border-theme py-8 px-4 sm:px-6 mt-16">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-faint">
+      <div class="flex items-center gap-2">
+        <img src="logo.png" alt="KolShek" class="w-5 h-5 rounded" />
+        <span id="footer-version">KolShek</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="https://github.com/DaveDushi/kolshek" target="_blank" rel="noopener" class="hover:text-label transition-colors">GitHub</a>
+        <a href="/" class="hover:text-label transition-colors">Home</a>
+        <a href="https://github.com/DaveDushi/kolshek/blob/master/LICENSE" target="_blank" rel="noopener" class="hover:text-label transition-colors">MIT License</a>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="/src/docs.js"></script>
+</body>
+</html>
