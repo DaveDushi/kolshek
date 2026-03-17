@@ -12,6 +12,7 @@ An open-source CLI that pulls transactions from Israeli banks and credit cards i
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/DaveDushi/kolshek)](https://github.com/DaveDushi/kolshek/releases)
+[![Website](https://img.shields.io/badge/site-kolshek.com-6366f1)](https://kolshek.com)
 
 </div>
 
