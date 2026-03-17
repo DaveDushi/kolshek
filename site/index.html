@@ -414,7 +414,7 @@
                     <!-- Tab switcher -->
                     <div class="hero-demo-tabs">
                         <button
-                            class="hero-demo-tab active"
+                            class="hero-demo-tab"
                             data-demo="terminal"
                         >
                             <svg
@@ -432,7 +432,7 @@
                             </svg>
                             Command Line
                         </button>
-                        <button class="hero-demo-tab" data-demo="chat">
+                        <button class="hero-demo-tab active" data-demo="chat">
                             <svg
                                 width="14"
                                 height="14"
@@ -452,7 +452,7 @@
                     </div>
 
                     <!-- Terminal demo panel -->
-                    <div class="hero-demo-panel active" id="demo-terminal">
+                    <div class="hero-demo-panel" id="demo-terminal">
                         <div class="terminal">
                             <div class="terminal-header">
                                 <span class="terminal-dot bg-red-500/80"></span>
@@ -536,7 +536,7 @@
                     </div>
 
                     <!-- Chat demo panel -->
-                    <div class="hero-demo-panel" id="demo-chat">
+                    <div class="hero-demo-panel active" id="demo-chat">
                         <div class="chat-window">
                             <div class="chat-header">
                                 <div class="flex items-center gap-3">
@@ -618,256 +618,115 @@
                             </div>
 
                             <div class="chat-body">
-                                <div
-                                    class="chat-msg chat-msg-user chat-anim-trigger"
-                                    style="--chat-delay: 0.5s"
-                                >
+                                <!-- Exchange 1: init -->
+                                <div class="chat-msg chat-msg-user chat-anim-trigger" style="--chat-delay: 0.3s">
                                     <div class="chat-bubble chat-bubble-user">
-                                        <span
-                                            >What's my spending for the
-                                            month?</span
-                                        >
+                                        <span>Set up my finances</span>
                                         <span class="chat-meta chat-meta-user">
                                             <span>09:41</span>
-                                            <svg
-                                                class="chat-read"
-                                                width="16"
-                                                height="10"
-                                                viewBox="0 0 16 10"
-                                            >
-                                                <path
-                                                    d="M1 5l3 3L11 1"
-                                                    stroke="currentColor"
-                                                    stroke-width="1.5"
-                                                    fill="none"
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                />
-                                                <path
-                                                    d="M5 5l3 3L15 1"
-                                                    stroke="currentColor"
-                                                    stroke-width="1.5"
-                                                    fill="none"
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                />
+                                            <svg class="chat-read" width="16" height="10" viewBox="0 0 16 10">
+                                                <path d="M1 5l3 3L11 1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                                                <path d="M5 5l3 3L15 1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
                                             </svg>
                                         </span>
                                     </div>
                                 </div>
-
-                                <div
-                                    class="chat-msg chat-msg-agent chat-anim-trigger"
-                                    style="--chat-delay: 1.8s"
-                                >
+                                <div class="chat-msg chat-msg-agent chat-anim-trigger" style="--chat-delay: 1.2s">
                                     <div class="chat-avatar-sm">
-                                        <svg
-                                            width="14"
-                                            height="14"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            stroke-width="2"
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                        >
-                                            <path d="M12 8V4H8" />
-                                            <rect
-                                                width="16"
-                                                height="12"
-                                                x="4"
-                                                y="8"
-                                                rx="2"
-                                            />
-                                            <path d="M15 13v2" />
-                                            <path d="M9 13v2" />
-                                        </svg>
-                                    </div>
-                                    <div class="chat-typing">
-                                        <span class="chat-typing-dot"></span>
-                                        <span class="chat-typing-dot"></span>
-                                        <span class="chat-typing-dot"></span>
-                                    </div>
-                                </div>
-
-                                <div
-                                    class="chat-msg chat-msg-agent chat-anim-trigger"
-                                    style="--chat-delay: 3.2s"
-                                >
-                                    <div class="chat-avatar-sm">
-                                        <svg
-                                            width="14"
-                                            height="14"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            stroke-width="2"
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                        >
-                                            <path d="M12 8V4H8" />
-                                            <rect
-                                                width="16"
-                                                height="12"
-                                                x="4"
-                                                y="8"
-                                                rx="2"
-                                            />
-                                            <path d="M15 13v2" />
-                                            <path d="M9 13v2" />
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M15 13v2" /><path d="M9 13v2" />
                                         </svg>
                                     </div>
                                     <div class="chat-bubble chat-bubble-agent">
-                                        <p class="chat-agent-intro">
-                                            Spending for March 2026:
-                                        </p>
-                                        <div class="chat-table">
-                                            <div class="chat-row">
-                                                <span class="chat-cat"
-                                                    >Groceries</span
-                                                ><span class="chat-amount"
-                                                    >&#8362;2,340</span
-                                                >
-                                            </div>
-                                            <div class="chat-row">
-                                                <span class="chat-cat"
-                                                    >Dining</span
-                                                ><span class="chat-amount"
-                                                    >&#8362;1,870</span
-                                                >
-                                            </div>
-                                            <div class="chat-row">
-                                                <span class="chat-cat"
-                                                    >Transportation</span
-                                                ><span class="chat-amount"
-                                                    >&#8362;980</span
-                                                >
-                                            </div>
-                                            <div class="chat-row">
-                                                <span class="chat-cat"
-                                                    >Subscriptions</span
-                                                ><span class="chat-amount"
-                                                    >&#8362;450</span
-                                                >
-                                            </div>
-                                            <div class="chat-row">
-                                                <span class="chat-cat"
-                                                    >Utilities</span
-                                                ><span class="chat-amount"
-                                                    >&#8362;620</span
-                                                >
-                                            </div>
-                                            <div
-                                                class="chat-row chat-row-total"
-                                            >
-                                                <span class="chat-cat"
-                                                    >Total</span
-                                                ><span class="chat-amount"
-                                                    >&#8362;6,260</span
-                                                >
-                                            </div>
-                                        </div>
-                                        <p class="chat-agent-note">
-                                            Groceries up 12% vs last month.
-                                        </p>
-                                        <span class="chat-meta chat-meta-agent"
-                                            >09:41</span
-                                        >
+                                        <p class="chat-agent-intro">Connected Bank Hapoalim, Isracard. Fetched 342 transactions. 287 translated, 12 category rules applied.</p>
+                                        <span class="chat-meta chat-meta-agent">09:41</span>
                                     </div>
                                 </div>
 
-                                <div
-                                    class="chat-msg chat-msg-user chat-anim-trigger"
-                                    style="--chat-delay: 5.8s"
-                                >
+                                <!-- Exchange 2: categorize -->
+                                <div class="chat-msg chat-msg-user chat-anim-trigger" style="--chat-delay: 2.5s">
                                     <div class="chat-bubble chat-bubble-user">
-                                        <span>Top grocery charges?</span>
+                                        <span>Categorize everything</span>
+                                        <span class="chat-meta chat-meta-user">
+                                            <span>09:41</span>
+                                            <svg class="chat-read" width="16" height="10" viewBox="0 0 16 10">
+                                                <path d="M1 5l3 3L11 1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                                                <path d="M5 5l3 3L15 1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="chat-msg chat-msg-agent chat-anim-trigger" style="--chat-delay: 3.4s">
+                                    <div class="chat-avatar-sm">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M15 13v2" /><path d="M9 13v2" />
+                                        </svg>
+                                    </div>
+                                    <div class="chat-bubble chat-bubble-agent">
+                                        <div class="chat-table">
+                                            <div class="chat-row"><span class="chat-cat">Groceries</span><span class="chat-amount">34 txns</span></div>
+                                            <div class="chat-row"><span class="chat-cat">Dining</span><span class="chat-amount">18 txns</span></div>
+                                            <div class="chat-row"><span class="chat-cat">Transport</span><span class="chat-amount">12 txns</span></div>
+                                            <div class="chat-row"><span class="chat-cat">Subscriptions</span><span class="chat-amount">8 txns</span></div>
+                                        </div>
+                                        <p class="chat-agent-note">Applied 12 rules. 94% coverage.</p>
+                                        <span class="chat-meta chat-meta-agent">09:41</span>
+                                    </div>
+                                </div>
+
+                                <!-- Exchange 3: analyze -->
+                                <div class="chat-msg chat-msg-user chat-anim-trigger" style="--chat-delay: 4.7s">
+                                    <div class="chat-bubble chat-bubble-user">
+                                        <span>Analyze my spending</span>
                                         <span class="chat-meta chat-meta-user">
                                             <span>09:42</span>
-                                            <svg
-                                                class="chat-read"
-                                                width="16"
-                                                height="10"
-                                                viewBox="0 0 16 10"
-                                            >
-                                                <path
-                                                    d="M1 5l3 3L11 1"
-                                                    stroke="currentColor"
-                                                    stroke-width="1.5"
-                                                    fill="none"
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                />
-                                                <path
-                                                    d="M5 5l3 3L15 1"
-                                                    stroke="currentColor"
-                                                    stroke-width="1.5"
-                                                    fill="none"
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                />
+                                            <svg class="chat-read" width="16" height="10" viewBox="0 0 16 10">
+                                                <path d="M1 5l3 3L11 1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                                                <path d="M5 5l3 3L15 1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
                                             </svg>
                                         </span>
                                     </div>
                                 </div>
-
-                                <div
-                                    class="chat-msg chat-msg-agent chat-anim-trigger"
-                                    style="--chat-delay: 7.4s"
-                                >
+                                <div class="chat-msg chat-msg-agent chat-anim-trigger" style="--chat-delay: 5.6s">
                                     <div class="chat-avatar-sm">
-                                        <svg
-                                            width="14"
-                                            height="14"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            stroke-width="2"
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                        >
-                                            <path d="M12 8V4H8" />
-                                            <rect
-                                                width="16"
-                                                height="12"
-                                                x="4"
-                                                y="8"
-                                                rx="2"
-                                            />
-                                            <path d="M15 13v2" />
-                                            <path d="M9 13v2" />
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M15 13v2" /><path d="M9 13v2" />
                                         </svg>
                                     </div>
                                     <div class="chat-bubble chat-bubble-agent">
                                         <div class="chat-table">
-                                            <div class="chat-row">
-                                                <span class="chat-cat"
-                                                    >Shufersal</span
-                                                ><span class="chat-amount"
-                                                    >&#8362;487</span
-                                                >
-                                            </div>
-                                            <div class="chat-row">
-                                                <span class="chat-cat"
-                                                    >Rami Levy</span
-                                                ><span class="chat-amount"
-                                                    >&#8362;412</span
-                                                >
-                                            </div>
-                                            <div class="chat-row">
-                                                <span class="chat-cat"
-                                                    >Yochananof</span
-                                                ><span class="chat-amount"
-                                                    >&#8362;389</span
-                                                >
-                                            </div>
+                                            <div class="chat-row"><span class="chat-cat">Income</span><span class="chat-amount">&#8362;18,500</span></div>
+                                            <div class="chat-row"><span class="chat-cat">Expenses</span><span class="chat-amount">&#8362;12,340</span></div>
+                                            <div class="chat-row chat-row-total"><span class="chat-cat">Savings rate</span><span class="chat-amount">33%</span></div>
                                         </div>
-                                        <p class="chat-agent-note">
-                                            All from your local SQLite DB.
-                                        </p>
-                                        <span class="chat-meta chat-meta-agent"
-                                            >09:42</span
-                                        >
+                                        <p class="chat-agent-note">Top opportunity: &#8362;450/mo in unused subscriptions.</p>
+                                        <span class="chat-meta chat-meta-agent">09:42</span>
+                                    </div>
+                                </div>
+
+                                <!-- Exchange 4: review -->
+                                <div class="chat-msg chat-msg-user chat-anim-trigger" style="--chat-delay: 6.9s">
+                                    <div class="chat-bubble chat-bubble-user">
+                                        <span>Monthly review</span>
+                                        <span class="chat-meta chat-meta-user">
+                                            <span>09:42</span>
+                                            <svg class="chat-read" width="16" height="10" viewBox="0 0 16 10">
+                                                <path d="M1 5l3 3L11 1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                                                <path d="M5 5l3 3L15 1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="chat-msg chat-msg-agent chat-anim-trigger" style="--chat-delay: 7.8s">
+                                    <div class="chat-avatar-sm">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M15 13v2" /><path d="M9 13v2" />
+                                        </svg>
+                                    </div>
+                                    <div class="chat-bubble chat-bubble-agent">
+                                        <p class="chat-agent-intro">B+ Overall</p>
+                                        <p class="chat-agent-note">Groceries on budget, dining 15% over. Savings rate 28% &rarr; 33%.</p>
+                                        <span class="chat-meta chat-meta-agent">09:42</span>
                                     </div>
                                 </div>
                             </div>
