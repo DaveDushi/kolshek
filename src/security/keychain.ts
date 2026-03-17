@@ -200,14 +200,11 @@ async function winHasKeychain(): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 async function macStore(target: string, encoded: string): Promise<void> {
-  // Delete first (update semantics — add-generic-password fails if it already exists)
-  try {
-    await run(["security", "delete-generic-password", "-s", SERVICE, "-a", target]);
-  } catch {
-    // may not exist yet — that's fine
-  }
-  // Pass password via stdin to avoid exposing credentials in process argument list
-  await run(["security", "add-generic-password", "-s", SERVICE, "-a", target, "-w"], encoded);
+  // -U = update if exists (no need for delete-first)
+  // -w VALUE = set password directly (stdin piping is unreliable — macOS prompts
+  //   "retype password" via /dev/tty even when stdin is a pipe, causing silent failures)
+  // The value is base64-encoded, and ps is same-user-only on macOS 10.12+.
+  await run(["security", "add-generic-password", "-U", "-s", SERVICE, "-a", target, "-w", encoded]);
 }
 
 async function macRead(target: string): Promise<string | null> {
