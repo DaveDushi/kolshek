@@ -383,6 +383,29 @@ body {
   background: var(--white-soft);
 }
 
+/* ── GitHub stars badge ────────────────────────────────────── */
+.gh-stars-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3rem 0.625rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-heading);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 150ms, background 150ms;
+}
+
+.gh-stars-badge:hover {
+  border-color: var(--border-hover);
+  background: var(--white-soft);
+}
+
+.gh-stars-count:empty { display: none; }
+
 /* ── Cards ─────────────────────────────────────────────────── */
 .card {
   background: var(--bg-surface);
@@ -575,6 +598,7 @@ body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   position: relative;
   background-color: var(--bg-sunken);
   background-image:
@@ -1523,6 +1547,16 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+/* ── Theme cycle button ───────────────────────────────────── */
+.theme-icon-light { display: none; }
+.theme-icon-dark { display: block; }
+[data-theme="light"] .theme-icon-light { display: block; }
+[data-theme="light"] .theme-icon-dark { display: none; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .theme-icon-light { display: block; }
+  :root:not([data-theme]) .theme-icon-dark { display: none; }
+}
+
 /* ── Hero split layout ────────────────────────────────────── */
 .hero-split {
   display: flex;
@@ -1611,15 +1645,10 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Chat animations inside hero — only animate when panel becomes active */
+/* Chat animations inside hero — JS reveals messages one by one via setTimeout,
+   so scrollHeight grows naturally and auto-scroll works correctly. */
 .hero-demo-panel .chat-anim-trigger {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
-.hero-demo-panel.active .chat-anim-trigger {
-  animation: chat-appear 0.4s ease forwards;
-  animation-delay: var(--chat-delay, 0s);
+  display: none;
 }
 
 /* ── Stat counters ─────────────────────────────────────────── */

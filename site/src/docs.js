@@ -1,43 +1,24 @@
-// ── Theme toggle ─────────────────────────────────────────────
+// ── Theme toggle (click to cycle: dark → light → dark) ──────
 var THEME_KEY = "kolshek-theme";
 
-function applyTheme(choice) {
-  if (choice === "system") {
-    document.documentElement.removeAttribute("data-theme");
-    localStorage.removeItem(THEME_KEY);
-  } else {
-    document.documentElement.setAttribute("data-theme", choice);
-    localStorage.setItem(THEME_KEY, choice);
-  }
-  updateToggleButtons(choice);
+function getCurrentTheme() {
+  var stored = localStorage.getItem(THEME_KEY);
+  if (stored === "light" || stored === "dark") return stored;
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
-function updateToggleButtons(activeValue) {
-  document.querySelectorAll(".theme-toggle-btn").forEach(function (btn) {
-    btn.classList.toggle("active", btn.dataset.themeValue === activeValue);
-    btn.setAttribute(
-      "aria-checked",
-      btn.dataset.themeValue === activeValue ? "true" : "false"
-    );
-  });
+function setTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem(THEME_KEY, theme);
 }
 
-var storedTheme = localStorage.getItem(THEME_KEY);
-updateToggleButtons(storedTheme || "system");
+function cycleTheme() {
+  setTheme(getCurrentTheme() === "dark" ? "light" : "dark");
+}
 
-document.querySelectorAll(".theme-toggle-btn").forEach(function (btn) {
-  btn.addEventListener("click", function () {
-    applyTheme(btn.dataset.themeValue);
-  });
+document.querySelectorAll(".theme-cycle-btn").forEach(function (btn) {
+  btn.addEventListener("click", cycleTheme);
 });
-
-window
-  .matchMedia("(prefers-color-scheme: dark)")
-  .addEventListener("change", function () {
-    if (!localStorage.getItem(THEME_KEY)) {
-      document.documentElement.removeAttribute("data-theme");
-    }
-  });
 
 // ── Mobile sidebar toggle ────────────────────────────────────
 var sidebarToggle = document.getElementById("docs-menu-toggle");

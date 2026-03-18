@@ -27,13 +27,32 @@ document.querySelectorAll(".hero-demo-tab").forEach(function (tab) {
 });
 
 // ── Chat auto-scroll on message appear ───────────────────────
+// Messages start display:none so scrollHeight grows as each appears.
+// JS reveals them at their --chat-delay, then scrolls the small delta.
 (function () {
   var chatBody = document.querySelector("#demo-chat .chat-body");
   if (!chatBody) return;
+
   chatBody.querySelectorAll(".chat-anim-trigger").forEach(function (msg) {
-    msg.addEventListener("animationstart", function () {
-      msg.scrollIntoView({ behavior: "smooth", block: "end" });
-    }, { once: true });
+    var delayStr = msg.style.getPropertyValue("--chat-delay") || "0s";
+    var delayMs = parseFloat(delayStr) * 1000;
+
+    setTimeout(function () {
+      msg.style.display = "flex";
+      msg.style.animation = "chat-appear 0.4s ease forwards";
+
+      // Fix typing dots: their CSS delay includes --chat-delay which already elapsed
+      var typing = msg.querySelector(".chat-typing");
+      if (typing) typing.style.animationDelay = "1.2s";
+
+      // After paint, scroll to show the new message (distance is small — just one msg)
+      requestAnimationFrame(function () {
+        var bottom = chatBody.scrollHeight - chatBody.clientHeight;
+        if (bottom > chatBody.scrollTop) {
+          chatBody.scrollTo({ top: bottom, behavior: "smooth" });
+        }
+      });
+    }, delayMs);
   });
 })();
 
@@ -295,57 +314,29 @@ const sectionObserver = new IntersectionObserver(
 
 sections.forEach((section) => sectionObserver.observe(section));
 
-// ── Theme toggle ─────────────────────────────────────────────
+// ── Theme toggle (click to cycle: dark → light → dark) ──────
 const THEME_KEY = "kolshek-theme";
 
-function getEffectiveTheme(stored) {
+function getCurrentTheme() {
+  var stored = localStorage.getItem(THEME_KEY);
   if (stored === "light" || stored === "dark") return stored;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
-function applyTheme(choice) {
-  if (choice === "system") {
-    document.documentElement.removeAttribute("data-theme");
-    localStorage.removeItem(THEME_KEY);
-  } else {
-    document.documentElement.setAttribute("data-theme", choice);
-    localStorage.setItem(THEME_KEY, choice);
-  }
-  updateToggleButtons(choice);
+function setTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem(THEME_KEY, theme);
 }
 
-function updateToggleButtons(activeValue) {
-  document.querySelectorAll(".theme-toggle-btn").forEach(function (btn) {
-    btn.classList.toggle("active", btn.dataset.themeValue === activeValue);
-    btn.setAttribute(
-      "aria-checked",
-      btn.dataset.themeValue === activeValue ? "true" : "false",
-    );
-  });
+function cycleTheme() {
+  var current = getCurrentTheme();
+  setTheme(current === "dark" ? "light" : "dark");
 }
 
-// Determine initial state
-var storedTheme = localStorage.getItem(THEME_KEY);
-var initialChoice = storedTheme || "system";
-updateToggleButtons(initialChoice);
-
-// Attach click handlers to all toggle buttons (desktop + mobile)
-document.querySelectorAll(".theme-toggle-btn").forEach(function (btn) {
-  btn.addEventListener("click", function () {
-    applyTheme(btn.dataset.themeValue);
-  });
+// Attach click handlers to all cycle buttons
+document.querySelectorAll("#theme-cycle, .theme-cycle-mobile").forEach(function (btn) {
+  btn.addEventListener("click", cycleTheme);
 });
-
-// Listen for OS theme changes (applies when in "system" mode)
-window
-  .matchMedia("(prefers-color-scheme: dark)")
-  .addEventListener("change", function () {
-    if (!localStorage.getItem(THEME_KEY)) {
-      document.documentElement.removeAttribute("data-theme");
-    }
-  });
 
 // ── OS auto-detection for download button ────────────────────
 (function () {
@@ -371,6 +362,10 @@ window
   // Windows is the default, no change needed
 })();
 
+// ── Footer year ──────────────────────────────────────────────
+var yearEl = document.getElementById("footer-year");
+if (yearEl) yearEl.textContent = new Date().getFullYear();
+
 // ── Fetch latest release version from GitHub ─────────────────
 (function () {
   var REPO = "DaveDushi/kolshek";
@@ -391,18 +386,31 @@ window
     if (el) el.textContent = count >= 1000 ? (count / 1000).toFixed(1) + "k" : String(count);
   }
 
+  function applyStars(count) {
+    var el = document.getElementById("gh-stars");
+    if (el) el.textContent = count >= 1000 ? (count / 1000).toFixed(1) + "k" : String(count);
+  }
+
   try {
     var cached = JSON.parse(sessionStorage.getItem(CACHE_KEY));
-    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+    if (cached && cached.stars != null && Date.now() - cached.ts < CACHE_TTL) {
       applyVersion(cached.tag);
       if (cached.downloads != null) applyDownloads(cached.downloads);
+      if (cached.stars != null) applyStars(cached.stars);
       return;
     }
   } catch (e) {}
 
-  fetch("https://api.github.com/repos/" + REPO + "/releases")
-    .then(function (r) { return r.json(); })
-    .then(function (releases) {
+  // Fetch releases + repo info in parallel
+  Promise.all([
+    fetch("https://api.github.com/repos/" + REPO + "/releases").then(function (r) { return r.json(); }),
+    fetch("https://api.github.com/repos/" + REPO).then(function (r) { return r.json(); })
+  ])
+    .then(function (results) {
+      var releases = results[0];
+      var repo = results[1];
+      var stars = repo.stargazers_count || 0;
+      applyStars(stars);
       if (!Array.isArray(releases) || !releases.length) return;
       var latest = releases[0];
       if (latest.tag_name) applyVersion(latest.tag_name);
@@ -412,7 +420,7 @@ window
       });
       applyDownloads(total);
       try {
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ tag: latest.tag_name, downloads: total, ts: Date.now() }));
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ tag: latest.tag_name, downloads: total, stars: stars, ts: Date.now() }));
       } catch (e) {}
     })
     .catch(function () {});
