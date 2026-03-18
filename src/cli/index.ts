@@ -8,7 +8,8 @@
 import { Command } from "commander";
 import { existsSync } from "fs";
 import { join } from "path";
-import { setOutputOptions, ExitCode, createSpinner, isInteractive } from "./output.js";
+import { setOutputOptions, setUpdateInfo, ExitCode, createSpinner, isInteractive } from "./output.js";
+import { checkForUpdate } from "./update-check.js";
 import { getAppPaths, ensureDirectories, getDbPath } from "../config/loader.js";
 import { initDatabase, closeDatabase } from "../db/database.js";
 import { registerInitCommand } from "./commands/init.js";
@@ -61,8 +62,24 @@ program
       nonInteractive: opts.nonInteractive,
     });
 
-    // Ensure data directories and init DB for commands that need it
+    // Check for available updates (cached, non-blocking)
     const commandName = actionCommand.name();
+    if (commandName !== "update") {
+      const updateInfo = checkForUpdate();
+      if (updateInfo) {
+        setUpdateInfo(updateInfo);
+        // Human-mode notice via exit handler (fires even with process.exit)
+        if (!opts.json && !opts.quiet) {
+          process.on("exit", () => {
+            const msg = `\nUpdate available: v${updateInfo.current} \u2192 v${updateInfo.latest}`
+              + `\nRun "kolshek update" to install.`;
+            console.error(msg);
+          });
+        }
+      }
+    }
+
+    // Ensure data directories and init DB for commands that need it
     if (commandName !== "init" && commandName !== "update") {
       await ensureDirectories();
       const dbPath = getDbPath();
