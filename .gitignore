@@ -26,6 +26,9 @@ Thumbs.db
 # Auto-generated
 src/cli/plugin-files.ts
 
+# React dashboard build output
+src/web/dist/app/
+
 # Bun
 bun.lock
 

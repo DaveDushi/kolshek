@@ -1,0 +1,291 @@
+@import "tailwindcss";
+
+@source "./**/*.tsx";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --animate-fade-up: fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 0.3s ease both;
+}
+
+/* ------------------------------------------------------------------ */
+/* Light theme                                                        */
+/* ------------------------------------------------------------------ */
+
+:root {
+  --radius: 0.625rem;
+
+  --background: #fafafa;
+  --foreground: #09090b;
+
+  --card: #ffffff;
+  --card-foreground: #09090b;
+
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #4f46e5;
+
+  --chart-1: #4f46e5;
+  --chart-2: #16a34a;
+  --chart-3: #d97706;
+  --chart-4: #0891b2;
+  --chart-5: #db2777;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #3f3f46;
+  --sidebar-primary: #4f46e5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f4f4f5;
+  --sidebar-accent-foreground: #18181b;
+  --sidebar-border: #e4e4e7;
+  --sidebar-ring: #4f46e5;
+
+  /* KolShek design tokens */
+  --surface-elevated: #ffffff;
+  --surface-sunken: #f4f4f5;
+  --border-subtle: #f4f4f5;
+  --border-strong: #d4d4d8;
+  --text-primary: #09090b;
+  --text-secondary: #52525b;
+  --text-tertiary: #a1a1aa;
+  --income: #16a34a;
+  --expense: #dc2626;
+  --income-muted: rgba(22, 163, 74, 0.08);
+  --expense-muted: rgba(220, 38, 38, 0.08);
+  --primary-muted: rgba(79, 70, 229, 0.06);
+  --primary-subtle: rgba(79, 70, 229, 0.1);
+}
+
+/* ------------------------------------------------------------------ */
+/* Dark theme                                                         */
+/* ------------------------------------------------------------------ */
+
+.dark {
+  --background: #09090b;
+  --foreground: #e4e4e7;
+
+  --card: #111113;
+  --card-foreground: #e4e4e7;
+
+  --popover: #111113;
+  --popover-foreground: #e4e4e7;
+
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+
+  --secondary: #1c1c1f;
+  --secondary-foreground: #e4e4e7;
+
+  --muted: #1c1c1f;
+  --muted-foreground: #a1a1aa;
+
+  --accent: #1c1c1f;
+  --accent-foreground: #e4e4e7;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --border: #1f1f23;
+  --input: #1f1f23;
+  --ring: #6366f1;
+
+  --chart-1: #818cf8;
+  --chart-2: #34d399;
+  --chart-3: #fbbf24;
+  --chart-4: #22d3ee;
+  --chart-5: #f472b6;
+
+  --sidebar: #0c0c0e;
+  --sidebar-foreground: #a1a1aa;
+  --sidebar-primary: #6366f1;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #18181b;
+  --sidebar-accent-foreground: #e4e4e7;
+  --sidebar-border: #1f1f23;
+  --sidebar-ring: #6366f1;
+
+  /* KolShek design tokens -- dark */
+  --surface-elevated: #18181b;
+  --surface-sunken: #0c0c0e;
+  --border-subtle: #1f1f23;
+  --border-strong: #27272a;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #52525b;
+  --income: #34d399;
+  --expense: #f87171;
+  --income-muted: rgba(52, 211, 153, 0.1);
+  --expense-muted: rgba(248, 113, 113, 0.1);
+  --primary-muted: rgba(99, 102, 241, 0.08);
+  --primary-subtle: rgba(99, 102, 241, 0.15);
+}
+
+/* ------------------------------------------------------------------ */
+/* Keyframes                                                          */
+/* ------------------------------------------------------------------ */
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes subtle-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes number-tick {
+  from { transform: translateY(4px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Base layer                                                         */
+/* ------------------------------------------------------------------ */
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Tighter font rendering for numbers */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Utility classes — KolShek design language                          */
+/* ------------------------------------------------------------------ */
+
+@layer utilities {
+  /* Brand text -- solid indigo, no gradient */
+  .brand-text {
+    color: var(--primary);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  /* Stagger children animation delays */
+  .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+  .stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+  .stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+  .stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+  .stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+
+  /* Semantic amount colors */
+  .text-income {
+    color: var(--income);
+  }
+  .text-expense {
+    color: var(--expense);
+  }
+  .bg-income-muted {
+    background-color: var(--income-muted);
+  }
+  .bg-expense-muted {
+    background-color: var(--expense-muted);
+  }
+  .bg-primary-muted {
+    background-color: var(--primary-muted);
+  }
+  .bg-primary-subtle {
+    background-color: var(--primary-subtle);
+  }
+
+  /* Number animation */
+  .number-tick {
+    animation: number-tick 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Tight tracking for headings */
+  .tracking-display {
+    letter-spacing: -0.025em;
+  }
+}

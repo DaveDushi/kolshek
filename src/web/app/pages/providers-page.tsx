@@ -1,0 +1,135 @@
+// Providers management page — grid of connected providers with sync and
+// add-connection wizard
+import { useState, useCallback } from "react";
+import { Plus, Unplug, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/shared/page-header";
+import { EmptyState } from "@/components/shared/empty-state";
+import { ProviderGrid } from "@/components/providers/provider-grid";
+import { AddProviderWizard } from "@/components/providers/add-provider-wizard";
+import { SyncPanel } from "@/components/layout/sync-panel";
+import { useProviders, useDeleteProvider, useUpdateAuth } from "@/hooks/use-providers";
+import { useSync } from "@/hooks/use-sync";
+import { Skeleton } from "@/components/ui/skeleton";
+
+export function ProvidersPage() {
+  const { data: providers, isLoading, isError, error } = useProviders();
+  const deleteProvider = useDeleteProvider();
+  const updateAuth = useUpdateAuth();
+  const { events, isRunning, start } = useSync();
+
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [syncPanelOpen, setSyncPanelOpen] = useState(false);
+  // Track which provider is being re-authed (for future inline auth modal)
+  const [_authTarget, setAuthTarget] = useState<number | null>(null);
+
+  const handleSync = useCallback(() => {
+    setSyncPanelOpen(true);
+    start();
+  }, [start]);
+
+  const handleDelete = useCallback(
+    (id: number) => {
+      deleteProvider.mutate(id);
+    },
+    [deleteProvider]
+  );
+
+  const handleAuth = useCallback(
+    (id: number) => {
+      // For now, open the wizard or an auth dialog
+      // This is a placeholder — a full auth update flow could be its own modal
+      setAuthTarget(id);
+      // TODO: Open dedicated auth-update dialog
+      // For now we signal intent via console (the grid card action works)
+      void updateAuth;
+    },
+    [updateAuth]
+  );
+
+  const handleRetrySync = useCallback(() => {
+    start();
+  }, [start]);
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Connections"
+        description="Manage your bank and credit card connections."
+      >
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSync}
+          disabled={isRunning || !providers?.length}
+        >
+          <RefreshCw className={isRunning ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+          Sync All
+        </Button>
+        <Button size="sm" onClick={() => setWizardOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Add Connection
+        </Button>
+      </PageHeader>
+
+      {isError && (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">
+            Failed to load providers:{" "}
+            {error instanceof Error ? error.message : "Unknown error"}
+          </p>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }, (_, i) => (
+            <div key={i} className="space-y-3 rounded-xl border p-6">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-lg" />
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              </div>
+              <Skeleton className="h-4 w-32" />
+              <div className="grid grid-cols-2 gap-2">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : !providers?.length ? (
+        <EmptyState
+          icon={<Unplug />}
+          title="No bank connections"
+          description="Add your first bank or credit card to start tracking your finances."
+          action={{
+            label: "Add Connection",
+            onClick: () => setWizardOpen(true),
+          }}
+        />
+      ) : (
+        <ProviderGrid
+          providers={providers}
+          onSync={handleSync}
+          onDelete={handleDelete}
+          onAuth={handleAuth}
+        />
+      )}
+
+      {/* Add provider wizard */}
+      <AddProviderWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+
+      {/* Sync progress panel */}
+      <SyncPanel
+        open={syncPanelOpen}
+        onOpenChange={setSyncPanelOpen}
+        events={events}
+        isRunning={isRunning}
+        onRetry={handleRetrySync}
+      />
+    </div>
+  );
+}

@@ -239,10 +239,11 @@ export function getBalanceReport(
   const excl = excludeClassifications ?? DEFAULT_REPORT_EXCLUDES;
   const { sql: excludeSQL, params: excludeParams } = buildClassificationExcludeSQL(excl, "t2");
 
-  // Remap params for the subquery context (avoid collision)
+  // Build a separate exclude clause for the t3 subquery with remapped params
+  const { sql: rawSQL3, params: rawParams3 } = buildClassificationExcludeSQL(excl, "t3");
+  const excludeSQL3 = rawSQL3.replace(/\$excl_/g, "$excl3_");
   const excludeParams3: Record<string, string> = {};
-  const excludeSQL3 = excludeSQL.replace(/\$excl_/g, "$excl3_");
-  for (const [k, v] of Object.entries(excludeParams)) {
+  for (const [k, v] of Object.entries(rawParams3)) {
     excludeParams3[k.replace("$excl_", "$excl3_")] = v;
   }
 
