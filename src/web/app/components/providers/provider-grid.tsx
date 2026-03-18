@@ -10,6 +10,8 @@ import {
   KeyRound,
   Trash2,
   MoreVertical,
+  RefreshCw,
+  Eye,
 } from "lucide-react";
 import {
   Card,
@@ -42,9 +44,10 @@ import type { ProviderCard as ProviderCardType } from "@/types/api";
 
 interface ProviderGridProps {
   providers: ProviderCardType[];
-  onSync: () => void;
+  onSync: (options?: { providerId?: number; visible?: boolean }) => void;
   onDelete: (id: number) => void;
   onAuth: (id: number) => void;
+  isSyncing?: boolean;
 }
 
 // Confirmation dialog for provider deletion
@@ -91,10 +94,14 @@ function ProviderCardItem({
   provider,
   onAuth,
   onDeleteRequest,
+  onSync,
+  isSyncing,
 }: {
   provider: ProviderCardType;
   onAuth: (id: number) => void;
   onDeleteRequest: (provider: ProviderCardType) => void;
+  onSync: (options?: { providerId?: number; visible?: boolean }) => void;
+  isSyncing?: boolean;
 }) {
   const Icon = provider.type === "bank" ? Building2 : CreditCard;
   const authStatus = provider.authStatus ?? (provider.hasCredentials ? "pending" : "no");
@@ -136,6 +143,21 @@ function ProviderCardItem({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => onSync({ providerId: provider.id })}
+                disabled={!provider.hasCredentials}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Sync
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onSync({ providerId: provider.id, visible: true })}
+                disabled={!provider.hasCredentials}
+              >
+                <Eye className="h-4 w-4" />
+                Sync (visible)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onAuth(provider.id)}>
                 <KeyRound className="h-4 w-4" />
                 Update Auth
@@ -210,9 +232,10 @@ function ProviderCardItem({
 
 export function ProviderGrid({
   providers,
-  onSync: _onSync,
+  onSync,
   onDelete,
   onAuth,
+  isSyncing,
 }: ProviderGridProps) {
   const [deleteTarget, setDeleteTarget] = useState<ProviderCardType | null>(
     null
@@ -234,6 +257,8 @@ export function ProviderGrid({
             provider={provider}
             onAuth={onAuth}
             onDeleteRequest={setDeleteTarget}
+            onSync={onSync}
+            isSyncing={isSyncing}
           />
         ))}
       </div>

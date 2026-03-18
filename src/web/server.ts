@@ -244,6 +244,15 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
   const sessionToken = randomBytes(32).toString("hex");
   const cookieName = "kolshek_session";
 
+  // Write session token to .dev-session so the Vite dev proxy can inject it.
+  // This file is gitignored and only used for local development.
+  try {
+    const devSessionPath = resolve(import.meta.dir, "../../.dev-session");
+    Bun.write(devSessionPath, `${cookieName}=${sessionToken}`);
+  } catch {
+    // Non-fatal — only needed for Vite dev mode
+  }
+
   // Parse the session cookie from a Cookie header
   function getSessionCookie(req: Request): string | null {
     const cookies = req.headers.get("cookie") ?? "";
@@ -288,6 +297,27 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       }
 
       // --- Authentication ---
+
+      // POST /api/v2/auth/token — exchange a token for a session cookie.
+      // This endpoint is unauthenticated so the Vite dev server (port 5173)
+      // can proxy it and set the cookie on its own origin.
+      if (method === "POST" && path === "/api/v2/auth/token") {
+        const body = await parseJsonBody(req);
+        const token = typeof body.token === "string" ? body.token : "";
+        if (token !== sessionToken) {
+          return jsonError("UNAUTHORIZED", "Invalid token.", 401);
+        }
+        return new Response(JSON.stringify({ success: true, data: null }), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Set-Cookie": sessionCookieHeader(),
+            ...SECURITY_HEADERS,
+            ...cors,
+          },
+        });
+      }
+
       // If the request has ?token= in the URL, validate it and set a cookie.
       // This is the initial browser open from the CLI.
       if (url.searchParams.has("token")) {
@@ -1062,7 +1092,8 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           }
           const body = await parseJsonBody(req);
           const visible = body.visible === true || body.visible === 1;
-          return startFetchSSE(visible, jsonError);
+          const providerIds = Array.isArray(body.providers) ? (body.providers as number[]) : undefined;
+          return startFetchSSE(visible, providerIds, jsonError);
         }
 
         // GET /api/v2/fetch/events — SSE stream for fetch progress
@@ -1119,7 +1150,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
 
 // --- SSE Helpers ---
 
-function startFetchSSE(visible: boolean, jsonError: JsonErrorFn): Response {
+function startFetchSSE(visible: boolean, providerIds: number[] | undefined, jsonError: JsonErrorFn): Response {
   const events: string[] = [];
   const listeners: Set<(event: string) => void> = new Set();
 
@@ -1128,10 +1159,13 @@ function startFetchSSE(visible: boolean, jsonError: JsonErrorFn): Response {
     for (const listener of listeners) listener(data);
   }
 
-  // Start fetch in background
-  const providers = listProviders();
+  // Start fetch in background — optionally filter to specific providers
+  const allProviders = listProviders();
+  const providers = providerIds
+    ? allProviders.filter((p) => providerIds.includes(p.id))
+    : allProviders;
   if (providers.length === 0) {
-    return jsonError("NO_PROVIDERS", "No providers configured.", 400);
+    return jsonError("NO_PROVIDERS", providerIds ? "No matching providers found." : "No providers configured.", 400);
   }
 
   pushEvent(

@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Clock,
 } from "lucide-react";
 import {
   Sheet,
@@ -33,7 +34,7 @@ interface ProviderStatus {
   name: string;
   stage: string;
   progress: number; // 0-100
-  status: "running" | "done" | "error";
+  status: "queued" | "running" | "done" | "error";
   added: number;
   updated: number;
   error: string | null;
@@ -54,20 +55,43 @@ function deriveProviderStatuses(events: SyncEvent[]): ProviderStatus[] {
   const map = new Map<string, ProviderStatus>();
 
   for (const evt of events) {
-    // "start" event initializes all providers so they appear immediately
-    if (evt.type === "start" && evt.providers) {
+    // "queued" event shows providers waiting for the current sync to finish
+    if (evt.type === "queued" && evt.providers) {
       for (const name of evt.providers) {
         if (!map.has(name)) {
           map.set(name, {
             name,
-            stage: "connecting...",
+            stage: "queued",
             progress: 0,
-            status: "running",
+            status: "queued",
             added: 0,
             updated: 0,
             error: null,
           });
         }
+      }
+      continue;
+    }
+
+    // "start" event initializes all providers so they appear immediately
+    if (evt.type === "start" && evt.providers) {
+      for (const name of evt.providers) {
+        // Remove any queued entry that matches (case-insensitive) —
+        // the queued name may be the displayName while the server uses the alias
+        for (const [key, val] of map) {
+          if (val.status === "queued" && key.toLowerCase() === name.toLowerCase()) {
+            map.delete(key);
+          }
+        }
+        map.set(name, {
+          name,
+          stage: "connecting...",
+          progress: 0,
+          status: "running",
+          added: 0,
+          updated: 0,
+          error: null,
+        });
       }
       continue;
     }
@@ -122,6 +146,9 @@ function ProviderRow({ provider }: { provider: ProviderStatus }) {
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">{provider.name}</span>
         <div className="flex items-center gap-1.5">
+          {provider.status === "queued" && (
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+          )}
           {provider.status === "running" && (
             <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
           )}
@@ -232,7 +259,11 @@ export function SyncPanel({
         {isDone && (
           <div className="pt-4 border-t space-y-3">
             <div className="text-sm text-center">
-              {totals.added === 0 && totals.updated === 0 ? (
+              {hasErrors ? (
+                <span className="text-destructive">
+                  Some providers failed to sync
+                </span>
+              ) : totals.added === 0 && totals.updated === 0 ? (
                 <span className="text-muted-foreground">
                   Everything is up to date
                 </span>
