@@ -6,6 +6,7 @@ import type {
   CategorySummary,
   CategoryRule,
   TransactionWithContext,
+  ClassificationMap,
 } from "@/types/api";
 
 // -- Queries --
@@ -100,6 +101,29 @@ export function useRemoveCategoryRule() {
       api.delete(`/api/v2/categories/rules/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.categories.rules() });
+    },
+  });
+}
+
+// -- Classification hooks --
+
+export function useClassificationMap() {
+  return useQuery({
+    queryKey: queryKeys.categories.classifications(),
+    queryFn: () => api.get<ClassificationMap>("/api/v2/categories/classifications"),
+  });
+}
+
+export function useSetClassification() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, classification }: { name: string; classification: string }) =>
+      api.put<{ name: string; classification: string }>(
+        `/api/v2/categories/${encodeURIComponent(name)}/classification`,
+        { classification }
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.categories.classifications() });
     },
   });
 }

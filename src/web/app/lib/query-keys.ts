@@ -20,6 +20,7 @@ export const queryKeys = {
     list: () => [...queryKeys.categories.all, "list"] as const,
     transactions: (cat: string) => [...queryKeys.categories.all, "tx", cat] as const,
     rules: () => [...queryKeys.categories.all, "rules"] as const,
+    classifications: () => [...queryKeys.categories.all, "classifications"] as const,
   },
   translations: {
     all: ["translations"] as const,

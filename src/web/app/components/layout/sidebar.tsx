@@ -18,7 +18,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
@@ -118,7 +117,7 @@ export function Sidebar() {
           icon: Tags,
           badge: () =>
             uncategorizedCount > 0 ? (
-              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
             ) : null,
         },
         {
@@ -172,71 +171,82 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r bg-background z-30">
+      <aside className="hidden md:flex md:w-60 md:flex-col md:fixed md:inset-y-0 border-r border-sidebar-border bg-sidebar z-30">
         {/* Logo / brand */}
-        <div className="flex h-14 items-center px-4 border-b">
+        <div className="flex h-14 items-center px-4">
           <button
             onClick={() => navigate("/")}
-            className="flex items-center gap-2 font-semibold text-lg hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
           >
-            <span className="text-primary">KolShek</span>
+            <img src="/logo.png" alt="KolShek" className="h-7 w-7 rounded-md" />
+            <span className="brand-text text-[15px]">KolShek</span>
           </button>
         </div>
 
         {/* Scrollable nav area */}
-        <ScrollArea className="flex-1 py-2">
-          <nav className="space-y-1 px-2" aria-label="Main navigation">
-            {navGroups.map((group) => (
-              <div key={group.title} className="py-2">
-                <p className="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <ScrollArea className="flex-1 py-1">
+          <nav className="space-y-0.5 px-3" aria-label="Main navigation">
+            {navGroups.map((group, groupIdx) => (
+              <div key={group.title} className={cn(groupIdx > 0 && "mt-6")}>
+                <p className="px-2 mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
                   {group.title}
                 </p>
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  const active = isActive(item.path);
-                  const badgeEl = item.badge?.() ?? null;
-                  return (
-                    <button
-                      key={item.path}
-                      onClick={() => navigate(item.path)}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                        "hover:bg-accent hover:text-accent-foreground",
-                        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                        active && "bg-accent text-accent-foreground"
-                      )}
-                      aria-current={active ? "page" : undefined}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span className="flex-1 text-left">{item.label}</span>
-                      {badgeEl}
-                    </button>
-                  );
-                })}
+                <div className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.path);
+                    const badgeEl = item.badge?.() ?? null;
+                    return (
+                      <button
+                        key={item.path}
+                        onClick={() => navigate(item.path)}
+                        className={cn(
+                          "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13px] font-medium transition-colors duration-150",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                          active
+                            ? "bg-primary-subtle text-primary"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        )}
+                        aria-current={active ? "page" : undefined}
+                      >
+                        <Icon
+                          className={cn(
+                            "h-4 w-4 shrink-0 transition-colors duration-150",
+                            active
+                              ? "text-primary"
+                              : "text-muted-foreground group-hover:text-sidebar-accent-foreground"
+                          )}
+                        />
+                        <span className="flex-1 text-left">{item.label}</span>
+                        {badgeEl}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </nav>
         </ScrollArea>
 
         {/* Bottom controls */}
-        <div className="border-t p-3 space-y-2">
+        <div className="border-t border-sidebar-border px-3 py-3 space-y-1">
           {/* Sync status / button */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full justify-start gap-2"
+                className="w-full justify-start gap-2 text-[13px] h-8"
                 onClick={handleSync}
                 disabled={false}
               >
                 <RefreshCw
                   className={cn(
-                    "h-4 w-4",
+                    "h-3.5 w-3.5",
                     isRunning && "animate-spin"
                   )}
                 />
-                <span className="flex-1 text-left text-xs">
+                <span className="flex-1 text-left text-xs text-muted-foreground">
                   {isRunning
                     ? "Syncing..."
                     : lastSyncedAt
@@ -261,18 +271,16 @@ export function Sidebar() {
             </div>
           )}
 
-          <Separator />
-
           {/* Theme toggle */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full justify-start gap-2"
+                className="w-full justify-start gap-2 text-[13px] h-8"
               >
-                <ThemeIcon className="h-4 w-4" />
-                <span className="text-xs capitalize">{theme} theme</span>
+                <ThemeIcon className="h-3.5 w-3.5" />
+                <span className="text-xs text-muted-foreground capitalize">{theme}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" side="top">

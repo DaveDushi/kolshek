@@ -19,10 +19,10 @@ interface CashflowTrendProps {
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload || payload.length === 0) return null;
   return (
-    <div className="rounded-lg border bg-background p-3 shadow-md">
-      <p className="mb-1 font-medium">{label ? formatMonth(label + "-01") : ""}</p>
+    <div className="rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm">
+      <p className="mb-1.5 text-[13px] font-medium">{label ? formatMonth(label + "-01") : ""}</p>
       {payload.map((entry) => (
-        <p key={entry.name} className="text-sm" style={{ color: entry.color }}>
+        <p key={entry.name} className="text-xs tabular-nums" style={{ color: entry.color }}>
           {entry.name}: {formatCurrency(entry.value)}
         </p>
       ))}
@@ -31,59 +31,64 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export function CashflowTrend({ data }: CashflowTrendProps) {
-  // Compute total expenses and format month labels
+  // Format month labels
   const chartData = data.map((d) => ({
     ...d,
-    expenses: d.bankExpenses + d.ccExpenses,
     label: formatMonth(d.month + "-01"),
   }));
 
   return (
-    <ResponsiveContainer width="100%" height={350}>
-      <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+    <ResponsiveContainer width="100%" height={320}>
+      <LineChart data={chartData} margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.5} />
         <XAxis
           dataKey="month"
           tickFormatter={(v: string) => {
             const d = new Date(v + "-01");
             return d.toLocaleDateString("en-US", { month: "short" });
           }}
-          className="text-xs"
+          tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+          axisLine={{ stroke: "var(--border)" }}
+          tickLine={false}
         />
         <YAxis
           tickFormatter={(v: number) => formatCurrency(v)}
-          className="text-xs"
+          tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+          axisLine={false}
+          tickLine={false}
           width={80}
         />
         <Tooltip content={<CustomTooltip />} />
-        <Legend />
+        <Legend
+          wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }}
+        />
         <Line
           type="monotone"
           dataKey="income"
           name="Income"
-          stroke="#22c55e"
+          stroke="var(--income)"
           strokeWidth={2}
-          dot={{ r: 4 }}
-          activeDot={{ r: 6 }}
+          dot={{ r: 3, fill: "var(--income)" }}
+          activeDot={{ r: 5, strokeWidth: 0 }}
         />
         <Line
           type="monotone"
           dataKey="expenses"
           name="Expenses"
-          stroke="#ef4444"
+          stroke="var(--expense)"
           strokeWidth={2}
-          dot={{ r: 4 }}
-          activeDot={{ r: 6 }}
+          dot={{ r: 3, fill: "var(--expense)" }}
+          activeDot={{ r: 5, strokeWidth: 0 }}
         />
         <Line
           type="monotone"
           dataKey="net"
           name="Net"
-          stroke="#3b82f6"
+          stroke="var(--primary)"
           strokeWidth={2}
-          strokeDasharray="5 5"
-          dot={{ r: 4 }}
-          activeDot={{ r: 6 }}
+          strokeDasharray="4 4"
+          dot={{ r: 3, fill: "var(--primary)" }}
+          activeDot={{ r: 5, strokeWidth: 0 }}
         />
       </LineChart>
     </ResponsiveContainer>

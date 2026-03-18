@@ -57,7 +57,16 @@ import {
   categoryExists,
   listAllCategories,
   listCategories,
+  setCategoryClassification,
+  getClassificationMap,
 } from "../db/repositories/categories.js";
+import {
+  DEFAULT_SPENDING_EXCLUDES,
+  DEFAULT_INCOME_EXCLUDES,
+  DEFAULT_REPORT_EXCLUDES,
+  BUILTIN_CLASSIFICATIONS,
+  isValidClassification,
+} from "../types/classification.js";
 import {
   listTranslationRules,
   addTranslationRule,
@@ -416,7 +425,7 @@ export function startDashboard(port: number) {
           try {
             const from = url.searchParams.get("from") ?? undefined;
             const to = url.searchParams.get("to") ?? undefined;
-            return json(getMonthlyReport({ from, to }));
+            return json(getMonthlyReport({ from, to }, undefined, DEFAULT_REPORT_EXCLUDES));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("MONTHLY_REPORT_FAILED", msg, 500);
@@ -428,7 +437,7 @@ export function startDashboard(port: number) {
           try {
             const from = url.searchParams.get("from") ?? undefined;
             const to = url.searchParams.get("to") ?? undefined;
-            return json(getCategoryReport({ from, to }));
+            return json(getCategoryReport({ from, to }, undefined, DEFAULT_REPORT_EXCLUDES));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("CATEGORY_REPORT_FAILED", msg, 500);
@@ -438,7 +447,7 @@ export function startDashboard(port: number) {
         // GET /api/v2/reports/balance
         if (method === "GET" && path === "/api/v2/reports/balance") {
           try {
-            return json(getBalanceReport());
+            return json(getBalanceReport(DEFAULT_REPORT_EXCLUDES));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("BALANCE_REPORT_FAILED", msg, 500);
@@ -453,15 +462,13 @@ export function startDashboard(port: number) {
             const sp = url.searchParams;
             const month = sp.get("month") ?? new Date().toISOString().slice(0, 7);
             const groupBy = (sp.get("groupBy") ?? "category") as "category" | "merchant" | "provider";
-            const lifestyle = sp.get("lifestyle") === "true" || sp.get("lifestyle") === "1";
-
             const from = month + "-01";
             // End of month: next month first day minus 1
             const [year, mon] = month.split("-").map(Number);
             const lastDay = new Date(year, mon, 0).getDate();
             const to = `${month}-${String(lastDay).padStart(2, "0")}`;
 
-            return json(getSpendingReport({ from, to, groupBy, lifestyle }));
+            return json(getSpendingReport({ from, to, groupBy, excludeClassifications: DEFAULT_SPENDING_EXCLUDES }));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("SPENDING_REPORT_FAILED", msg, 500);
@@ -480,7 +487,7 @@ export function startDashboard(port: number) {
             const lastDay = new Date(year, mon, 0).getDate();
             const to = `${month}-${String(lastDay).padStart(2, "0")}`;
 
-            return json(getIncomeReport({ from, to }));
+            return json(getIncomeReport({ from, to, excludeClassifications: DEFAULT_INCOME_EXCLUDES }));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("INCOME_REPORT_FAILED", msg, 500);
@@ -497,7 +504,7 @@ export function startDashboard(port: number) {
             const from = new Date(now.getFullYear(), now.getMonth() - months, 1)
               .toISOString()
               .slice(0, 10);
-            return json(getTotalTrends({ from }));
+            return json(getTotalTrends({ from }, undefined, DEFAULT_REPORT_EXCLUDES));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("TRENDS_TOTAL_FAILED", msg, 500);
@@ -514,7 +521,7 @@ export function startDashboard(port: number) {
             const from = new Date(now.getFullYear(), now.getMonth() - months, 1)
               .toISOString()
               .slice(0, 10);
-            return json(getCategoryTrends({ from }, category));
+            return json(getCategoryTrends({ from }, category, undefined, DEFAULT_REPORT_EXCLUDES));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("TRENDS_CATEGORY_FAILED", msg, 500);
@@ -529,7 +536,7 @@ export function startDashboard(port: number) {
             const from = new Date(now.getFullYear(), now.getMonth() - months, 1)
               .toISOString()
               .slice(0, 10);
-            return json(getFixedVariableTrends({ from }));
+            return json(getFixedVariableTrends({ from }, undefined, DEFAULT_REPORT_EXCLUDES));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("TRENDS_FIXED_VAR_FAILED", msg, 500);
@@ -704,6 +711,45 @@ export function startDashboard(port: number) {
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("CATEGORY_RULE_DELETE_FAILED", msg, 500);
+          }
+        }
+
+        // --- Classification management ---
+
+        // GET /api/v2/classifications — list built-in classifications
+        if (method === "GET" && path === "/api/v2/classifications") {
+          return json(BUILTIN_CLASSIFICATIONS);
+        }
+
+        // GET /api/v2/categories/classifications — get classification map for all categories
+        if (method === "GET" && path === "/api/v2/categories/classifications") {
+          try {
+            const map = getClassificationMap();
+            const entries = Object.fromEntries(map);
+            return json(entries);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("CLASSIFICATION_MAP_FAILED", msg, 500);
+          }
+        }
+
+        // PUT /api/v2/categories/:name/classification — set classification
+        const v2CatClassMatch = path.match(/^\/api\/v2\/categories\/([^/]+)\/classification$/);
+        if (method === "PUT" && v2CatClassMatch) {
+          try {
+            const name = decodeURIComponent(v2CatClassMatch[1]);
+            const body = await parseJsonBody(req);
+            const classification = String(body.classification ?? "").trim();
+            if (!classification) return jsonError("MISSING_CLASSIFICATION", "classification is required.");
+            if (!isValidClassification(classification)) {
+              return jsonError("INVALID_CLASSIFICATION", "Classification must be lowercase alphanumeric + underscores.");
+            }
+            const updated = setCategoryClassification(name, classification);
+            if (!updated) return jsonError("NOT_FOUND", "Category not found.", 404);
+            return json({ name, classification });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("CLASSIFICATION_SET_FAILED", msg, 500);
           }
         }
 

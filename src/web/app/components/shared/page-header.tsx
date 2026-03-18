@@ -18,14 +18,16 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between",
+        "flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between animate-fade-in",
         className
       )}
     >
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+      <div className="space-y-0.5">
+        <h1 className="text-xl font-semibold tracking-display text-foreground">
+          {title}
+        </h1>
         {description && (
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="text-[13px] text-muted-foreground">{description}</p>
         )}
       </div>
       {children && (

@@ -1,4 +1,4 @@
-// Dashboard page — assembles all dashboard cards in a responsive grid
+// Dashboard page -- assembles all dashboard cards in a responsive grid
 import { useNavigate } from "react-router";
 import { LayoutDashboard } from "lucide-react";
 import { useBalanceReport } from "@/hooks/use-accounts";
@@ -36,19 +36,25 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader title="Dashboard" />
 
-      {/* 2x2 grid on desktop, single column on mobile */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <NetWorthCard />
-        <CashflowCard />
-        <SpendingDonut />
-        <InsightsCard />
+      {/* Top row: Net Worth takes 1/3, Cashflow takes 2/3 on large screens */}
+      <div className="grid gap-4 lg:grid-cols-5 stagger-children">
+        <div className="animate-fade-up lg:col-span-2"><NetWorthCard /></div>
+        <div className="animate-fade-up lg:col-span-3"><CashflowCard /></div>
+      </div>
+
+      {/* Bottom row: Spending and Insights side by side */}
+      <div className="grid gap-4 md:grid-cols-2 stagger-children">
+        <div className="animate-fade-up"><SpendingDonut /></div>
+        <div className="animate-fade-up"><InsightsCard /></div>
       </div>
 
       {/* Recent transactions spans full width */}
-      <RecentTransactions />
+      <div className="animate-fade-up" style={{ animationDelay: "200ms" }}>
+        <RecentTransactions />
+      </div>
     </div>
   );
 }

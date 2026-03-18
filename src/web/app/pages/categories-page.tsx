@@ -5,6 +5,7 @@ import { Tags, Plus } from "lucide-react";
 import {
   useCategorySummary,
   useApplyCategoryRules,
+  useClassificationMap,
 } from "@/hooks/use-categories";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -12,6 +13,7 @@ import { CategorySidebar } from "@/components/categories/category-sidebar";
 import { TriageInbox } from "@/components/categories/triage-inbox";
 import { RulesTable } from "@/components/categories/rules-table";
 import { RuleBuilder } from "@/components/categories/rule-builder";
+import { ClassificationPanel } from "@/components/categories/classification-panel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -23,6 +25,7 @@ export function CategoriesPage() {
   const [ruleBuilderOpen, setRuleBuilderOpen] = useState(false);
 
   const { data: categories, isLoading } = useCategorySummary();
+  const { data: classificationMap } = useClassificationMap();
   const applyRules = useApplyCategoryRules();
 
   function handleSelectCategory(cat: string) {
@@ -65,16 +68,25 @@ export function CategoriesPage() {
               categories={categories}
               activeCategory={activeCategory}
               onSelect={handleSelectCategory}
+              classificationMap={classificationMap}
             />
           </Card>
 
           {/* Main panel */}
           <div className="flex-1 space-y-8">
-            {/* Triage inbox when category selected */}
+            {/* Category detail when selected */}
             {activeCategory ? (
-              <Card className="p-6">
-                <TriageInbox category={activeCategory} />
-              </Card>
+              <>
+                <Card className="px-5 py-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium">{activeCategory}</h3>
+                    <ClassificationPanel category={activeCategory} />
+                  </div>
+                </Card>
+                <Card className="p-6">
+                  <TriageInbox category={activeCategory} />
+                </Card>
+              </>
             ) : (
               <EmptyState
                 icon={<Tags />}

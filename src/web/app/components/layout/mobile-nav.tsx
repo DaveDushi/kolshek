@@ -26,7 +26,6 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/hooks/use-theme";
 import { useSync } from "@/hooks/use-sync";
 import { useInsights } from "@/hooks/use-insights";
@@ -35,7 +34,7 @@ import { useUntranslated } from "@/hooks/use-translations";
 import { cn } from "@/lib/utils";
 import { SyncPanel } from "./sync-panel";
 
-// Bottom tab items — the 5 visible tabs
+// Bottom tab items -- the 4 visible tabs + More
 interface TabItem {
   label: string;
   path: string;
@@ -126,7 +125,7 @@ export function MobileNav() {
       icon: Tags,
       badge:
         uncategorizedCount > 0 ? (
-          <span className="h-2 w-2 rounded-full bg-amber-500" />
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
         ) : null,
     },
     {
@@ -169,7 +168,7 @@ export function MobileNav() {
     <>
       {/* Bottom tab bar */}
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card/95 backdrop-blur-sm"
         aria-label="Mobile navigation"
       >
         <div className="flex items-center justify-around h-14 px-1">
@@ -181,8 +180,8 @@ export function MobileNav() {
                 key={tab.path}
                 onClick={() => navigate(tab.path)}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 flex-1 py-1 rounded-md transition-colors",
-                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  "flex flex-col items-center justify-center gap-0.5 flex-1 py-1 rounded-lg transition-colors duration-150",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
                   active
                     ? "text-primary"
                     : "text-muted-foreground hover:text-foreground"
@@ -201,8 +200,8 @@ export function MobileNav() {
           <button
             onClick={() => setMoreOpen(true)}
             className={cn(
-              "flex flex-col items-center justify-center gap-0.5 flex-1 py-1 rounded-md transition-colors",
-              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+              "flex flex-col items-center justify-center gap-0.5 flex-1 py-1 rounded-lg transition-colors duration-150",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
               isMoreActive
                 ? "text-primary"
                 : "text-muted-foreground hover:text-foreground"
@@ -224,7 +223,7 @@ export function MobileNav() {
           </SheetHeader>
 
           <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-1 py-2">
+            <div className="space-y-0.5 py-2">
               {moreNavItems.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.path);
@@ -233,14 +232,14 @@ export function MobileNav() {
                     key={item.path}
                     onClick={() => handleMoreNav(item.path)}
                     className={cn(
-                      "flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                      "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150",
                       "hover:bg-accent hover:text-accent-foreground",
                       "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                      active && "bg-accent text-accent-foreground"
+                      active && "bg-primary-subtle text-primary"
                     )}
                     aria-current={active ? "page" : undefined}
                   >
-                    <Icon className="h-4 w-4 shrink-0" />
+                    <Icon className={cn("h-4 w-4 shrink-0", active && "text-primary")} />
                     <span className="flex-1 text-left">{item.label}</span>
                     {item.badge}
                   </button>
@@ -248,7 +247,7 @@ export function MobileNav() {
               })}
             </div>
 
-            <Separator className="my-3" />
+            <div className="border-t border-border my-3" />
 
             {/* Sync button */}
             <Button
@@ -267,7 +266,7 @@ export function MobileNav() {
 
             {/* Theme options */}
             <div className="space-y-1">
-              <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60 mb-1">
                 Theme
               </p>
               <div className="flex gap-1 px-1">

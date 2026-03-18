@@ -1,4 +1,4 @@
-// Spending donut chart — top categories for the current month
+// Spending donut chart -- top categories for the current month
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { ShoppingCart } from "lucide-react";
@@ -12,36 +12,36 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Color palette aligned with CategoryBadge ordering
+// Muted, sophisticated color palette -- works in both light and dark
 const CHART_COLORS = [
+  "#6366f1", // indigo -- primary
   "#3b82f6", // blue
   "#10b981", // emerald
-  "#8b5cf6", // purple
   "#f59e0b", // amber
   "#f43f5e", // rose
+  "#8b5cf6", // purple
   "#06b6d4", // cyan
   "#f97316", // orange
-  "#6366f1", // indigo
   "#14b8a6", // teal
   "#ec4899", // pink
   "#84cc16", // lime
   "#d946ef", // fuchsia
 ];
 
-const OTHER_COLOR = "#9ca3af"; // gray-400
+const OTHER_COLOR = "#71717a"; // zinc-500
 
 function SpendingSkeleton() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <ShoppingCart className="h-4 w-4" />
+        <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <ShoppingCart className="h-3.5 w-3.5" />
           Spending
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="mx-auto flex h-48 w-48 items-center justify-center">
-          <Skeleton className="h-40 w-40 rounded-full" />
+        <div className="mx-auto flex h-44 w-44 items-center justify-center">
+          <Skeleton className="h-36 w-36 rounded-full" />
         </div>
         <div className="space-y-2">
           <Skeleton className="h-4 w-full" />
@@ -62,19 +62,19 @@ interface LegendItemProps {
 
 function LegendItem({ name, amount, percentage, color }: LegendItemProps) {
   return (
-    <div className="flex items-center justify-between text-sm">
-      <div className="flex items-center gap-2 truncate">
+    <div className="flex items-center justify-between py-1 text-[13px]">
+      <div className="flex items-center gap-2 truncate min-w-0">
         <div
-          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          className="h-2 w-2 shrink-0 rounded-[2px]"
           style={{ backgroundColor: color }}
         />
-        <span className="truncate">{name}</span>
+        <span className="truncate text-foreground">{name}</span>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-3 shrink-0 ml-2">
         <span className="tabular-nums font-medium">
           {formatCurrency(amount)}
         </span>
-        <span className="text-xs text-muted-foreground tabular-nums w-10 text-right">
+        <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">
           {percentage.toFixed(0)}%
         </span>
       </div>
@@ -87,9 +87,9 @@ function ChartTooltip({ active, payload }: any) {
   if (!active || !payload || payload.length === 0) return null;
   const item = payload[0].payload;
   return (
-    <div className="rounded-lg border bg-background px-3 py-2 shadow-md">
-      <p className="font-medium">{item.name}</p>
-      <p className="text-sm text-muted-foreground tabular-nums">
+    <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-sm">
+      <p className="text-[13px] font-medium">{item.name}</p>
+      <p className="text-xs text-muted-foreground tabular-nums">
         {formatCurrency(item.amount)} ({item.percentage.toFixed(1)}%)
       </p>
     </div>
@@ -137,8 +137,8 @@ export function SpendingDonut() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <ShoppingCart className="h-4 w-4" />
+          <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <ShoppingCart className="h-3.5 w-3.5" />
             Spending
           </CardTitle>
         </CardHeader>
@@ -151,16 +151,19 @@ export function SpendingDonut() {
     );
   }
 
+  const totalSpending = chartData.reduce((sum, d) => sum + d.amount, 0);
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <ShoppingCart className="h-4 w-4" />
+        <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <ShoppingCart className="h-3.5 w-3.5" />
           Spending by Category
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="h-48">
+      <CardContent className="space-y-3">
+        {/* Donut chart with total in center */}
+        <div className="relative h-44">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -169,7 +172,7 @@ export function SpendingDonut() {
                 nameKey="name"
                 cx="50%"
                 cy="50%"
-                innerRadius="55%"
+                innerRadius="60%"
                 outerRadius="85%"
                 paddingAngle={2}
                 strokeWidth={0}
@@ -181,8 +184,16 @@ export function SpendingDonut() {
               <Tooltip content={<ChartTooltip />} />
             </PieChart>
           </ResponsiveContainer>
+          {/* Center label */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <span className="text-xs text-muted-foreground">Total</span>
+            <span className="text-base font-bold tabular-nums tracking-display">
+              {formatCurrency(totalSpending)}
+            </span>
+          </div>
         </div>
-        <div className="space-y-1.5">
+        {/* Legend */}
+        <div className="space-y-0">
           {chartData.map((item) => (
             <LegendItem
               key={item.name}

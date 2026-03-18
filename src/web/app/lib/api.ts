@@ -60,6 +60,15 @@ class ApiClient {
     return parseResponse<T>(res);
   }
 
+  async put<T>(path: string, body: unknown): Promise<T> {
+    const res = await fetch(path, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return parseResponse<T>(res);
+  }
+
   async delete<T = null>(path: string): Promise<T> {
     const res = await fetch(path, { method: "DELETE" });
     return parseResponse<T>(res);

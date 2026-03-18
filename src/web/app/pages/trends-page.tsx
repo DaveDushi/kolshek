@@ -13,7 +13,6 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { CashflowTrend } from "@/components/trends/cashflow-trend";
 import { CategoryTrend as CategoryTrendChart } from "@/components/trends/category-trend";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -44,7 +43,7 @@ export function TrendsPage() {
   const monthsNum = Number(months);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader title="Trends" description="Track your financial trends over time">
         {/* Period selector */}
         <div className="space-y-1">
@@ -98,7 +97,7 @@ function CashflowTab({ months }: { months: number }) {
     return (
       <Card className="mt-4">
         <CardContent className="pt-6">
-          <Skeleton className="h-[350px] w-full" />
+          <Skeleton className="h-[320px] w-full" />
         </CardContent>
       </Card>
     );
@@ -115,10 +114,10 @@ function CashflowTab({ months }: { months: number }) {
   }
 
   return (
-    <div className="mt-4 space-y-6">
+    <div className="space-y-5">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Income vs Expenses</CardTitle>
+          <CardTitle className="text-sm font-medium">Income vs Expenses</CardTitle>
         </CardHeader>
         <CardContent>
           <CashflowTrend data={data} />
@@ -127,7 +126,7 @@ function CashflowTab({ months }: { months: number }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Monthly Breakdown</CardTitle>
+          <CardTitle className="text-sm font-medium">Monthly Breakdown</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -143,14 +142,14 @@ function CashflowTab({ months }: { months: number }) {
             <TableBody>
               {data.map((row) => (
                 <TableRow key={row.month}>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium text-[13px]">
                     {formatMonth(row.month + "-01")}
                   </TableCell>
                   <TableCell className="text-right">
                     <CurrencyDisplay amount={row.income} />
                   </TableCell>
                   <TableCell className="text-right">
-                    <CurrencyDisplay amount={-(row.bankExpenses + row.ccExpenses)} />
+                    <CurrencyDisplay amount={-row.expenses} />
                   </TableCell>
                   <TableCell className="text-right">
                     <CurrencyDisplay amount={row.net} />
@@ -159,7 +158,10 @@ function CashflowTab({ months }: { months: number }) {
                     {row.expenseChange !== null ? (
                       <span
                         className={cn(
-                          row.expenseChange > 0 ? "text-red-500" : "text-green-500"
+                          "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium",
+                          row.expenseChange > 0
+                            ? "bg-expense-muted text-expense"
+                            : "bg-income-muted text-income"
                         )}
                       >
                         {row.expenseChange > 0 ? "+" : ""}
@@ -194,7 +196,7 @@ function CategoryTab({
   const { data: trend, isLoading } = useCategoryTrend(selectedCategory, months);
 
   return (
-    <div className="mt-4 space-y-4">
+    <div className="space-y-4">
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">Category</Label>
         <Select value={selectedCategory} onValueChange={onCategoryChange}>
@@ -230,7 +232,7 @@ function CategoryTab({
       {selectedCategory && !isLoading && trend && trend.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{selectedCategory} Trend</CardTitle>
+            <CardTitle className="text-sm font-medium">{selectedCategory} Trend</CardTitle>
           </CardHeader>
           <CardContent>
             <CategoryTrendChart data={trend} />
@@ -275,9 +277,9 @@ function FixedVariableTab({ months }: { months: number }) {
   }
 
   return (
-    <Card className="mt-4">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-base">Fixed vs Variable Expenses by Month</CardTitle>
+        <CardTitle className="text-sm font-medium">Fixed vs Variable Expenses by Month</CardTitle>
       </CardHeader>
       <CardContent>
         <Table>
@@ -293,7 +295,7 @@ function FixedVariableTab({ months }: { months: number }) {
           <TableBody>
             {data.map((item) => (
               <TableRow key={item.month}>
-                <TableCell className="font-medium">
+                <TableCell className="font-medium text-[13px]">
                   {formatMonth(item.month + "-01")}
                 </TableCell>
                 <TableCell className="text-right">
@@ -302,10 +304,10 @@ function FixedVariableTab({ months }: { months: number }) {
                 <TableCell className="text-right">
                   <CurrencyDisplay amount={-item.variable} />
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
+                <TableCell className="text-right tabular-nums text-[13px]">
                   {item.fixedPercent.toFixed(1)}%
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
+                <TableCell className="text-right tabular-nums text-[13px]">
                   {item.fixedMerchants}
                 </TableCell>
               </TableRow>

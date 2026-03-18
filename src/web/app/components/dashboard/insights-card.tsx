@@ -1,8 +1,7 @@
-// Insights card — top 3 insights with severity indicators
+// Insights card -- top 3 insights with severity indicators
 import { Link } from "react-router";
 import { Lightbulb, CheckCircle2, ArrowRight } from "lucide-react";
 import { useInsights } from "@/hooks/use-insights";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardHeader,
@@ -12,24 +11,24 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Border and badge styles keyed by severity
+// Severity-keyed visual styles using semantic tokens
 const SEVERITY_STYLES: Record<
   string,
-  { border: string; badge: string; label: string }
+  { dot: string; bg: string; label: string }
 > = {
   alert: {
-    border: "border-l-red-500",
-    badge: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+    dot: "bg-red-500",
+    bg: "bg-expense-muted",
     label: "Alert",
   },
   warning: {
-    border: "border-l-amber-500",
-    badge: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+    dot: "bg-amber-500",
+    bg: "bg-amber-500/5 dark:bg-amber-500/10",
     label: "Warning",
   },
   info: {
-    border: "border-l-blue-500",
-    badge: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    dot: "bg-blue-500",
+    bg: "bg-blue-500/5 dark:bg-blue-500/10",
     label: "Info",
   },
 };
@@ -38,12 +37,12 @@ function InsightsSkeleton() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <Lightbulb className="h-4 w-4" />
+        <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <Lightbulb className="h-3.5 w-3.5" />
           Insights
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2">
         <Skeleton className="h-14 w-full" />
         <Skeleton className="h-14 w-full" />
         <Skeleton className="h-14 w-full" />
@@ -63,8 +62,8 @@ export function InsightsCard() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Lightbulb className="h-4 w-4" />
+          <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <Lightbulb className="h-3.5 w-3.5" />
             Insights
           </CardTitle>
         </CardHeader>
@@ -80,21 +79,21 @@ export function InsightsCard() {
   const insights = data || [];
   const topInsights = insights.slice(0, 3);
 
-  // No insights — all clear
+  // No insights -- all clear
   if (insights.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Lightbulb className="h-4 w-4" />
+          <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <Lightbulb className="h-3.5 w-3.5" />
             Insights
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center py-6 text-center">
-            <CheckCircle2 className="h-10 w-10 text-green-500 mb-2" />
-            <p className="font-medium">All clear</p>
-            <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col items-center py-8 text-center">
+            <CheckCircle2 className="h-8 w-8 text-income mb-2" />
+            <p className="text-sm font-medium">All clear</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
               No anomalies detected
             </p>
           </div>
@@ -106,12 +105,12 @@ export function InsightsCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <Lightbulb className="h-4 w-4" />
+        <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <Lightbulb className="h-3.5 w-3.5" />
           Insights
-          <Badge variant="secondary" className="ml-auto">
-            {insights.length}
-          </Badge>
+          <span className="ml-auto text-xs font-normal normal-case tracking-normal text-muted-foreground">
+            {insights.length} total
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -120,35 +119,34 @@ export function InsightsCard() {
           return (
             <div
               key={`${insight.type}-${idx}`}
-              className={`rounded-md border-l-4 bg-muted/50 px-3 py-2 ${style.border}`}
+              className={`rounded-lg px-3 py-2.5 ${style.bg}`}
             >
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-medium leading-tight">
-                  {insight.title}
-                </p>
-                <Badge
-                  variant="outline"
-                  className={`shrink-0 border-transparent text-xs ${style.badge}`}
-                >
-                  {style.label}
-                </Badge>
+              <div className="flex items-start gap-2.5">
+                <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium leading-tight">
+                    {insight.title}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+                    {insight.detail}
+                  </p>
+                </div>
               </div>
-              <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
-                {insight.detail}
-              </p>
             </div>
           );
         })}
       </CardContent>
-      <CardFooter>
-        <Link
-          to="/insights"
-          className="flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          View All
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
-      </CardFooter>
+      {insights.length > 3 && (
+        <CardFooter>
+          <Link
+            to="/insights"
+            className="group flex items-center gap-1 text-[13px] text-muted-foreground transition-colors duration-150 hover:text-foreground"
+          >
+            View all {insights.length} insights
+            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
+          </Link>
+        </CardFooter>
+      )}
     </Card>
   );
 }

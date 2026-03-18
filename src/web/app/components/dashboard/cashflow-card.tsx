@@ -1,6 +1,6 @@
-// Cashflow card — current month income vs expenses with previous month comparison
+// Cashflow card -- current month income vs expenses with previous month comparison
 import { useMemo } from "react";
-import { ArrowDownRight, ArrowUpRight, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useMonthlyReport } from "@/hooks/use-reports";
 import { formatCurrency, getCurrentMonth } from "@/lib/format";
 import {
@@ -22,15 +22,15 @@ function getPreviousMonth(monthStr: string): string {
 function monthLabel(monthStr: string): string {
   const [year, month] = monthStr.split("-").map(Number);
   const d = new Date(year, month - 1, 1);
-  return d.toLocaleDateString("en-US", { month: "short" });
+  return d.toLocaleDateString("en-US", { month: "long" });
 }
 
 function CashflowSkeleton() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <TrendingUp className="h-4 w-4" />
+        <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <Minus className="h-3.5 w-3.5" />
           Cash Flow
         </CardTitle>
       </CardHeader>
@@ -50,16 +50,16 @@ interface BarProps {
   label: string;
   amount: number;
   maxAmount: number;
-  color: string;
+  barColor: string;
   icon: React.ReactNode;
 }
 
-function CashflowBar({ label, amount, maxAmount, color, icon }: BarProps) {
+function CashflowBar({ label, amount, maxAmount, barColor, icon }: BarProps) {
   const pct = maxAmount > 0 ? Math.min((Math.abs(amount) / maxAmount) * 100, 100) : 0;
 
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between text-sm">
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-[13px]">
         <span className="flex items-center gap-1.5 text-muted-foreground">
           {icon}
           {label}
@@ -68,9 +68,9 @@ function CashflowBar({ label, amount, maxAmount, color, icon }: BarProps) {
           {formatCurrency(Math.abs(amount))}
         </span>
       </div>
-      <div className="h-2 w-full rounded-full bg-muted">
+      <div className="h-1.5 w-full rounded-full bg-muted">
         <div
-          className={`h-2 rounded-full transition-all ${color}`}
+          className={`h-1.5 rounded-full transition-all duration-500 ease-out ${barColor}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -108,8 +108,8 @@ export function CashflowCard() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <TrendingUp className="h-4 w-4" />
+          <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <Minus className="h-3.5 w-3.5" />
             Cash Flow
           </CardTitle>
         </CardHeader>
@@ -122,67 +122,68 @@ export function CashflowCard() {
     );
   }
 
-  const totalExpenses = current.bankExpenses + current.ccExpenses;
-  const maxAmount = Math.max(current.income, totalExpenses, 1);
+  const maxAmount = Math.max(current.income, current.expenses, 1);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <TrendingUp className="h-4 w-4" />
+        <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <Minus className="h-3.5 w-3.5" />
           Cash Flow
-          <span className="ml-auto text-xs">{monthLabel(currentMonth)}</span>
+          <span className="ml-auto text-xs font-normal normal-case tracking-normal">{monthLabel(currentMonth)}</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <CashflowBar
-          label="Income"
-          amount={current.income}
-          maxAmount={maxAmount}
-          color="bg-green-500"
-          icon={<ArrowDownRight className="h-3.5 w-3.5 text-green-500" />}
-        />
-        <CashflowBar
-          label="Expenses"
-          amount={totalExpenses}
-          maxAmount={maxAmount}
-          color="bg-red-500"
-          icon={<ArrowUpRight className="h-3.5 w-3.5 text-red-500" />}
-        />
-
-        <div className="flex items-center justify-between border-t pt-3">
-          <span className="text-sm font-medium">Net</span>
-          <div className="flex items-center gap-2">
+        {/* Net amount -- hero number */}
+        <div className="flex items-baseline gap-3">
+          <span
+            className={`text-2xl font-bold tabular-nums tracking-display number-tick ${
+              current.net >= 0
+                ? "text-income"
+                : "text-expense"
+            }`}
+          >
+            {formatCurrency(current.net)}
+          </span>
+          {percentChange !== null && (
             <span
-              className={`text-lg font-bold tabular-nums ${
-                current.net >= 0
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-red-600 dark:text-red-400"
+              className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-medium ${
+                percentChange >= 0
+                  ? "bg-income-muted text-income"
+                  : "bg-expense-muted text-expense"
               }`}
             >
-              {formatCurrency(current.net)}
+              {percentChange >= 0 ? (
+                <TrendingUp className="h-3 w-3" />
+              ) : (
+                <TrendingDown className="h-3 w-3" />
+              )}
+              {Math.abs(percentChange).toFixed(0)}%
             </span>
-            {percentChange !== null && (
-              <span
-                className={`flex items-center gap-0.5 text-xs ${
-                  percentChange >= 0
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-red-600 dark:text-red-400"
-                }`}
-              >
-                {percentChange >= 0 ? (
-                  <TrendingUp className="h-3 w-3" />
-                ) : (
-                  <TrendingDown className="h-3 w-3" />
-                )}
-                {Math.abs(percentChange).toFixed(0)}%
-              </span>
-            )}
-          </div>
+          )}
         </div>
+
+        {/* Income / Expense bars */}
+        <div className="space-y-3">
+          <CashflowBar
+            label="Income"
+            amount={current.income}
+            maxAmount={maxAmount}
+            barColor="bg-[var(--income)]"
+            icon={<ArrowDownLeft className="h-3.5 w-3.5 text-income" />}
+          />
+          <CashflowBar
+            label="Expenses"
+            amount={current.expenses}
+            maxAmount={maxAmount}
+            barColor="bg-[var(--expense)]"
+            icon={<ArrowUpRight className="h-3.5 w-3.5 text-expense" />}
+          />
+        </div>
+
         {previous && (
-          <p className="text-xs text-muted-foreground">
-            vs {monthLabel(prevMonth)}: {formatCurrency(previous.net)}
+          <p className="text-xs text-muted-foreground pt-1">
+            vs {monthLabel(prevMonth)}: <span className="tabular-nums font-medium text-foreground/70">{formatCurrency(previous.net)}</span>
           </p>
         )}
       </CardContent>

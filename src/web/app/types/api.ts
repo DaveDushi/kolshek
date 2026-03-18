@@ -123,9 +123,7 @@ export interface BalanceRow {
 export interface MonthlyReport {
   month: string;
   income: number;
-  bankExpenses: number;
-  ccExpenses: number;
-  ccCharge: number;
+  expenses: number;
   net: number;
   transactionCount: number;
 }
@@ -184,9 +182,7 @@ export interface IncomeResult {
 export interface TrendTotal {
   month: string;
   income: number;
-  bankExpenses: number;
-  ccExpenses: number;
-  ccCharge: number;
+  expenses: number;
   net: number;
   transactionCount: number;
   expenseChange: number | null;
@@ -235,3 +231,16 @@ export interface ProviderInfo {
   type: "bank" | "credit-card";
   loginFields: string[];
 }
+
+// Classification system
+export type BuiltinClassification =
+  | "expense"
+  | "income"
+  | "cc_billing"
+  | "transfer"
+  | "investment"
+  | "debt"
+  | "savings";
+
+// Map of category name → classification
+export type ClassificationMap = Record<string, string>;

@@ -1,7 +1,7 @@
 // Left sidebar listing all categories with counts and create button
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import type { CategorySummary } from "@/types/api";
+import type { CategorySummary, ClassificationMap } from "@/types/api";
 import { useCreateCategory } from "@/hooks/use-categories";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -16,17 +16,20 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { ClassificationBadge } from "./classification-panel";
 
 interface CategorySidebarProps {
   categories: CategorySummary[];
   activeCategory: string | null;
   onSelect: (cat: string) => void;
+  classificationMap?: ClassificationMap;
 }
 
 export function CategorySidebar({
   categories,
   activeCategory,
   onSelect,
+  classificationMap,
 }: CategorySidebarProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -64,11 +67,16 @@ export function CategorySidebar({
                   isActive && "bg-accent text-accent-foreground font-medium"
                 )}
               >
-                <span className="truncate">{cat.category}</span>
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span className="truncate">{cat.category}</span>
+                  {classificationMap && classificationMap[cat.category] && (
+                    <ClassificationBadge classification={classificationMap[cat.category]} />
+                  )}
+                </div>
                 <Badge
                   variant="secondary"
                   className={cn(
-                    "ml-2 tabular-nums",
+                    "ml-2 tabular-nums shrink-0",
                     isUncategorized &&
                       cat.transactionCount > 0 &&
                       "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"

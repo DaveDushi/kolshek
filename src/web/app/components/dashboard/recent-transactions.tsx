@@ -1,4 +1,4 @@
-// Recent transactions — last 5 transactions in a compact table
+// Recent transactions -- last 5 transactions in a compact table
 import { Link } from "react-router";
 import { ArrowRight, Receipt } from "lucide-react";
 import { useTransactions } from "@/hooks/use-transactions";
@@ -27,13 +27,13 @@ function RecentTransactionsSkeleton() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <Receipt className="h-4 w-4" />
+        <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <Receipt className="h-3.5 w-3.5" />
           Recent Transactions
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
+        <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-8 w-full" />
           ))}
@@ -57,8 +57,8 @@ export function RecentTransactions() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Receipt className="h-4 w-4" />
+          <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <Receipt className="h-3.5 w-3.5" />
             Recent Transactions
           </CardTitle>
         </CardHeader>
@@ -74,8 +74,8 @@ export function RecentTransactions() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <Receipt className="h-4 w-4" />
+        <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <Receipt className="h-3.5 w-3.5" />
           Recent Transactions
         </CardTitle>
       </CardHeader>
@@ -92,21 +92,21 @@ export function RecentTransactions() {
           <TableBody>
             {data.transactions.map((tx) => (
               <TableRow key={tx.id}>
-                <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                <TableCell className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
                   {formatDate(tx.date)}
                 </TableCell>
                 <TableCell className="max-w-[200px]">
                   <TransactionDescription
                     description={tx.description}
                     descriptionEn={tx.descriptionEn}
-                    className="text-sm"
+                    className="text-[13px]"
                   />
                 </TableCell>
                 <TableCell className="text-right">
                   <CurrencyDisplay
                     amount={tx.chargedAmount}
                     currency={tx.chargedCurrency}
-                    className="text-sm"
+                    className="text-[13px] font-medium"
                   />
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">
@@ -120,10 +120,10 @@ export function RecentTransactions() {
       <CardFooter>
         <Link
           to="/transactions"
-          className="flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="group flex items-center gap-1 text-[13px] text-muted-foreground transition-colors duration-150 hover:text-foreground"
         >
-          View All
-          <ArrowRight className="h-3.5 w-3.5" />
+          View all transactions
+          <ArrowRight className="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
         </Link>
       </CardFooter>
     </Card>
