@@ -215,12 +215,14 @@ export interface Insight {
 }
 
 export interface SyncEvent {
-  type: "progress" | "result" | "error" | "done";
+  type: "start" | "progress" | "result" | "error" | "done";
   provider?: string;
+  providers?: string[];
   stage?: string;
   message?: string;
   added?: number;
   updated?: number;
+  success?: boolean;
   error?: string;
 }
 

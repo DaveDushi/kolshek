@@ -38,6 +38,7 @@ export function useSync() {
       const body = visible !== undefined ? { visible } : undefined;
       const res = await fetch("/api/v2/fetch", {
         method: "POST",
+        credentials: "include",
         headers: body ? { "Content-Type": "application/json" } : {},
         body: body ? JSON.stringify(body) : undefined,
         signal: controller.signal,

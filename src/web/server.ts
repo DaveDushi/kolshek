@@ -86,7 +86,7 @@ import type { RuleConditions } from "../types/category-rule.js";
 import type { TransactionFilters } from "../types/transaction.js";
 
 // Track active fetch so we don't allow concurrent syncs
-let activeFetch: { promise: Promise<void>; events: string[] } | null = null;
+let activeFetch: { promise: Promise<void>; events: string[]; listeners: Set<(event: string) => void> } | null = null;
 
 // Resolve paths to static assets (import.meta.dir is Bun-native, handles Windows)
 const logoPath = resolve(import.meta.dir, "../../assets/logo.png");
@@ -127,12 +127,18 @@ function getAllowedOrigins(port: number): string[] {
 function corsHeaders(origin: string | null, allowedOrigins: string[]): Record<string, string> {
   // Only reflect the origin if it's in our allowlist
   const allowed = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-  return {
+  const headers: Record<string, string> = {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     Vary: "Origin",
   };
+  // Allow credentials (cookies) for cross-origin Vite dev server requests.
+  // Only set when the origin is an actual allowed origin (never for the fallback).
+  if (origin && allowedOrigins.includes(origin)) {
+    headers["Access-Control-Allow-Credentials"] = "true";
+  }
+  return headers;
 }
 
 // Security headers applied to all responses
@@ -140,6 +146,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "no-referrer",
+  "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'",
 };
 
 // MAX_PAGINATION_LIMIT prevents dumping entire DB via ?limit=999999999
@@ -345,7 +352,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           }
           return new Response("Not found", { status: 404 });
         }
-        if (method === "GET" && (path === "/favicon.png" || path === "/favicon.ico")) {
+        if (method === "GET" && path === "/favicon.ico") {
           const file = Bun.file(faviconPath);
           if (await file.exists()) {
             return new Response(file, {
@@ -758,7 +765,9 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           try {
             const cat = url.searchParams.get("cat") ?? "Uncategorized";
             const categoryFilter = cat === "Uncategorized" ? null : cat;
-            const transactions = listTransactions({ category: categoryFilter, sort: "date" });
+            const limit = Math.min(Number(url.searchParams.get("limit")) || MAX_PAGINATION_LIMIT, MAX_PAGINATION_LIMIT);
+            const offset = Math.max(Number(url.searchParams.get("offset")) || 0, 0);
+            const transactions = listTransactions({ category: categoryFilter, sort: "date", limit, offset });
             return json(transactions);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -1122,30 +1131,35 @@ function startFetchSSE(visible: boolean, jsonError: JsonErrorFn): Response {
 
   // Set activeFetch BEFORE starting the sync to prevent race condition
   // where double-click could start two syncs
-  const placeholder = { promise: Promise.resolve(), events };
+  const placeholder = { promise: Promise.resolve(), events, listeners };
   activeFetch = placeholder;
 
   const fetchPromise = syncProviders(providers, {
     visible,
     onProgress: (alias, stage) => {
-      pushEvent(JSON.stringify({ type: "progress", alias, stage }));
+      pushEvent(JSON.stringify({ type: "progress", provider: alias, stage }));
     },
   })
     .then((result) => {
-      const summary = result.results.map((r) => ({
-        alias: r.alias,
-        success: r.success,
-        added: r.transactionsAdded,
-        updated: r.transactionsUpdated,
-        error: r.error,
-      }));
+      // Emit a per-provider "result" event so the UI can show individual completion status
+      for (const r of result.results) {
+        pushEvent(
+          JSON.stringify({
+            type: "result",
+            provider: r.alias,
+            success: r.success,
+            added: r.transactionsAdded,
+            updated: r.transactionsUpdated,
+            error: r.error ? sanitizeError(r.error) : undefined,
+          }),
+        );
+      }
       pushEvent(
         JSON.stringify({
           type: "done",
           success: !result.hasErrors,
           totalAdded: result.totalAdded,
           totalUpdated: result.totalUpdated,
-          results: summary,
         }),
       );
     })
@@ -1153,7 +1167,7 @@ function startFetchSSE(visible: boolean, jsonError: JsonErrorFn): Response {
       pushEvent(
         JSON.stringify({
           type: "error",
-          message: err instanceof Error ? err.message : String(err),
+          message: sanitizeError(err instanceof Error ? err.message : String(err)),
         }),
       );
     })
@@ -1199,6 +1213,7 @@ function startFetchSSE(visible: boolean, jsonError: JsonErrorFn): Response {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      ...SECURITY_HEADERS,
     },
   });
 }
@@ -1211,17 +1226,50 @@ function fetchEventsSSE(): Response {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        ...SECURITY_HEADERS,
       },
     });
   }
 
-  // Replay stored events from the active fetch
-  const events = activeFetch.events;
-  const body = events.map((e) => `data: ${e}\n\n`).join("");
-  return new Response(body, {
+  // Live stream: replay buffered events then continue streaming new ones.
+  // Uses the same listener pattern as startFetchSSE.
+  const { events, listeners } = activeFetch;
+  const stream = new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder();
+      let closed = false;
+
+      const listener = (data: string) => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+          const parsed = JSON.parse(data);
+          if (parsed.type === "done" || parsed.type === "error") {
+            closed = true;
+            listeners.delete(listener);
+            controller.close();
+          }
+        } catch {
+          // ignore encoding errors on closed stream
+        }
+      };
+      listeners.add(listener);
+
+      // Replay events that already happened
+      for (const evt of events) {
+        if (closed) break;
+        controller.enqueue(encoder.encode(`data: ${evt}\n\n`));
+      }
+    },
+  });
+
+  return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      ...SECURITY_HEADERS,
     },
   });
 }

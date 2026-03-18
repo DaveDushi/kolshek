@@ -2,7 +2,6 @@
 // Unix: chmod 0o600/0o700. Windows: icacls owner-only ACL.
 
 import { chmodSync, statSync } from "fs";
-import { spawnSync } from "child_process";
 
 // Restrict a file or directory so only the current user can access it.
 export function restrictPathToOwner(targetPath: string): void {
@@ -27,15 +26,18 @@ function restrictWindows(targetPath: string): void {
     return;
   }
 
-  const result = spawnSync("icacls", [
+  // Use Bun.spawnSync — Node's child_process.spawnSync doesn't reliably
+  // capture icacls exit status or stderr under Bun on Windows.
+  const result = Bun.spawnSync([
+    "icacls",
     targetPath,
     "/inheritance:r",
     "/grant:r",
     `${username}:(F)`,
-  ], { stdio: "pipe", timeout: 5000 });
+  ], { stderr: "pipe" });
 
-  if (result.status !== 0) {
-    const stderr = result.stderr?.toString().trim();
+  if (result.exitCode !== 0) {
+    const stderr = result.stderr ? new TextDecoder().decode(result.stderr).trim() : "";
     console.error(`[security] WARNING: Failed to restrict permissions on ${targetPath}: ${stderr || "unknown error"}`);
   }
 }

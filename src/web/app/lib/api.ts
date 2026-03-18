@@ -37,14 +37,17 @@ async function parseResponse<T>(res: Response): Promise<T> {
 }
 
 class ApiClient {
+  // credentials: "include" ensures cookies are sent for cross-origin requests
+  // (Vite dev server on :5173 → API on :3000). Harmless for same-origin production.
   async get<T>(path: string): Promise<T> {
-    const res = await fetch(path);
+    const res = await fetch(path, { credentials: "include" });
     return parseResponse<T>(res);
   }
 
   async post<T>(path: string, body?: unknown): Promise<T> {
     const res = await fetch(path, {
       method: "POST",
+      credentials: "include",
       headers: body ? { "Content-Type": "application/json" } : {},
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -54,6 +57,7 @@ class ApiClient {
   async patch<T>(path: string, body: unknown): Promise<T> {
     const res = await fetch(path, {
       method: "PATCH",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
@@ -63,6 +67,7 @@ class ApiClient {
   async put<T>(path: string, body: unknown): Promise<T> {
     const res = await fetch(path, {
       method: "PUT",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
@@ -70,7 +75,7 @@ class ApiClient {
   }
 
   async delete<T = null>(path: string): Promise<T> {
-    const res = await fetch(path, { method: "DELETE" });
+    const res = await fetch(path, { method: "DELETE", credentials: "include" });
     return parseResponse<T>(res);
   }
 }

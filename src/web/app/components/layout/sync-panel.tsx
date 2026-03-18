@@ -54,6 +54,24 @@ function deriveProviderStatuses(events: SyncEvent[]): ProviderStatus[] {
   const map = new Map<string, ProviderStatus>();
 
   for (const evt of events) {
+    // "start" event initializes all providers so they appear immediately
+    if (evt.type === "start" && evt.providers) {
+      for (const name of evt.providers) {
+        if (!map.has(name)) {
+          map.set(name, {
+            name,
+            stage: "connecting...",
+            progress: 0,
+            status: "running",
+            added: 0,
+            updated: 0,
+            error: null,
+          });
+        }
+      }
+      continue;
+    }
+
     if (!evt.provider) continue;
 
     const existing = map.get(evt.provider);
@@ -78,14 +96,15 @@ function deriveProviderStatuses(events: SyncEvent[]): ProviderStatus[] {
     }
 
     if (evt.type === "result") {
-      base.status = "done";
+      base.status = evt.success === false ? "error" : "done";
       base.progress = 100;
-      base.stage = "done";
+      base.stage = evt.success === false ? "failed" : "done";
       base.added = evt.added ?? 0;
       base.updated = evt.updated ?? 0;
+      if (evt.error) base.error = evt.error;
     }
 
-    if (evt.type === "error") {
+    if (evt.type === "error" && evt.provider) {
       base.status = "error";
       base.error = evt.error || evt.message || "Unknown error";
       base.stage = "error";
