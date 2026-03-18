@@ -22,7 +22,7 @@ export function useSync() {
   const abortRef = useRef<AbortController | null>(null);
   const queryClient = useQueryClient();
 
-  const start = useCallback(async (visible?: boolean) => {
+  const start = useCallback(async (options?: { visible?: boolean; providers?: number[] }) => {
     // Prevent double-start
     if (abortRef.current) {
       abortRef.current.abort();
@@ -35,12 +35,15 @@ export function useSync() {
     setIsRunning(true);
 
     try {
-      const body = visible !== undefined ? { visible } : undefined;
+      const body: Record<string, unknown> = {};
+      if (options?.visible) body.visible = true;
+      if (options?.providers?.length) body.providers = options.providers;
+      const hasBody = Object.keys(body).length > 0;
       const res = await fetch("/api/v2/fetch", {
         method: "POST",
         credentials: "include",
-        headers: body ? { "Content-Type": "application/json" } : {},
-        body: body ? JSON.stringify(body) : undefined,
+        headers: hasBody ? { "Content-Type": "application/json" } : {},
+        body: hasBody ? JSON.stringify(body) : undefined,
         signal: controller.signal,
       });
 

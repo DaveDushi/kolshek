@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "./hooks/use-theme";
+import { useTokenAuth } from "./hooks/use-token-auth";
 import { AppShell } from "./components/layout/app-shell";
 import { ErrorBoundary } from "./components/shared/error-boundary";
 import { DashboardPage } from "./pages/dashboard-page";
@@ -22,6 +23,9 @@ const queryClient = new QueryClient({
 });
 
 export function App() {
+  // Exchange ?token= for a session cookie via API (works through Vite proxy in dev)
+  useTokenAuth();
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
