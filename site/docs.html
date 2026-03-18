@@ -96,6 +96,7 @@
           <a href="#security" class="docs-sidebar-link">Security Model</a>
           <a href="#ai-agents" class="docs-sidebar-link">AI Agent Integration</a>
           <a href="#dashboard" class="docs-sidebar-link">Web Dashboard</a>
+          <a href="#changelog" class="docs-sidebar-link">Changelog</a>
         </div>
       </nav>
     </aside>
@@ -761,6 +762,141 @@ kolshek db schema transactions --json</code></pre></div>
 
         <h3 class="docs-h3">Architecture</h3>
         <p class="docs-p">Built with <strong>Bun.serve()</strong> (localhost-only HTTP server), <strong>HTMX</strong> (dynamic updates without a JS framework), <strong>Tailwind CSS v4</strong>, and <strong>SSE</strong> for real-time fetch progress. All data stays local.</p>
+      </section>
+
+      <!-- ── Changelog ──────────────────────────────────────────── -->
+      <section id="changelog" class="docs-section">
+        <h1 class="docs-h1">Changelog</h1>
+
+        <h2 class="docs-h2">v0.3.6</h2>
+        <h3 class="docs-h3">Features</h3>
+        <ul class="docs-ul">
+          <li><strong>Multi-agent plugin rewrite</strong> &mdash; consolidated plugin system from 7+ tool-specific integration folders into a single canonical source. Skills now install from one source to Claude Code, OpenCode, Codex, and OpenClaw.</li>
+          <li><strong>New skills &mdash; analyze and review</strong> &mdash; <code class="docs-code">/kolshek:analyze</code> for deep-dive financial analysis with budget targets, and <code class="docs-code">/kolshek:review</code> for monthly spending reviews with progress report cards.</li>
+          <li><strong>CLI reference documentation</strong> &mdash; added complete CLI reference to plugin skills covering all commands, global flags, command aliases, exit codes, DB schema, and SQL patterns.</li>
+        </ul>
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li>Fixed init wizard offering unsupported AI tools (removed Cursor, Gemini CLI, Windsurf, Aider; added OpenCode, Codex)</li>
+          <li>Fixed Codex skill install path &mdash; now installs to <code class="docs-code">~/.codex/skills/</code></li>
+          <li>Fixed OpenClaw skill install path &mdash; now installs to <code class="docs-code">~/.openclaw/workspace/skills/</code></li>
+          <li>Fixed <code class="docs-code">--type</code> flag documentation &mdash; corrected to <code class="docs-code">--type &lt;bank|credit_card&gt;</code></li>
+          <li>Removed dead <code class="docs-code">/kolshek:budget-app</code> references</li>
+          <li>Fixed <code class="docs-code">/dev/null</code> usage in check-config hook for Windows compatibility</li>
+        </ul>
+        <h3 class="docs-h3">Other</h3>
+        <ul class="docs-ul">
+          <li>Standardized skill frontmatter with consistent <code class="docs-code">allowed-tools</code>, <code class="docs-code">compatibility</code>, and <code class="docs-code">metadata</code> fields</li>
+          <li>Added missing commands to CLI reference (<code class="docs-code">dashboard</code>, <code class="docs-code">update</code>, <code class="docs-code">plugin</code>)</li>
+          <li>Added release step for plugin bundle regeneration</li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
+        <h2 class="docs-h2">v0.3.5</h2>
+        <h3 class="docs-h3">Security</h3>
+        <ul class="docs-ul">
+          <li><strong>Migrated credential storage to Bun.secrets</strong> &mdash; replaces platform-specific subprocess wrappers with Bun&rsquo;s native API. Eliminates credential exposure in process listings.</li>
+          <li><strong>Input validation on credential aliases</strong> &mdash; validates against prototype pollution, path traversal, and special character injection.</li>
+          <li><strong>Atomic credential file writes</strong> &mdash; write-to-temp + rename to prevent corruption on crash.</li>
+          <li><strong>Windows permission hardening</strong> &mdash; credential files now get explicit owner-only ACLs via <code class="docs-code">icacls</code>.</li>
+          <li><strong>Keychain probe caching</strong> &mdash; avoids repeated probe writes that could leave residual entries.</li>
+          <li><strong>Payload size limits</strong> &mdash; credential payloads larger than 64KB are rejected.</li>
+          <li><strong>Security test suite</strong> &mdash; 47 unit tests covering alias validation, AES-256-GCM roundtrips, tamper detection, and more.</li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
+        <h2 class="docs-h2">v0.3.4</h2>
+        <h3 class="docs-h3">Features</h3>
+        <ul class="docs-ul">
+          <li><strong>Self-update command</strong> &mdash; new <code class="docs-code">kolshek update</code> downloads and installs the latest release binary from GitHub. Use <code class="docs-code">--check</code> to check without installing.</li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
+        <h2 class="docs-h2">v0.3.3</h2>
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li><strong>macOS keychain credentials not readable after save</strong> &mdash; fixed <code class="docs-code">providers add</code> saving credentials that couldn&rsquo;t be read back on macOS.</li>
+        </ul>
+        <h3 class="docs-h3">Other</h3>
+        <ul class="docs-ul">
+          <li>Landing site switched from GitHub Pages to Cloudflare Pages</li>
+          <li>Added BETA badge, live download counter, docs page, provider logos, and plugin picker</li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
+        <h2 class="docs-h2">v0.3.2</h2>
+        <h3 class="docs-h3">Features</h3>
+        <ul class="docs-ul">
+          <li><strong>Web settings dashboard</strong> &mdash; new <code class="docs-code">kolshek dashboard</code> launches an HTMX-powered browser UI for managing providers, categories, and translations with real-time SSE progress.</li>
+          <li><strong>Custom Tailwind v4 design system</strong> &mdash; dashboard uses a custom indigo/zinc design system with dark mode.</li>
+          <li><strong>Logo</strong> &mdash; KolShek logo added to dashboard navbar and favicon.</li>
+        </ul>
+        <h3 class="docs-h3">Security</h3>
+        <ul class="docs-ul">
+          <li>Localhost-only binding, CSRF protection, XSS prevention, security headers</li>
+          <li>Type-safe rule validation and server-side alias validation</li>
+        </ul>
+        <h3 class="docs-h3">Other</h3>
+        <ul class="docs-ul">
+          <li>Added MIT license, security policy, and documentation site</li>
+          <li>Extracted shared utilities, wrapped translation rules in DB transaction</li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
+        <h2 class="docs-h2">v0.3.1</h2>
+        <h3 class="docs-h3">Features</h3>
+        <ul class="docs-ul">
+          <li><strong>Lifestyle spending mode</strong> &mdash; new <code class="docs-code">spending --lifestyle</code> flag excludes financial mechanics from spending reports.</li>
+          <li><strong>Duplicate rule detection</strong> &mdash; <code class="docs-code">categorize rule add</code> blocks duplicate conditions.</li>
+        </ul>
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li>Mutating PRAGMAs bypassed query validation</li>
+          <li>LIMIT appended to PRAGMA/VALUES queries causing syntax errors</li>
+          <li>Insights included excluded categories</li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
+        <h2 class="docs-h2">v0.3.0</h2>
+        <h3 class="docs-h3">Features</h3>
+        <ul class="docs-ul">
+          <li><strong>Spending command</strong> &mdash; <code class="docs-code">spending [month]</code> with grouping by category, merchant, or provider.</li>
+          <li><strong>Income command</strong> &mdash; <code class="docs-code">income [month]</code> with salary detection and transfer classification.</li>
+          <li><strong>Trends command</strong> &mdash; month-over-month spending and income trends.</li>
+          <li><strong>Insights command</strong> &mdash; automated financial alerts for category spikes, large transactions, new merchants, and more.</li>
+        </ul>
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li>Fixed broken merchant insights (snake_case/camelCase mapping)</li>
+          <li>Fixed wrong merchant average calculation (per-month vs per-transaction)</li>
+          <li>Fixed missing transfer classification in income</li>
+          <li>Fixed silent invalid month fallback in spending/income</li>
+          <li>Fixed insights NaN crash on invalid <code class="docs-code">--months</code></li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
+        <h2 class="docs-h2">v0.2.0</h2>
+        <h3 class="docs-h3">Features</h3>
+        <ul class="docs-ul">
+          <li><strong>Multi-field category rule engine</strong> &mdash; match on multiple fields with AND logic, regex/substring/exact modes, and priority ordering.</li>
+          <li><strong>Recategorize and reassign commands</strong> &mdash; re-apply updated rules to existing transactions.</li>
+          <li><strong>Category bulk import, migration, and rename</strong></li>
+          <li><strong>CC billing charge handling</strong> &mdash; detect and flag credit card billing lines to prevent double-counting.</li>
+        </ul>
+        <h3 class="docs-h3">Security</h3>
+        <ul class="docs-ul">
+          <li>Windows file permission hardening via <code class="docs-code">icacls</code></li>
+          <li>Credential zeroing after use</li>
+          <li>Read-only PRAGMA whitelist, SQL injection guard on schema introspection</li>
+          <li>Pinned scraper dependency to exact version</li>
+        </ul>
       </section>
 
     </main>
