@@ -88,3 +88,30 @@ export function getLastSuccessfulSync(providerId: number): SyncLog | null {
 
   return row ? rowToSyncLog(row) : null;
 }
+
+export function getLatestCompletedSyncLog(providerId: number): SyncLog | null {
+  const db = getDatabase();
+  const row = db
+    .prepare(
+      `SELECT * FROM sync_log
+       WHERE provider_id = $providerId AND status != 'running'
+       ORDER BY started_at DESC
+       LIMIT 1`,
+    )
+    .get({ $providerId: providerId }) as SyncLogRow | null;
+
+  return row ? rowToSyncLog(row) : null;
+}
+
+export function hasSuccessfulSync(providerId: number): boolean {
+  const db = getDatabase();
+  const row = db
+    .prepare(
+      `SELECT 1 FROM sync_log
+       WHERE provider_id = $providerId AND status = 'success'
+       LIMIT 1`,
+    )
+    .get({ $providerId: providerId });
+
+  return row != null;
+}

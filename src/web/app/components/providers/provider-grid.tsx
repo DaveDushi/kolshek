@@ -5,6 +5,8 @@ import {
   CreditCard,
   CheckCircle2,
   XCircle,
+  Clock,
+  AlertTriangle,
   KeyRound,
   Trash2,
   MoreVertical,
@@ -95,6 +97,7 @@ function ProviderCardItem({
   onDeleteRequest: (provider: ProviderCardType) => void;
 }) {
   const Icon = provider.type === "bank" ? Building2 : CreditCard;
+  const authStatus = provider.authStatus ?? (provider.hasCredentials ? "pending" : "no");
 
   return (
     <Card>
@@ -153,12 +156,25 @@ function ProviderCardItem({
       <CardContent className="space-y-3">
         {/* Auth status */}
         <div className="flex items-center gap-2 text-sm">
-          {provider.hasCredentials ? (
+          {authStatus === "connected" && (
             <>
               <CheckCircle2 className="h-4 w-4 text-green-500" />
-              <span className="text-muted-foreground">Authenticated</span>
+              <span className="text-muted-foreground">Connected</span>
             </>
-          ) : (
+          )}
+          {authStatus === "pending" && (
+            <>
+              <Clock className="h-4 w-4 text-yellow-500" />
+              <span className="text-yellow-600 dark:text-yellow-400">Pending</span>
+            </>
+          )}
+          {authStatus === "expired" && (
+            <>
+              <AlertTriangle className="h-4 w-4 text-orange-500" />
+              <span className="text-orange-600 dark:text-orange-400">Expired</span>
+            </>
+          )}
+          {authStatus === "no" && (
             <>
               <XCircle className="h-4 w-4 text-destructive" />
               <span className="text-destructive">No credentials</span>

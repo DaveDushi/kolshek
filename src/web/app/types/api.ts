@@ -10,8 +10,11 @@ export interface Provider {
   lastSyncedAt: string | null;
 }
 
+export type AuthStatus = "no" | "pending" | "connected" | "expired";
+
 export interface ProviderCard extends Provider {
   hasCredentials: boolean;
+  authStatus: AuthStatus;
   accountCount: number;
   transactionCount: number;
 }

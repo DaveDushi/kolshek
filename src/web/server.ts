@@ -28,6 +28,11 @@ import {
 } from "../db/repositories/transactions.js";
 import { getAccountsByProvider } from "../db/repositories/accounts.js";
 import {
+  getLatestCompletedSyncLog,
+  hasSuccessfulSync,
+} from "../db/repositories/sync-log.js";
+import { computeAuthStatus } from "../core/auth-status.js";
+import {
   listCategoryRules,
   addCategoryRule,
   removeCategoryRule,
@@ -380,9 +385,17 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
                 const hasCreds = await hasCredentials(p.alias);
                 const accounts = getAccountsByProvider(p.id);
                 const txCount = countTransactions({ providerId: p.id });
+                const latestSync = getLatestCompletedSyncLog(p.id);
+                const everSucceeded = hasSuccessfulSync(p.id);
+                const authStatus = computeAuthStatus(
+                  hasCreds,
+                  (latestSync?.status as "success" | "error") ?? null,
+                  everSucceeded,
+                );
                 return {
                   ...p,
                   hasCredentials: hasCreds,
+                  authStatus,
                   accountCount: accounts.length,
                   transactionCount: txCount,
                 };

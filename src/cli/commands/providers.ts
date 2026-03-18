@@ -4,11 +4,14 @@
 
 import type { Command } from "commander";
 import { select, input, password, confirm } from "@inquirer/prompts";
+import chalk from "chalk";
+import { formatISO } from "date-fns";
 import {
   PROVIDERS,
   getProvidersByType,
   type ProviderType,
   type CompanyId,
+  type AuthStatus,
 } from "../../types/index.js";
 import {
   createProvider,
@@ -18,11 +21,18 @@ import {
   deleteProvider,
 } from "../../db/repositories/providers.js";
 import {
+  createSyncLog,
+  completeSyncLog,
+  getLatestCompletedSyncLog,
+  hasSuccessfulSync,
+} from "../../db/repositories/sync-log.js";
+import {
   storeCredentials,
   getCredentials,
   deleteCredentials,
   hasCredentials,
 } from "../../security/keychain.js";
+import { computeAuthStatus } from "../../core/auth-status.js";
 import { scrapeProvider, findChromePath, launchBrowser, closeBrowser } from "../../core/scraper.js";
 import {
   isJsonMode,
@@ -62,9 +72,18 @@ export function registerProvidersCommand(program: Command): void {
     .action(async () => {
       const all = listProviders();
 
-      // Check credentials for each provider in parallel
-      const authStatuses = await Promise.all(
-        all.map((p) => hasCredentials(p.alias)),
+      // Compute auth status for each provider
+      const statuses = await Promise.all(
+        all.map(async (p) => {
+          const hasCreds = await hasCredentials(p.alias);
+          const latestSync = getLatestCompletedSyncLog(p.id);
+          const everSucceeded = hasSuccessfulSync(p.id);
+          return computeAuthStatus(
+            hasCreds,
+            (latestSync?.status as "success" | "error") ?? null,
+            everSucceeded,
+          );
+        }),
       );
 
       if (isJsonMode()) {
@@ -76,7 +95,8 @@ export function registerProvidersCommand(program: Command): void {
               alias: p.alias,
               displayName: p.displayName,
               type: p.type,
-              authenticated: authStatuses[i],
+              authenticated: statuses[i] === "connected",
+              authStatus: statuses[i],
               lastSyncedAt: p.lastSyncedAt,
               createdAt: p.createdAt,
             })),
@@ -90,15 +110,24 @@ export function registerProvidersCommand(program: Command): void {
         return;
       }
 
+      const statusDisplay = (status: AuthStatus): string => {
+        switch (status) {
+          case "no": return chalk.red("No");
+          case "pending": return chalk.yellow("Pending");
+          case "connected": return chalk.green("Connected");
+          case "expired": return chalk.hex("#FF8C00")("Expired");
+        }
+      };
+
       const table = createTable(
-        ["ID", "Alias", "Name", "Type", "Company ID", "Auth", "Last Synced"],
+        ["ID", "Alias", "Name", "Type", "Company ID", "Status", "Last Synced"],
         all.map((p, i) => [
           String(p.id),
           p.alias,
           p.displayName,
           p.type,
           p.companyId,
-          authStatuses[i] ? "Yes" : "No",
+          statusDisplay(statuses[i]),
           p.lastSyncedAt ? formatDateTime(p.lastSyncedAt) : "Never",
         ]),
       );
@@ -166,6 +195,9 @@ export function registerProvidersCommand(program: Command): void {
       }
 
       // Test connection
+      let testSucceeded = false;
+      let testFailed = false;
+      let testError: string | undefined;
       const chromePath = findChromePath();
       if (chromePath) {
         const doTest = await confirm({
@@ -194,11 +226,14 @@ export function registerProvidersCommand(program: Command): void {
               browser,
             });
             if (result.success) {
+              testSucceeded = true;
               spinner.succeed(
                 `Connected! Found ${result.accounts.length} account(s).`,
               );
             } else {
-              spinner.fail(`Test failed: ${sanitizeError(result.error ?? "", credentials)}`);
+              testFailed = true;
+              testError = sanitizeError(result.error ?? "", credentials);
+              spinner.fail(`Test failed: ${testError}`);
               const proceed = await confirm({
                 message: "Save anyway?",
                 default: false,
@@ -232,6 +267,17 @@ export function registerProvidersCommand(program: Command): void {
         providerInfo.type,
         alias,
       );
+
+      // Record test result in sync_log so auth status reflects the test
+      if (testSucceeded || testFailed) {
+        const now = formatISO(new Date(), { representation: "date" });
+        const testLog = createSyncLog(provider.id, now, now);
+        if (testSucceeded) {
+          completeSyncLog(testLog.id, "success", 0, 0);
+        } else {
+          completeSyncLog(testLog.id, "error", 0, 0, testError);
+        }
+      }
 
       if (isJsonMode()) {
         printJson(jsonSuccess(provider));
@@ -465,7 +511,13 @@ export function registerProvidersCommand(program: Command): void {
           browser,
         });
 
+        const now = formatISO(new Date(), { representation: "date" });
+
         if (result.success) {
+          // Record successful test in sync_log
+          const testLog = createSyncLog(provider.id, now, now);
+          completeSyncLog(testLog.id, "success", 0, 0);
+
           spinner.succeed(`${provider.displayName} — credentials valid.`);
           for (const acc of result.accounts) {
             const bal =
@@ -488,8 +540,13 @@ export function registerProvidersCommand(program: Command): void {
             );
           }
         } else {
+          // Record failed test in sync_log
+          const safeError = sanitizeError(result.error ?? "Unknown error", credentials);
+          const testLog = createSyncLog(provider.id, now, now);
+          completeSyncLog(testLog.id, "error", 0, 0, safeError);
+
           spinner.fail(`${provider.displayName} — test failed.`);
-          printError("AUTH_FAILURE", sanitizeError(result.error ?? "Unknown error", credentials), {
+          printError("AUTH_FAILURE", safeError, {
             provider: provider.companyId,
             retryable: true,
           });

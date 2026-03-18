@@ -5,6 +5,8 @@
 
 export type ProviderType = "bank" | "credit_card";
 
+export type AuthStatus = "no" | "pending" | "connected" | "expired";
+
 /** CompanyTypes enum values from israeli-bank-scrapers */
 export type CompanyId =
   // Banks
