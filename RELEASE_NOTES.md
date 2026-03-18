@@ -1,22 +1,32 @@
-## v0.3.6
+## v0.3.7
 
 ### Features
 
-- **Multi-agent plugin rewrite**: Consolidated plugin system from 7+ tool-specific integration folders into a single canonical source. Skills now install from one source to Claude Code, OpenCode, Codex, and OpenClaw.
-- **New skills — analyze and review** (by Adir): `/kolshek:analyze` for deep-dive financial analysis with budget targets, and `/kolshek:review` for monthly spending reviews with progress report cards.
-- **CLI reference documentation**: Added complete CLI reference to plugin skills covering all commands, global flags, command aliases, exit codes, DB schema, and SQL patterns.
+- **React dashboard with client-side routing**: Full SPA dashboard with 8 pages — overview, transactions, spending, trends, insights, categories, translations, and providers. Includes live sync progress panel, per-provider status tracking, and theme switching.
+- **Classification-based filtering**: Transactions are now classified (expense, income, transfer, cc_billing, etc.) with filtering support across all report and trend endpoints.
+- **Custom classifications**: Users can create and assign custom classifications beyond the built-in set via the dashboard classification panel.
+- **Real-time sync streaming**: Bank sync now streams per-provider SSE events (start → progress → result → done) with live reconnection support for late-joining clients.
+
+### Security
+
+- **Session authentication**: Dashboard requires a cryptographic token (generated at launch, exchanged for an HttpOnly/SameSite=Strict cookie) — no more open endpoints.
+- **CORS hardening**: Replaced wildcard `Access-Control-Allow-Origin: *` with an explicit origin allowlist and exact-match validation.
+- **CSRF protection**: All mutations reject requests with missing or non-allowlisted `Origin` headers.
+- **Path traversal prevention**: Static file serving validates resolved paths stay within the build output directory.
+- **Content-Security-Policy**: Added CSP header restricting scripts, styles, images, and connections to same-origin only.
+- **ReDoS prevention**: User-supplied regex patterns are validated for length, nested quantifiers, and excessive alternation before compilation.
+- **Error sanitization**: All API and SSE error responses strip file paths, stack traces, and internal details.
+- **Pagination limits**: Transaction endpoints capped at 500 rows per request to prevent database dumps.
+- **Windows permission fix**: Switched from Node's `child_process.spawnSync` to `Bun.spawnSync` for reliable `icacls` permission hardening.
 
 ### Bug Fixes
 
-- **Fixed init wizard offering unsupported AI tools**: Removed dead tool options (Cursor, Gemini CLI, Windsurf, Aider) and added missing ones (OpenCode, Codex) to match supported tools.
-- **Fixed Codex skill install path**: Skills now install to `~/.codex/skills/` instead of the incorrect `.agents/skills/`.
-- **Fixed OpenClaw skill install path**: Skills now install to `~/.openclaw/workspace/skills/` instead of the incorrect `.agents/skills/`.
-- **Fixed `--type` flag documentation**: Corrected `--type <bank|card>` to `--type <bank|credit_card>` to match actual CLI.
-- **Removed dead `/kolshek:budget-app` references**: Replaced all references to the removed skill in init workflow and check-config hook.
-- **Fixed `/dev/null` usage in check-config hook**: Replaced with variable capture for Windows compatibility.
+- **Fixed sync endpoint mismatch**: Client and server now agree on `/api/v2/fetch` route and SSE event types (`start`, `progress`, `result`, `done`).
+- **Fixed SSE reconnection**: `GET /api/v2/fetch/events` now streams live events instead of returning a dead snapshot.
+- **Fixed Vite dev server auth**: Added `credentials: "include"` on client and `Access-Control-Allow-Credentials` on server for cross-origin cookie support.
+- **Fixed duplicate favicon route**: Removed dead code branch for `/favicon.png` that shadowed the `/favicon.ico` handler.
 
 ### Other
 
-- **Standardized skill frontmatter**: All 5 skills now have consistent `allowed-tools`, `compatibility`, and `metadata` fields.
-- **Added missing commands to CLI reference**: Documented `dashboard`, `update`, and `plugin` commands, plus `--visible` and `-m, --month-offset` flags.
-- **Added release step for plugin bundle regeneration**: Release command now regenerates embedded plugin files before committing.
+- **Removed legacy HTMX partials**: Deleted all server-rendered HTML templates, styles, and layout files (~1,500 lines) in favor of the React SPA.
+- **Site polish**: Updated favicon, added GitHub stars badge, footer credits, and improved nav/chat/theme toggle on the docs site.
