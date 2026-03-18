@@ -48,11 +48,15 @@ kolshek query "SELECT description, COUNT(*) as count, SUM(charged_amount) as tot
 kolshek query "SELECT description, COUNT(*) as count, SUM(charged_amount) as total FROM transactions WHERE charged_amount > 0 AND (category IS NULL OR category = '') GROUP BY description ORDER BY count DESC" --json
 ```
 
-### CC Billing Detection
+### Internal Transfers & CC Billing Detection
 
-If the user has both bank and credit card providers, look for uncategorized bank transactions whose descriptions match credit card company names. These are CC billing charges — the monthly bank debit that pays the CC bill. They are internal transfers, not real expenses, and cause double-counting since the CC provider already tracks individual purchases.
+Run `kolshek providers list --json` to get connected providers.
 
-Suggest to the user that these transactions be categorized as `"CC Billing"` (exact string) — but let the user decide. Reports automatically exclude `"CC Billing"` from expense totals.
+**CC billing charges:** For each connected credit card provider (e.g., Max, Isracard, Cal/Visa Cal, Amex), look for uncategorized bank transactions whose descriptions match that CC company name. These are the monthly bank debit that pays the CC bill — internal transfers, not real expenses. Including them double-counts spending since the CC provider already tracks individual purchases. Suggest categorizing these and setting their classification to `cc_billing` in Step 5.
+
+**Inter-bank transfers:** If the user has multiple bank providers connected (e.g., Leumi and Hapoalim), look for transactions in one bank that reference the other bank's name. These are transfers between the user's own accounts — not income or expenses. Suggest categorizing these and setting their classification to `transfer` in Step 5.
+
+**Other non-spending:** Also look for investment deposits, loan payments, or savings transfers — these should get appropriate classifications (`investment`, `debt`, `savings`) so they don't pollute spending reports.
 
 ## Step 3: Suggest Categories
 
@@ -108,7 +112,35 @@ Other apply options:
 
 Report how many transactions were categorized (expenses and income separately).
 
-## Step 5: Post-Categorization Tools
+## Step 5: Set Classifications
+
+Every category has a **classification** that tells reports how to treat it. The built-in classifications are: `expense`, `income`, `cc_billing`, `transfer`, `investment`, `debt`, `savings`. New categories default to `expense` or `income` based on transaction direction.
+
+First, check current classifications:
+```
+kolshek categorize classify list --json
+```
+
+Auto-classify based on dominant transaction direction (>80% debit → expense, >80% credit → income):
+```
+kolshek categorize classify auto --dry-run --json
+```
+
+If the preview looks good, apply:
+```
+kolshek categorize classify auto --json
+```
+
+For categories that need special treatment (CC billing, transfers, investments), set them manually:
+```
+kolshek categorize classify set "CC Billing" cc_billing --json
+kolshek categorize classify set "Bank Transfer" transfer --json
+kolshek categorize classify set "Savings Deposit" savings --json
+```
+
+Present the final classification map to the user. Reports use `--exclude` and `--include` flags on classifications — for example, `kolshek spending 2026-03 --exclude cc_billing,transfer` excludes those categories from spending totals. Sensible defaults are applied automatically (spending excludes `cc_billing`, `transfer`, and `income` by default).
+
+## Step 6: Post-Categorization Tools
 
 After initial categorization, the user may want to clean up:
 
@@ -119,7 +151,8 @@ After initial categorization, the user may want to clean up:
 
 All support `--dry-run` to preview changes before applying.
 
-## Step 6: Done
+## Step 7: Done
 
 > Categorized N transactions (X expenses, Y income).
 > You now have Z category rules. Add more anytime with `kolshek categorize rule add <category> --match <pattern>`.
+> Classifications set for N categories. Reports automatically exclude non-expense classifications from spending totals.

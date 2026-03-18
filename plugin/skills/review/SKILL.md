@@ -35,6 +35,8 @@ bun -e "import envPaths from 'env-paths'; console.log(envPaths('kolshek').config
 ```
 Check if `budget.toml` exists in that directory. Read it if present — you need the `[targets]` section for Step 3. If missing, note that target compliance will be skipped and suggest running `/kolshek:analyze` to set targets.
 
+**Build classification exclusion list:** Run `kolshek categorize classify list --json` to get all categories and their classifications. By default, exclude categories classified as `cc_billing` and `transfer` from expense comparisons. Ask the user if they want to adjust exclusions. Build `$EXCLUDE_SQL` from their choices, e.g.: `category NOT IN (SELECT name FROM categories WHERE classification IN ('cc_billing', 'transfer'))`. If the user wants no exclusions, omit this clause entirely.
+
 ## Step 1: Determine Review Period
 
 Ask the user:
@@ -44,9 +46,9 @@ Ask the user:
 
 Set `$CURRENT` and `$PREVIOUS` month identifiers (e.g., `2026-03` and `2026-02`).
 
-Verify both months have sufficient data:
+Verify both months have sufficient data (apply `$EXCLUDE_SQL` from Before You Start):
 ```
-kolshek query "SELECT strftime('%Y-%m', date) as month, COUNT(*) as txns, ROUND(SUM(CASE WHEN charged_amount < 0 THEN ABS(charged_amount) ELSE 0 END), 2) as total_spending FROM transactions WHERE date >= '$PREVIOUS-01' AND date < date('$CURRENT-01', '+1 month') AND COALESCE(category, '') != 'CC Billing' GROUP BY month ORDER BY month" --json
+kolshek query "SELECT strftime('%Y-%m', date) as month, COUNT(*) as txns, ROUND(SUM(CASE WHEN charged_amount < 0 THEN ABS(charged_amount) ELSE 0 END), 2) as total_spending FROM transactions WHERE date >= '$PREVIOUS-01' AND date < date('$CURRENT-01', '+1 month') AND $EXCLUDE_SQL GROUP BY month ORDER BY month" --json
 ```
 
 If a month has very few transactions, warn the user that the comparison may be unreliable (data may still be syncing).
@@ -127,14 +129,14 @@ kolshek insights --months 1 --json
 kolshek query "SELECT COALESCE(t.description_en, t.description) AS merchant, ROUND(ABS(t.charged_amount), 2) AS amount, t.date, t.category FROM transactions t WHERE t.charged_amount < 0 AND t.date >= '$CURRENT-01' AND t.date < date('$CURRENT-01', '+1 month') AND COALESCE(t.description_en, t.description) NOT IN (SELECT DISTINCT COALESCE(t2.description_en, t2.description) FROM transactions t2 WHERE t2.date < '$CURRENT-01' AND t2.charged_amount < 0) ORDER BY ABS(t.charged_amount) DESC LIMIT 10" --json
 ```
 
-**Potential duplicates** (same merchant + similar amount on same day):
+**Potential duplicates** (same merchant + similar amount on same day, apply `$EXCLUDE_SQL`):
 ```
-kolshek query "SELECT COALESCE(description_en, description) AS merchant, date, ROUND(ABS(charged_amount), 2) AS amount, COUNT(*) AS occurrences FROM transactions WHERE charged_amount < 0 AND date >= '$CURRENT-01' AND date < date('$CURRENT-01', '+1 month') AND COALESCE(category, '') != 'CC Billing' GROUP BY merchant, date, ROUND(ABS(charged_amount), 2) HAVING occurrences > 1 ORDER BY amount DESC" --json
+kolshek query "SELECT COALESCE(description_en, description) AS merchant, date, ROUND(ABS(charged_amount), 2) AS amount, COUNT(*) AS occurrences FROM transactions WHERE charged_amount < 0 AND date >= '$CURRENT-01' AND date < date('$CURRENT-01', '+1 month') AND $EXCLUDE_SQL GROUP BY merchant, date, ROUND(ABS(charged_amount), 2) HAVING occurrences > 1 ORDER BY amount DESC" --json
 ```
 
-**Large transactions** (over ₪500):
+**Large transactions** (over ₪500, apply `$EXCLUDE_SQL`):
 ```
-kolshek query "SELECT COALESCE(description_en, description) AS merchant, ROUND(ABS(charged_amount), 2) AS amount, date, category FROM transactions WHERE charged_amount < 0 AND date >= '$CURRENT-01' AND date < date('$CURRENT-01', '+1 month') AND ABS(charged_amount) > 500 AND COALESCE(category, '') != 'CC Billing' ORDER BY ABS(charged_amount) DESC" --json
+kolshek query "SELECT COALESCE(description_en, description) AS merchant, ROUND(ABS(charged_amount), 2) AS amount, date, category FROM transactions WHERE charged_amount < 0 AND date >= '$CURRENT-01' AND date < date('$CURRENT-01', '+1 month') AND ABS(charged_amount) > 500 AND $EXCLUDE_SQL ORDER BY ABS(charged_amount) DESC" --json
 ```
 
 Present:

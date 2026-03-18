@@ -82,6 +82,9 @@ kolshek categorize rename <old> <new> [--dry-run] [--json]
 kolshek categorize migrate --file <path> [--dry-run] [--json]
 kolshek categorize reassign --match <pattern> --to <category> [--dry-run] [--json]
 kolshek categorize reassign --file <path> [--dry-run] [--json]
+kolshek categorize classify set <category> <classification> [--json]
+kolshek categorize classify list [--json]
+kolshek categorize classify auto [--dry-run] [--json]
 ```
 
 `rule add` supports multiple conditions (AND'd together): `--match`/`--match-exact`/`--match-regex` for description, `--memo` for memo, `--account` for provider:account, `--amount`/`--amount-min`/`--amount-max` for amount, `--direction` for debit/credit. Use `--priority` to control evaluation order. Duplicate conditions are blocked — remove the existing rule first if you need to change its category.
@@ -98,27 +101,24 @@ kolshek translate rule import [file] [--json]
 
 ### Spending & Income Analysis
 ```
-kolshek spending [month] [--group-by <category|merchant|provider>] [--category <name>] [--top <n>] [--type] [-m, --month-offset <n>] [--lifestyle] [--json]
-kolshek spending exclude add <category>          # mark category as non-spending
-kolshek spending exclude remove <category>       # unmark
-kolshek spending exclude list [--json]           # show excluded categories
-kolshek income [month] [--salary-only] [--include-refunds] [-m, --month-offset <n>] [--json]
-kolshek trends [months] [--mode <total|category|fixed-variable>] [--category <name>] [--type] [--json]
-kolshek insights [--months <n>] [--json]
+kolshek spending [month] [--group-by <category|merchant|provider>] [--category <name>] [--top <n>] [--type] [-m, --month-offset <n>] [--exclude <classifications>] [--include <classifications>] [--json]
+kolshek income [month] [--salary-only] [--include-refunds] [-m, --month-offset <n>] [--exclude <classifications>] [--include <classifications>] [--json]
+kolshek trends [months] [--mode <total|category|fixed-variable>] [--category <name>] [--type] [--exclude <classifications>] [--include <classifications>] [--json]
+kolshek insights [--months <n>] [--exclude <classifications>] [--include <classifications>] [--json]
 ```
 
 Month formats: `current`, `prev`, `-3`, `2026-03`, or omit for current month.
 
-**`--lifestyle` flag:** Excludes categories the user has marked as non-spending (transfers, CC settlements, investment moves, etc.). Use `spending exclude add/remove/list` to manage the exclusion list. Insights automatically uses this list for large-transaction and merchant detection.
+**`--exclude` / `--include` flags:** Filter by category classification. `--exclude cc_billing,transfer` removes those classifications from results. `--include expense` shows only expense-classified categories. Mutually exclusive — use one or the other. Defaults: spending excludes `cc_billing,transfer,income`; income excludes `cc_billing`; reports/trends/insights exclude `cc_billing`. Use `kolshek categorize classify list` to see all categories and their classifications.
 
 **Income defaults to bank accounts only** — CC positive amounts are refunds, not income. Use `--include-refunds` to see them.
 
 ### Reports (alias: report)
 ```
-kolshek reports monthly [--from] [--to] [--type] [--json]
-kolshek reports categories [--from] [--to] [--type] [--json]
-kolshek reports merchants [--from] [--to] [--type] [--limit] [--json]
-kolshek reports balance [--json]
+kolshek reports monthly [--from] [--to] [--type] [--exclude <classifications>] [--include <classifications>] [--json]
+kolshek reports categories [--from] [--to] [--type] [--exclude <classifications>] [--include <classifications>] [--json]
+kolshek reports merchants [--from] [--to] [--type] [--limit] [--exclude <classifications>] [--include <classifications>] [--json]
+kolshek reports balance [--exclude <classifications>] [--include <classifications>] [--json]
 ```
 
 ### Database & Queries (query alias: sql)
@@ -183,7 +183,7 @@ Month arguments (spending, income, trends) accept: `current`, `prev`, `-3` (3 mo
 
 **Sign convention:** negative `charged_amount` = expense, positive = income/refund.
 
-**CC Billing:** Transactions categorized as `"CC Billing"` are internal bank-to-CC transfers. Report commands auto-exclude them. When writing custom SQL for expenses, add `AND COALESCE(category, '') != 'CC Billing'` to avoid double-counting.
+**Category classifications:** Each category has a `classification` (expense, income, cc_billing, transfer, investment, debt, savings, or custom). Report commands auto-exclude categories by classification — e.g., spending excludes `cc_billing`, `transfer`, and `income` by default. When writing custom SQL for expenses, exclude by classification: `AND category NOT IN (SELECT name FROM categories WHERE classification IN ('cc_billing', 'transfer'))`.
 
 **`authenticated` field:** appears in `kolshek providers list --json` output but is NOT a DB column — it's computed at runtime by checking the OS keychain.
 
@@ -193,6 +193,7 @@ Month arguments (spending, income, trends) accept: `current`, `prev`, `-3` (3 mo
 - **accounts** — discovered accounts (`id`, `provider_id`, `account_number`, `display_name`, `balance`, `currency`, `created_at`)
 - **transactions** — all scraped transactions (`id`, `account_id`, `type`, `identifier`, `date`, `processed_date`, `original_amount`, `original_currency`, `charged_amount`, `charged_currency`, `description`, `description_en`, `memo`, `status`, `installment_number`, `installment_total`, `category`, `hash`, `unique_id`, `created_at`, `updated_at`)
 - **sync_log** — fetch history (`id`, `provider_id`, `started_at`, `completed_at`, `status`, `transactions_added`, `transactions_updated`, `error_message`, `scrape_start_date`, `scrape_end_date`)
+- **categories** — category definitions with classifications (`name`, `source`, `classification`, `created_at`)
 - **category_rules** — auto-categorization rules (`id`, `category`, `conditions` (JSON), `priority`, `created_at`)
 - **translation_rules** — Hebrew→English translations (`id`, `english_name`, `match_pattern`, `created_at`)
 

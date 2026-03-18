@@ -149,6 +149,30 @@ If they choose auto-categorize:
 
 Mention they can re-run `/kolshek:categorize` anytime to handle new merchants or use `categorize rename`, `migrate`, and `reassign` to refine categories later.
 
+## Step 5b: Set Classifications
+
+After categorization, set **classifications** on categories so reports know how to treat them. Classifications determine what gets excluded from spending/income reports (e.g., CC billing charges, internal transfers).
+
+Run auto-classification first:
+```
+kolshek categorize classify auto --dry-run --json
+```
+
+If the preview looks good, apply:
+```
+kolshek categorize classify auto --json
+```
+
+For categories that need special treatment, set them manually:
+```
+kolshek categorize classify set "CC Billing" cc_billing --json
+kolshek categorize classify set "Bank Transfer" transfer --json
+```
+
+Built-in classifications: `expense`, `income`, `cc_billing`, `transfer`, `investment`, `debt`, `savings`. Most categories auto-classify correctly based on transaction direction — only override for non-obvious ones like CC billing or transfers.
+
+> Classifications set. Reports automatically exclude internal transfers and CC billing from spending totals. You can customize this with `--exclude` and `--include` flags on any report command.
+
 ## Step 6: Schedule Auto-Fetch
 
 Ask the user:
@@ -175,6 +199,7 @@ Present:
 > - **Transactions:** N total (earliest: YYYY-MM-DD)
 > - **Translations:** N rules applied / skipped
 > - **Categories:** N rules applied / skipped
+> - **Classifications:** N categories classified (expense/income/cc_billing/transfer/...)
 > - **Auto-fetch:** every Xh / not scheduled
 >
 > **What's next?**
