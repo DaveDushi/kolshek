@@ -1,7 +1,16 @@
-// Sync hook — streams SSE events from the fetch endpoint
+// Sync hook — streams SSE events from the fetch endpoint.
+// Supports queuing: if a sync is in progress and start() is called again,
+// the new providers are queued and run automatically after the current sync.
 import { useState, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { SyncEvent } from "@/types/api";
+
+interface SyncOptions {
+  visible?: boolean;
+  providers?: number[];
+  // Display names for the queued providers (used in sync panel)
+  providerNames?: string[];
+}
 
 // Parse a single SSE "data: {...}" line into a SyncEvent
 function parseSseEvent(line: string): SyncEvent | null {
@@ -20,19 +29,14 @@ export function useSync() {
   const [events, setEvents] = useState<SyncEvent[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const queueRef = useRef<SyncOptions[]>([]);
+  const runningRef = useRef(false);
   const queryClient = useQueryClient();
 
-  const start = useCallback(async (options?: { visible?: boolean; providers?: number[] }) => {
-    // Prevent double-start
-    if (abortRef.current) {
-      abortRef.current.abort();
-    }
-
+  // Internal: run a single sync batch (no queuing logic)
+  const runSync = useCallback(async (options?: SyncOptions) => {
     const controller = new AbortController();
     abortRef.current = controller;
-
-    setEvents([]);
-    setIsRunning(true);
 
     try {
       const body: Record<string, unknown> = {};
@@ -53,7 +57,6 @@ export function useSync() {
           ...prev,
           { type: "error", error: text || "Fetch failed" },
         ]);
-        setIsRunning(false);
         return;
       }
 
@@ -69,31 +72,31 @@ export function useSync() {
 
         // SSE events are separated by double newlines
         const parts = buffer.split("\n\n");
-        // Keep the last incomplete chunk in the buffer
         buffer = parts.pop() || "";
 
         for (const part of parts) {
-          // Each part may have multiple lines (event:, data:, etc.)
           for (const line of part.split("\n")) {
             const event = parseSseEvent(line);
             if (event) {
+              // Filter out "done" events from intermediate batches —
+              // we emit our own final "done" after all queued syncs complete
+              if (event.type === "done" && queueRef.current.length > 0) continue;
               setEvents((prev) => [...prev, event]);
             }
           }
         }
       }
 
-      // Process any remaining buffer
       if (buffer.trim()) {
         for (const line of buffer.split("\n")) {
           const event = parseSseEvent(line);
           if (event) {
+            if (event.type === "done" && queueRef.current.length > 0) continue;
             setEvents((prev) => [...prev, event]);
           }
         }
       }
     } catch (err: unknown) {
-      // Ignore abort errors
       if (err instanceof DOMException && err.name === "AbortError") {
         return;
       }
@@ -101,12 +104,53 @@ export function useSync() {
         err instanceof Error ? err.message : "Unknown sync error";
       setEvents((prev) => [...prev, { type: "error", error: message }]);
     } finally {
-      setIsRunning(false);
       abortRef.current = null;
-      // Invalidate all cached queries so the dashboard shows fresh data
-      queryClient.invalidateQueries();
     }
-  }, [queryClient]);
+  }, []);
+
+  // Process the queue: run syncs one by one until the queue is empty
+  const processQueue = useCallback(async (initial: SyncOptions | undefined) => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    setIsRunning(true);
+
+    // Run the initial sync
+    await runSync(initial);
+
+    // Drain the queue
+    while (queueRef.current.length > 0) {
+      const next = queueRef.current.shift()!;
+      // Remove the "queued" events for providers that are about to start
+      // (they'll get real "start"/"progress" events from the server)
+      await runSync(next);
+    }
+
+    runningRef.current = false;
+    setIsRunning(false);
+    queryClient.invalidateQueries();
+  }, [runSync, queryClient]);
+
+  const start = useCallback((options?: SyncOptions) => {
+    if (runningRef.current) {
+      // Already syncing — queue this request and show queued status
+      queueRef.current.push(options ?? {});
+      // Add synthetic "queued" events so the panel shows them
+      const names = options?.providerNames ?? options?.providers?.map(String);
+      setEvents((prev) => [
+        ...prev,
+        {
+          type: "queued",
+          providers: names,
+          message: names ? undefined : "All providers queued",
+        },
+      ]);
+      return;
+    }
+
+    // Fresh sync — clear previous events
+    setEvents([]);
+    processQueue(options);
+  }, [processQueue]);
 
   return { events, isRunning, start };
 }

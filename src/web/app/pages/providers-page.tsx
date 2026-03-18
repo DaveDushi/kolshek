@@ -32,11 +32,15 @@ export function ProvidersPage() {
 
   const handleSync = useCallback((options?: { providerId?: number; visible?: boolean }) => {
     setSyncPanelOpen(true);
+    const provider = options?.providerId
+      ? providers?.find((p) => p.id === options.providerId)
+      : undefined;
     start({
       providers: options?.providerId ? [options.providerId] : undefined,
+      providerNames: provider ? [provider.displayName] : undefined,
       visible: options?.visible,
     });
-  }, [start]);
+  }, [start, providers]);
 
   const handleDelete = useCallback(
     (id: number) => {

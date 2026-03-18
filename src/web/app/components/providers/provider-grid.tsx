@@ -142,14 +142,14 @@ function ProviderCardItem({
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onClick={() => onSync({ providerId: provider.id })}
-                disabled={isSyncing || !provider.hasCredentials}
+                disabled={!provider.hasCredentials}
               >
                 <RefreshCw className="h-4 w-4" />
                 Sync
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => onSync({ providerId: provider.id, visible: true })}
-                disabled={isSyncing || !provider.hasCredentials}
+                disabled={!provider.hasCredentials}
               >
                 <Eye className="h-4 w-4" />
                 Sync (visible)

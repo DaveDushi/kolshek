@@ -215,7 +215,7 @@ export interface Insight {
 }
 
 export interface SyncEvent {
-  type: "start" | "progress" | "result" | "error" | "done";
+  type: "start" | "progress" | "result" | "error" | "done" | "queued";
   provider?: string;
   providers?: string[];
   stage?: string;
