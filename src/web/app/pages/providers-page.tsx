@@ -9,13 +9,14 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ProviderGrid } from "@/components/providers/provider-grid";
 import { AddProviderWizard } from "@/components/providers/add-provider-wizard";
 import { SyncPanel } from "@/components/layout/sync-panel";
+import { UpdateAuthDialog } from "@/components/providers/update-auth-dialog";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { useProviders, useDeleteProvider, useUpdateAuth } from "@/hooks/use-providers";
+import { useProviders, useDeleteProvider } from "@/hooks/use-providers";
 import { useSync } from "@/hooks/use-sync";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -23,13 +24,11 @@ export function ProvidersPage() {
   useDocumentTitle("Providers");
   const { data: providers, isLoading, isError, error } = useProviders();
   const deleteProvider = useDeleteProvider();
-  const updateAuth = useUpdateAuth();
   const { events, isRunning, start } = useSync();
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [syncPanelOpen, setSyncPanelOpen] = useState(false);
-  // Track which provider is being re-authed (for future inline auth modal)
-  const [_authTarget, setAuthTarget] = useState<number | null>(null);
+  const [authTarget, setAuthTarget] = useState<number | null>(null);
 
   const handleSync = useCallback((options?: { providerId?: number; visible?: boolean }) => {
     setSyncPanelOpen(true);
@@ -46,17 +45,9 @@ export function ProvidersPage() {
     [deleteProvider]
   );
 
-  const handleAuth = useCallback(
-    (id: number) => {
-      // For now, open the wizard or an auth dialog
-      // This is a placeholder — a full auth update flow could be its own modal
-      setAuthTarget(id);
-      // TODO: Open dedicated auth-update dialog
-      // For now we signal intent via console (the grid card action works)
-      void updateAuth;
-    },
-    [updateAuth]
-  );
+  const handleAuth = useCallback((id: number) => {
+    setAuthTarget(id);
+  }, []);
 
   const handleRetrySync = useCallback(() => {
     start();
@@ -164,6 +155,15 @@ export function ProvidersPage() {
           {isRunning ? "Syncing..." : "Sync Results"}
         </Button>
       )}
+
+      {/* Update auth dialog */}
+      <UpdateAuthDialog
+        provider={providers?.find((p) => p.id === authTarget) ?? null}
+        open={authTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setAuthTarget(null);
+        }}
+      />
 
       {/* Add provider wizard */}
       <AddProviderWizard open={wizardOpen} onOpenChange={setWizardOpen} />
