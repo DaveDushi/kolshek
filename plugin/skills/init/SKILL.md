@@ -82,96 +82,19 @@ Use AskUserQuestion:
 - **Yes, translate them** — I'll generate translations for all your merchants (recommended)
 - **Skip for now** — Keep original Hebrew descriptions
 
-If they choose to translate:
+If they choose to translate, run `/kolshek:translate`. It handles dictionary seeding, Hebrew→English translation, user review, rule creation, and application. When it completes, continue to the next step.
 
-1. First, seed the built-in dictionary: `kolshek translate seed --json` (covers common Israeli merchants).
-2. Get all unique untranslated descriptions: `kolshek query "SELECT DISTINCT description FROM transactions WHERE description IS NOT NULL ORDER BY description" --json`.
-3. Cross-reference with existing translation rules: `kolshek translate rule list --json`.
-4. For any descriptions not already covered by a rule, generate English translations yourself (you can read Hebrew). Group them into a table and present to the user:
-
-> Here are the translations I've prepared:
->
-> | Hebrew | English |
-> |--------|---------|
-> | שופרסל דיל | Shufersal Deal (supermarket) |
-> | קפה גרג | Cafe Greg |
-> | ... | ... |
->
-> Look good? You can suggest changes or approve.
-
-5. Let the user review — they can approve all, request changes to specific ones, or skip specific entries.
-6. For each approved translation, run `kolshek translate rule add "<english>" --match "<hebrew>" --json`.
-7. Run `kolshek translate apply --json` to apply all rules to existing transactions.
-8. Report how many transactions were translated.
-
-Mention they can re-run `/kolshek:translate` anytime to handle new merchants.
-
-## Step 5: Categorization
+## Step 5: Categorization & Classifications
 
 Ask the user:
 
-> Would you like to categorize your transactions? This covers both expenses (groceries, restaurants, bills) and income (salary, freelance, refunds).
+> Would you like to categorize your transactions? This covers both expenses (groceries, restaurants, bills) and income (salary, freelance, refunds), plus setting up classifications so reports know what to exclude (CC billing, transfers, etc.).
 
 Use AskUserQuestion:
 - **Auto-categorize** — I'll analyze your transactions and suggest category rules (recommended)
 - **Skip for now** — Categorize later
 
-If they choose auto-categorize:
-1. Get all unique uncategorized descriptions, split by direction:
-   - Expenses: `kolshek query "SELECT description, COUNT(*) as count, SUM(charged_amount) as total FROM transactions WHERE charged_amount < 0 AND (category IS NULL OR category = '') GROUP BY description ORDER BY count DESC" --json`
-   - Income: `kolshek query "SELECT description, COUNT(*) as count, SUM(charged_amount) as total FROM transactions WHERE charged_amount > 0 AND (category IS NULL OR category = '') GROUP BY description ORDER BY count DESC" --json`
-2. Generate category suggestions for both. Present as two tables:
-
-> **Expenses:**
->
-> | Description | Occurrences | Category |
-> |-------------|-------------|----------|
-> | Shufersal Deal | 12 | Groceries |
-> | Wolt | 8 | Restaurants |
-> | Cellcom | 3 | Utilities |
-> | ... | ... | ... |
->
-> **Income:**
->
-> | Description | Occurrences | Category |
-> |-------------|-------------|----------|
-> | Salary - Acme Corp | 3 | Salary |
-> | Bit Transfer | 5 | Transfers |
-> | Tax Refund | 1 | Refunds |
-> | ... | ... | ... |
->
-> Look good? You can suggest changes or approve.
-
-3. Let the user review — they can approve all, request changes to specific ones, or skip entries.
-4. For each approved rule, run `kolshek categorize rule add <category> --match <pattern> --json`. For precise rules, use `--match-exact`, `--amount`, `--account`, or `--direction` options.
-5. Run `kolshek categorize apply --json` to apply all rules.
-6. Report how many transactions were categorized (expenses and income separately).
-
-Mention they can re-run `/kolshek:categorize` anytime to handle new merchants or use `categorize rename`, `migrate`, and `reassign` to refine categories later.
-
-## Step 5b: Set Classifications
-
-After categorization, set **classifications** on categories so reports know how to treat them. Classifications determine what gets excluded from spending/income reports (e.g., CC billing charges, internal transfers).
-
-Run auto-classification first:
-```
-kolshek categorize classify auto --dry-run --json
-```
-
-If the preview looks good, apply:
-```
-kolshek categorize classify auto --json
-```
-
-For categories that need special treatment, set them manually:
-```
-kolshek categorize classify set "CC Billing" cc_billing --json
-kolshek categorize classify set "Bank Transfer" transfer --json
-```
-
-Built-in classifications: `expense`, `income`, `cc_billing`, `transfer`, `investment`, `debt`, `savings`. Most categories auto-classify correctly based on transaction direction — only override for non-obvious ones like CC billing or transfers.
-
-> Classifications set. Reports automatically exclude internal transfers and CC billing from spending totals. You can customize this with `--exclude` and `--include` flags on any report command.
+If they choose auto-categorize, run `/kolshek:categorize`. It handles transaction analysis, CC billing / internal transfer detection, category suggestions, rule creation, classification setup, and application. When it completes, continue to the next step.
 
 ## Step 6: Schedule Auto-Fetch
 
