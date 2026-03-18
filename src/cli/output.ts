@@ -41,6 +41,17 @@ let _opts: OutputOptions = {
   nonInteractive: false,
 };
 
+// Update-available state (set from preAction via checkForUpdate)
+let _updateInfo: { latest: string; current: string } | null = null;
+
+export function setUpdateInfo(info: { latest: string; current: string } | null): void {
+  _updateInfo = info;
+}
+
+export function getUpdateInfo(): { latest: string; current: string } | null {
+  return _updateInfo;
+}
+
 export function setOutputOptions(opts: Partial<OutputOptions>): void {
   _opts = { ..._opts, ...opts };
   // Apply environment-based overrides
@@ -73,10 +84,16 @@ export function isInteractive(): boolean {
 // JSON envelope
 // ---------------------------------------------------------------------------
 
+interface JsonMetadata {
+  timestamp: string;
+  version: string;
+  updateAvailable?: { latest: string; current: string };
+}
+
 interface JsonSuccess<T = unknown> {
   success: true;
   data: T;
-  metadata: { timestamp: string; version: string };
+  metadata: JsonMetadata;
 }
 
 interface JsonError {
@@ -88,13 +105,17 @@ interface JsonError {
     retryable: boolean;
     suggestions: string[];
   };
-  metadata: { timestamp: string; version: string };
+  metadata: JsonMetadata;
 }
 
 import pkg from "../../package.json";
 
-function meta(): { timestamp: string; version: string } {
-  return { timestamp: new Date().toISOString(), version: pkg.version };
+function meta(): JsonMetadata {
+  const m: JsonMetadata = { timestamp: new Date().toISOString(), version: pkg.version };
+  if (_updateInfo) {
+    m.updateAvailable = _updateInfo;
+  }
+  return m;
 }
 
 export function jsonSuccess<T>(data: T): JsonSuccess<T> {
