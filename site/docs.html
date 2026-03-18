@@ -764,6 +764,18 @@ kolshek db schema transactions --json</code></pre></div>
       <section id="changelog" class="docs-section">
         <h1 class="docs-h1">Changelog</h1>
 
+        <h2 class="docs-h2">v0.3.7</h2>
+        <h3 class="docs-h3">Features</h3>
+        <ul class="docs-ul">
+          <li><strong>Full React dashboard</strong> &mdash; migrated from HTMX to a full React SPA with client-side routing. 8 pages: Dashboard, Transactions, Spending, Trends, Insights, Categories, Translations, Providers.</li>
+          <li><strong>Per-provider sync events</strong> &mdash; SSE now emits granular events per provider during sync, enabling real-time progress tracking in the dashboard.</li>
+          <li><strong>Cross-origin authentication</strong> &mdash; dashboard auth now works across origins, supporting the desktop app sidecar architecture.</li>
+          <li><strong>Dashboard analytics</strong> &mdash; net worth card, cashflow chart, spending donut, automated insights, and recent transactions view.</li>
+          <li><strong>Landing page polish</strong> &mdash; GitHub stars badge, trimmed favicon, theme toggle simplification, docs sidebar reorder, chat auto-scroll.</li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
         <h2 class="docs-h2">v0.3.6</h2>
         <h3 class="docs-h3">Features</h3>
         <ul class="docs-ul">

@@ -338,6 +338,27 @@
                             </svg>
                             Command Line
                         </button>
+                        <button
+                            class="hero-demo-tab"
+                            data-demo="dashboard"
+                        >
+                            <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <rect x="3" y="3" width="7" height="7" />
+                                <rect x="14" y="3" width="7" height="7" />
+                                <rect x="14" y="14" width="7" height="7" />
+                                <rect x="3" y="14" width="7" height="7" />
+                            </svg>
+                            Dashboard
+                        </button>
                     </div>
 
                     <!-- Terminal demo panel -->
@@ -670,6 +691,201 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Dashboard demo panel -->
+                    <div class="hero-demo-panel" id="demo-dashboard">
+                        <div class="dash-mock">
+                            <!-- Sidebar -->
+                            <div class="dash-sidebar">
+                                <div class="dash-sidebar-logo">
+                                    <img src="logo.png" alt="" class="w-5 h-5 rounded" />
+                                    <span class="text-xs font-semibold text-heading">KolShek</span>
+                                </div>
+                                <div class="dash-nav-item active" data-dash-page="overview">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                                    <span>Dashboard</span>
+                                </div>
+                                <div class="dash-nav-item" data-dash-page="transactions">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                    <span>Transactions</span>
+                                </div>
+                                <div class="dash-nav-item" data-dash-page="spending">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18M7 16l4-4 4 4 5-5"/></svg>
+                                    <span>Spending</span>
+                                </div>
+                                <div class="dash-nav-item" data-dash-page="trends">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                                    <span>Trends</span>
+                                </div>
+                                <div class="dash-nav-item" data-dash-page="insights">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.674M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                                    <span>Insights</span>
+                                </div>
+                            </div>
+
+                            <!-- Main content -->
+                            <div class="dash-main">
+                                <!-- PAGE: Dashboard overview -->
+                                <div class="dash-page active" id="dash-overview">
+                                    <div class="dash-header">
+                                        <span class="text-xs font-semibold text-heading">Dashboard</span>
+                                        <span class="dash-sync-badge">Synced 2m ago</span>
+                                    </div>
+                                    <div class="dash-grid-top">
+                                        <div class="dash-card">
+                                            <div class="dash-card-label">Net Worth</div>
+                                            <div class="dash-card-value">&#8362;47,280</div>
+                                            <div class="dash-card-sub">
+                                                <span>Hapoalim</span><span class="text-right">&#8362;32,100</span>
+                                                <span>Leumi</span><span class="text-right">&#8362;15,180</span>
+                                            </div>
+                                        </div>
+                                        <div class="dash-card dash-card-wide">
+                                            <div class="dash-card-label">Cashflow — March</div>
+                                            <div class="dash-cashflow-row">
+                                                <div>
+                                                    <div class="dash-card-sub-label" style="color: #10b981">Income</div>
+                                                    <div class="dash-card-value-sm">&#8362;18,500</div>
+                                                </div>
+                                                <div>
+                                                    <div class="dash-card-sub-label" style="color: #f43f5e">Expenses</div>
+                                                    <div class="dash-card-value-sm">&#8362;12,340</div>
+                                                </div>
+                                                <div>
+                                                    <div class="dash-card-sub-label" style="color: #6366f1">Net</div>
+                                                    <div class="dash-card-value-sm">+&#8362;6,160</div>
+                                                </div>
+                                            </div>
+                                            <div class="dash-bar-chart">
+                                                <div class="dash-bar" style="--h: 60%"></div>
+                                                <div class="dash-bar" style="--h: 75%"></div>
+                                                <div class="dash-bar" style="--h: 45%"></div>
+                                                <div class="dash-bar" style="--h: 90%"></div>
+                                                <div class="dash-bar" style="--h: 55%"></div>
+                                                <div class="dash-bar dash-bar-current" style="--h: 70%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="dash-grid-bottom">
+                                        <div class="dash-card">
+                                            <div class="dash-card-label">Spending</div>
+                                            <div class="dash-donut-row">
+                                                <svg class="dash-donut" viewBox="0 0 36 36">
+                                                    <circle cx="18" cy="18" r="14" fill="none" stroke="var(--border)" stroke-width="3" />
+                                                    <circle cx="18" cy="18" r="14" fill="none" stroke="#6366f1" stroke-width="3" stroke-dasharray="35 65" stroke-dashoffset="25" />
+                                                    <circle cx="18" cy="18" r="14" fill="none" stroke="#3b82f6" stroke-width="3" stroke-dasharray="20 80" stroke-dashoffset="-10" />
+                                                    <circle cx="18" cy="18" r="14" fill="none" stroke="#10b981" stroke-width="3" stroke-dasharray="15 85" stroke-dashoffset="-30" />
+                                                    <circle cx="18" cy="18" r="14" fill="none" stroke="#f59e0b" stroke-width="3" stroke-dasharray="10 90" stroke-dashoffset="-45" />
+                                                </svg>
+                                                <div class="dash-legend">
+                                                    <div><span class="dash-dot" style="background:#6366f1"></span>Housing</div>
+                                                    <div><span class="dash-dot" style="background:#3b82f6"></span>Groceries</div>
+                                                    <div><span class="dash-dot" style="background:#10b981"></span>Transport</div>
+                                                    <div><span class="dash-dot" style="background:#f59e0b"></span>Dining</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="dash-card">
+                                            <div class="dash-card-label">Insights</div>
+                                            <div class="dash-insight"><span class="dash-insight-icon" style="color:#f59e0b">!</span> Dining up 23% vs last month</div>
+                                            <div class="dash-insight"><span class="dash-insight-icon" style="color:#10b981">&#x2713;</span> Groceries down 8%</div>
+                                            <div class="dash-insight"><span class="dash-insight-icon" style="color:#6366f1">i</span> 3 uncategorized transactions</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- PAGE: Transactions -->
+                                <div class="dash-page" id="dash-transactions">
+                                    <div class="dash-header">
+                                        <span class="text-xs font-semibold text-heading">Transactions</span>
+                                        <span class="dash-filter-badge">March 2026</span>
+                                    </div>
+                                    <div class="dash-card" style="flex:1">
+                                        <table class="dash-table">
+                                            <thead>
+                                                <tr><th>Date</th><th>Description</th><th>Category</th><th class="text-right">Amount</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr><td>Mar 15</td><td>Shufersal Deal</td><td><span class="dash-cat-badge" style="--cat:#3b82f6">Groceries</span></td><td class="text-right" style="color:#f43f5e">-&#8362;342</td></tr>
+                                                <tr><td>Mar 14</td><td>Salary — Acme Ltd</td><td><span class="dash-cat-badge" style="--cat:#10b981">Income</span></td><td class="text-right" style="color:#10b981">+&#8362;18,500</td></tr>
+                                                <tr><td>Mar 13</td><td>HOT Internet</td><td><span class="dash-cat-badge" style="--cat:#8b5cf6">Bills</span></td><td class="text-right" style="color:#f43f5e">-&#8362;149</td></tr>
+                                                <tr><td>Mar 12</td><td>Wolt — Sushi Rehavia</td><td><span class="dash-cat-badge" style="--cat:#f59e0b">Dining</span></td><td class="text-right" style="color:#f43f5e">-&#8362;87</td></tr>
+                                                <tr><td>Mar 11</td><td>Gett Ride</td><td><span class="dash-cat-badge" style="--cat:#06b6d4">Transport</span></td><td class="text-right" style="color:#f43f5e">-&#8362;34</td></tr>
+                                                <tr><td>Mar 10</td><td>AM:PM Herzl</td><td><span class="dash-cat-badge" style="--cat:#3b82f6">Groceries</span></td><td class="text-right" style="color:#f43f5e">-&#8362;56</td></tr>
+                                                <tr><td>Mar 9</td><td>Rent — March</td><td><span class="dash-cat-badge" style="--cat:#6366f1">Housing</span></td><td class="text-right" style="color:#f43f5e">-&#8362;4,200</td></tr>
+                                                <tr><td>Mar 8</td><td>Apple Music</td><td><span class="dash-cat-badge" style="--cat:#ec4899">Subscriptions</span></td><td class="text-right" style="color:#f43f5e">-&#8362;22</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- PAGE: Spending -->
+                                <div class="dash-page" id="dash-spending">
+                                    <div class="dash-header">
+                                        <span class="text-xs font-semibold text-heading">Spending</span>
+                                        <span class="dash-filter-badge">March 2026</span>
+                                    </div>
+                                    <div class="dash-card">
+                                        <div class="dash-card-label">Total Spent</div>
+                                        <div class="dash-card-value">&#8362;12,340</div>
+                                    </div>
+                                    <div class="dash-card" style="flex:1">
+                                        <div class="dash-card-label">By Category</div>
+                                        <div class="dash-spend-bars">
+                                            <div class="dash-spend-row"><span>Housing</span><div class="dash-spend-track"><div class="dash-spend-fill" style="width:68%;background:#6366f1"></div></div><span>&#8362;4,200</span></div>
+                                            <div class="dash-spend-row"><span>Groceries</span><div class="dash-spend-track"><div class="dash-spend-fill" style="width:45%;background:#3b82f6"></div></div><span>&#8362;2,780</span></div>
+                                            <div class="dash-spend-row"><span>Dining</span><div class="dash-spend-track"><div class="dash-spend-fill" style="width:30%;background:#f59e0b"></div></div><span>&#8362;1,850</span></div>
+                                            <div class="dash-spend-row"><span>Transport</span><div class="dash-spend-track"><div class="dash-spend-fill" style="width:22%;background:#10b981"></div></div><span>&#8362;1,340</span></div>
+                                            <div class="dash-spend-row"><span>Bills</span><div class="dash-spend-track"><div class="dash-spend-fill" style="width:18%;background:#8b5cf6"></div></div><span>&#8362;1,120</span></div>
+                                            <div class="dash-spend-row"><span>Other</span><div class="dash-spend-track"><div class="dash-spend-fill" style="width:10%;background:#71717a"></div></div><span>&#8362;1,050</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- PAGE: Trends -->
+                                <div class="dash-page" id="dash-trends">
+                                    <div class="dash-header">
+                                        <span class="text-xs font-semibold text-heading">Trends</span>
+                                        <span class="dash-filter-badge">6 months</span>
+                                    </div>
+                                    <div class="dash-card" style="flex:1">
+                                        <div class="dash-card-label">Monthly Spending</div>
+                                        <div class="dash-trend-chart">
+                                            <div class="dash-trend-y">
+                                                <span>15k</span><span>10k</span><span>5k</span><span>0</span>
+                                            </div>
+                                            <div class="dash-trend-bars">
+                                                <div class="dash-trend-col"><div class="dash-trend-bar" style="--h:72%"></div><span>Oct</span></div>
+                                                <div class="dash-trend-col"><div class="dash-trend-bar" style="--h:85%"></div><span>Nov</span></div>
+                                                <div class="dash-trend-col"><div class="dash-trend-bar" style="--h:95%"></div><span>Dec</span></div>
+                                                <div class="dash-trend-col"><div class="dash-trend-bar" style="--h:65%"></div><span>Jan</span></div>
+                                                <div class="dash-trend-col"><div class="dash-trend-bar" style="--h:78%"></div><span>Feb</span></div>
+                                                <div class="dash-trend-col"><div class="dash-trend-bar dash-bar-current" style="--h:82%"></div><span>Mar</span></div>
+                                            </div>
+                                        </div>
+                                        <div class="dash-trend-summary">
+                                            <div><span class="text-muted">Avg</span> <strong>&#8362;11,420</strong></div>
+                                            <div><span class="text-muted">Highest</span> <strong>&#8362;14,200</strong></div>
+                                            <div><span class="text-muted">Lowest</span> <strong>&#8362;9,750</strong></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- PAGE: Insights -->
+                                <div class="dash-page" id="dash-insights">
+                                    <div class="dash-header">
+                                        <span class="text-xs font-semibold text-heading">Insights</span>
+                                        <span class="dash-sync-badge">3 new</span>
+                                    </div>
+                                    <div class="dash-card"><div class="dash-insight"><span class="dash-insight-icon" style="color:#f59e0b">!</span> Dining spending up 23% vs last month (&#8362;1,850 vs &#8362;1,504)</div></div>
+                                    <div class="dash-card"><div class="dash-insight"><span class="dash-insight-icon" style="color:#10b981">&#x2713;</span> Groceries spending down 8% — on track with budget</div></div>
+                                    <div class="dash-card"><div class="dash-insight"><span class="dash-insight-icon" style="color:#6366f1">i</span> 3 uncategorized transactions need review</div></div>
+                                    <div class="dash-card"><div class="dash-insight"><span class="dash-insight-icon" style="color:#10b981">&#x2713;</span> Net savings rate: 33% — above your 25% target</div></div>
+                                    <div class="dash-card"><div class="dash-insight"><span class="dash-insight-icon" style="color:#f43f5e">!</span> Subscriptions total &#8362;340/mo across 8 services</div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -851,8 +1067,9 @@
                             Built for AI Agents
                         </h3>
                         <p class="text-sm text-body">
-                            First-class plugins for Claude Code, Cursor, Gemini
-                            CLI, and more.
+                            First-class plugins for Claude Code, OpenCode,
+                            Codex, and OpenClaw. 4 skills: init, categorize,
+                            analyze, review.
                         </p>
                     </div>
 
@@ -877,8 +1094,9 @@
                             Web Dashboard
                         </h3>
                         <p class="text-sm text-body">
-                            HTMX-powered settings UI with real-time fetch
-                            progress via SSE.
+                            Full React dashboard with spending analytics,
+                            category management, trends, insights, and
+                            real-time sync progress.
                         </p>
                     </div>
 
@@ -908,7 +1126,7 @@
                         </p>
                     </div>
 
-                    <!-- SQL Access -->
+                    <!-- Financial Analytics -->
                     <div class="card fade-up lg:col-span-2">
                         <div class="feature-icon mb-4">
                             <svg
@@ -921,19 +1139,16 @@
                                 <path
                                     stroke-linecap="round"
                                     stroke-linejoin="round"
-                                    d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+                                    d="M3 3v18h18M7 16l4-4 4 4 5-5"
                                 />
                             </svg>
                         </div>
                         <h3 class="text-base font-semibold text-heading mb-1.5">
-                            SQL Access
+                            Financial Analytics
                         </h3>
                         <p class="text-sm text-body">
-                            Read-only
-                            <code
-                                class="text-xs bg-code-inline px-1.5 py-0.5 rounded"
-                                >kolshek query</code
-                            >. Schema introspection for agents.
+                            Spending breakdowns, income tracking, month-over-month
+                            trends, and automated financial insights.
                         </p>
                     </div>
 
@@ -988,9 +1203,9 @@
                             </h3>
                             <p class="text-sm text-body">
                                 Monthly summaries, category breakdowns, balance
-                                history, merchant insights, and multi-month
-                                trend analysis. Lifestyle spending mode excludes
-                                non-spending categories for a clearer picture.
+                                history, and multi-month trend analysis.
+                                Lifestyle mode filters non-spending categories.
+                                Self-update built in.
                             </p>
                         </div>
                     </div>

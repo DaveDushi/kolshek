@@ -26,6 +26,19 @@ document.querySelectorAll(".hero-demo-tab").forEach(function (tab) {
   });
 });
 
+// ── Dashboard mock page switcher ─────────────────────────────
+document.querySelectorAll(".dash-nav-item[data-dash-page]").forEach(function (item) {
+  item.addEventListener("click", function () {
+    var page = item.dataset.dashPage;
+    document.querySelectorAll(".dash-nav-item").forEach(function (n) {
+      n.classList.toggle("active", n.dataset.dashPage === page);
+    });
+    document.querySelectorAll(".dash-page").forEach(function (p) {
+      p.classList.toggle("active", p.id === "dash-" + page);
+    });
+  });
+});
+
 // ── Chat auto-scroll on message appear ───────────────────────
 // Messages start display:none so scrollHeight grows as each appears.
 // JS reveals them at their --chat-delay, then scrolls the small delta.
