@@ -401,7 +401,7 @@ export function deleteTransaction(
 
 export function updateTransactionCategory(
   id: number,
-  category: string,
+  category: string | null,
 ): boolean {
   const db = getDatabase();
   const result = db

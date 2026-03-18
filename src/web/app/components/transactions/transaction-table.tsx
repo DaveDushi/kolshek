@@ -186,18 +186,16 @@ export function TransactionTable({
             <TableRow
               key={tx.id}
               className={cn(
-                "cursor-pointer",
-                onRowClick && "hover:bg-muted/50"
+                onRowClick && "cursor-pointer hover:bg-muted/50"
               )}
               onClick={() => onRowClick?.(tx)}
-              tabIndex={0}
-              onKeyDown={(e) => {
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={onRowClick ? (e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  onRowClick?.(tx);
+                  onRowClick(tx);
                 }
-              }}
-              role="button"
+              } : undefined}
             >
               <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                 {formatDate(tx.date)}

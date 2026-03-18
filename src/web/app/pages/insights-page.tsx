@@ -1,6 +1,7 @@
 // Insights page — all insights grouped by severity
 import { useMemo, useState } from "react";
 import { Lightbulb, CalendarClock } from "lucide-react";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useInsights } from "@/hooks/use-insights";
 import { REPORT_DEFAULT_EXCLUDES } from "@/lib/classification";
 import { PageHeader } from "@/components/shared/page-header";
@@ -70,6 +71,7 @@ function SeveritySection({ label, description, insights }: SeveritySectionProps)
 }
 
 export function InsightsPage() {
+  useDocumentTitle("Insights");
   const [excluded, setExcluded] = useState<string[]>([...REPORT_DEFAULT_EXCLUDES]);
   const { data, isLoading, isError } = useInsights(undefined, excluded);
 

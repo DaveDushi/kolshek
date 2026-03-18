@@ -1,6 +1,7 @@
 // Spending analysis page with chart, table, and filters
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, ShoppingCart } from "lucide-react";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useSpending } from "@/hooks/use-spending";
 import { getCurrentMonth, formatMonth } from "@/lib/format";
 import { SPENDING_DEFAULT_EXCLUDES } from "@/lib/classification";
@@ -39,6 +40,7 @@ function shiftMonth(month: string, delta: number): string {
 type GroupBy = "category" | "merchant" | "provider";
 
 export function SpendingPage() {
+  useDocumentTitle("Spending");
   const [month, setMonth] = useState(getCurrentMonth);
   const [groupBy, setGroupBy] = useState<GroupBy>("category");
   const [excluded, setExcluded] = useState<string[]>([...SPENDING_DEFAULT_EXCLUDES]);

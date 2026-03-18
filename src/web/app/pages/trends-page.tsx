@@ -1,6 +1,7 @@
 // Trends analysis page with Cashflow, Category, and Fixed vs Variable tabs
 import { useState } from "react";
 import { TrendingUp } from "lucide-react";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import {
   useTotalTrends,
   useCategoryTrend,
@@ -39,6 +40,7 @@ import { cn } from "@/lib/utils";
 type Period = "3" | "6" | "12";
 
 export function TrendsPage() {
+  useDocumentTitle("Trends");
   const [months, setMonths] = useState<Period>("6");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [excluded, setExcluded] = useState<string[]>([...REPORT_DEFAULT_EXCLUDES]);

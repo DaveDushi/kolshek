@@ -2,6 +2,7 @@
 // add-connection wizard
 import { useState, useCallback } from "react";
 import { Plus, Unplug, RefreshCw } from "lucide-react";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -13,6 +14,7 @@ import { useSync } from "@/hooks/use-sync";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function ProvidersPage() {
+  useDocumentTitle("Providers");
   const { data: providers, isLoading, isError, error } = useProviders();
   const deleteProvider = useDeleteProvider();
   const updateAuth = useUpdateAuth();

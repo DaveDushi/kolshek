@@ -194,7 +194,7 @@ export function SyncPanel({
           )}
 
           {globalError && (
-            <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 my-2">
+            <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 my-2" role="alert">
               <p className="text-sm text-destructive font-medium">Sync Error</p>
               <p className="text-xs text-destructive/80 mt-1">
                 {globalError.error || globalError.message}

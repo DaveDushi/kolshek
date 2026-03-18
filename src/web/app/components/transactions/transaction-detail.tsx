@@ -252,10 +252,7 @@ export function TransactionDetail({
                     <code className="text-xs">{transaction.accountId}</code>
                   </DetailRow>
                   <DetailRow label="Company ID">
-                    <code className="text-xs">{transaction.companyId}</code>
-                  </DetailRow>
-                  <DetailRow label="Provider Type">
-                    <code className="text-xs">{transaction.providerType}</code>
+                    <code className="text-xs">{transaction.providerCompanyId}</code>
                   </DetailRow>
                 </div>
               </div>

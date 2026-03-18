@@ -13,22 +13,23 @@ export function registerDashboardCommand(program: Command): void {
     .action(async (opts: { port: string; open: boolean }) => {
       const port = Number(opts.port);
 
-      const server = startDashboard(port);
-      const url = `http://localhost:${server.port}`;
+      const { server, token } = startDashboard(port);
+      const baseUrl = `http://localhost:${server.port}`;
+      const authUrl = `${baseUrl}/?token=${token}`;
 
-      success(`Dashboard running at ${url}`);
+      success(`Dashboard running at ${authUrl}`);
       info("Press Ctrl+C to stop.\n");
 
       if (opts.open) {
-        // Open browser — platform-specific
+        // Open browser with auth token — platform-specific
         try {
           const platform = process.platform;
           if (platform === "win32") {
-            Bun.spawn(["cmd", "/c", "start", url]);
+            Bun.spawn(["cmd", "/c", "start", authUrl]);
           } else if (platform === "darwin") {
-            Bun.spawn(["open", url]);
+            Bun.spawn(["open", authUrl]);
           } else {
-            Bun.spawn(["xdg-open", url]);
+            Bun.spawn(["xdg-open", authUrl]);
           }
         } catch {
           // Silently ignore if browser open fails

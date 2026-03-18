@@ -2,6 +2,7 @@
 import { useNavigate } from "react-router";
 import { LayoutDashboard } from "lucide-react";
 import { useBalanceReport } from "@/hooks/use-accounts";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { NetWorthCard } from "@/components/dashboard/net-worth-card";
@@ -11,6 +12,7 @@ import { InsightsCard } from "@/components/dashboard/insights-card";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 
 export function DashboardPage() {
+  useDocumentTitle("Dashboard");
   const navigate = useNavigate();
   const { data: balanceData, isLoading } = useBalanceReport();
 

@@ -1,5 +1,6 @@
 // Sync hook — streams SSE events from the fetch endpoint
 import { useState, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { SyncEvent } from "@/types/api";
 
 // Parse a single SSE "data: {...}" line into a SyncEvent
@@ -19,6 +20,7 @@ export function useSync() {
   const [events, setEvents] = useState<SyncEvent[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const queryClient = useQueryClient();
 
   const start = useCallback(async (visible?: boolean) => {
     // Prevent double-start
@@ -97,8 +99,10 @@ export function useSync() {
     } finally {
       setIsRunning(false);
       abortRef.current = null;
+      // Invalidate all cached queries so the dashboard shows fresh data
+      queryClient.invalidateQueries();
     }
-  }, []);
+  }, [queryClient]);
 
   return { events, isRunning, start };
 }

@@ -1,6 +1,7 @@
 // Full categories management page with sidebar + main panel
 import { useState } from "react";
 import { useSearchParams } from "react-router";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Tags, Plus } from "lucide-react";
 import {
   useCategorySummary,
@@ -20,6 +21,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function CategoriesPage() {
+  useDocumentTitle("Categories");
   const [searchParams, setSearchParams] = useSearchParams();
   const activeCategory = searchParams.get("cat");
   const [ruleBuilderOpen, setRuleBuilderOpen] = useState(false);

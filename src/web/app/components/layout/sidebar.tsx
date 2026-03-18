@@ -260,15 +260,15 @@ export function Sidebar() {
           </Tooltip>
 
           {/* Sync progress mini-section when running */}
-          {isRunning && events.length > 0 && (
-            <div className="px-2">
+          <div className="px-2" aria-live="polite" role="status">
+            {isRunning && events.length > 0 && (
               <p className="text-[11px] text-muted-foreground truncate">
                 {events[events.length - 1]?.provider
                   ? `${events[events.length - 1].provider}: ${events[events.length - 1].stage || "working..."}`
                   : events[events.length - 1]?.message || "working..."}
               </p>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Theme toggle */}
           <DropdownMenu>

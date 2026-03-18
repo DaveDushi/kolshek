@@ -46,8 +46,7 @@ export interface Transaction {
 
 export interface TransactionWithContext extends Transaction {
   providerDisplayName: string;
-  providerType: string;
-  companyId: string;
+  providerCompanyId: string;
   accountNumber: string;
 }
 

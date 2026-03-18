@@ -1,6 +1,7 @@
 // Full translations page: untranslated, rules, and already translated
 import { useState } from "react";
 import { Languages, ChevronDown, ChevronRight } from "lucide-react";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useApplyTranslationRules } from "@/hooks/use-translations";
 import { PageHeader } from "@/components/shared/page-header";
 import { UntranslatedList } from "@/components/translations/untranslated-list";
@@ -11,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
 export function TranslationsPage() {
+  useDocumentTitle("Translations");
   const applyAllRules = useApplyTranslationRules();
   const [translatedOpen, setTranslatedOpen] = useState(false);
 

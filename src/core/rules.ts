@@ -24,6 +24,9 @@ function matchesText(
         break;
       case "regex":
         try {
+          // Guard against ReDoS: reject patterns > 200 chars or with nested quantifiers
+          if (condition.pattern.length > 200) break;
+          if (/(\+|\*|\{)\)?(\+|\*|\{)/.test(condition.pattern)) break;
           if (new RegExp(condition.pattern, "i").test(value)) return true;
         } catch {
           // invalid regex — treat as non-match

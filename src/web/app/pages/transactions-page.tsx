@@ -1,6 +1,7 @@
 // Transactions page — filter panel, data table, pagination, and detail sheet
 import { useState, useCallback } from "react";
 import { Download, Receipt } from "lucide-react";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -19,6 +20,7 @@ import type { TransactionFilters, TransactionWithContext } from "@/types/api";
 const PAGE_SIZE = 50;
 
 export function TransactionsPage() {
+  useDocumentTitle("Transactions");
   // Filters include pagination via limit/offset
   const [filters, setFilters] = useState<TransactionFilters>({
     limit: PAGE_SIZE,
