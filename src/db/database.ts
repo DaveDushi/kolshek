@@ -292,4 +292,16 @@ function runMigrations(db: Database): void {
       });
     }
   }
+
+  // Safety net: re-run CREATE TABLE IF NOT EXISTS statements even for
+  // applied migrations. Handles edge case where migration was recorded
+  // but table disappeared (e.g. WAL checkpoint issue on Windows).
+  for (const [, sql] of MIGRATIONS) {
+    const createStmts = sql
+      .split(";")
+      .filter((s) => /CREATE TABLE IF NOT EXISTS/i.test(s));
+    for (const stmt of createStmts) {
+      db.exec(stmt.trim());
+    }
+  }
 }
