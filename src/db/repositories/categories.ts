@@ -8,7 +8,9 @@ import type {
   CategoryRule,
   CategoryRuleInput,
   TransactionForMatching,
+  Classification,
 } from "../../types/index.js";
+import { inferClassification } from "../../types/index.js";
 import { applyRules as applyRulesEngine } from "../../core/rules.js";
 
 // ---------------------------------------------------------------------------
@@ -49,12 +51,82 @@ function serializeConditions(conditions: RuleConditions): string {
 // Category entity CRUD (categories table)
 // ---------------------------------------------------------------------------
 
-export function createCategory(name: string): boolean {
+export function createCategory(name: string, classification: Classification = "expense"): boolean {
   const db = getDatabase();
   const result = db
-    .prepare("INSERT OR IGNORE INTO categories (name) VALUES ($name)")
-    .run({ $name: name });
+    .prepare("INSERT OR IGNORE INTO categories (name, classification) VALUES ($name, $classification)")
+    .run({ $name: name, $classification: classification });
   return result.changes > 0;
+}
+
+export function setCategoryClassification(name: string, classification: Classification): boolean {
+  const db = getDatabase();
+  const result = db
+    .prepare("UPDATE categories SET classification = $classification WHERE name = $name")
+    .run({ $name: name, $classification: classification });
+  return result.changes > 0;
+}
+
+export function getCategoryClassification(name: string): string | null {
+  const db = getDatabase();
+  const row = db
+    .prepare("SELECT classification FROM categories WHERE name = $name")
+    .get({ $name: name }) as { classification: string } | null;
+  return row?.classification ?? null;
+}
+
+// Returns a map of category name -> classification for all categories.
+export function getClassificationMap(): Map<string, string> {
+  const db = getDatabase();
+  const rows = db
+    .prepare("SELECT name, classification FROM categories")
+    .all() as Array<{ name: string; classification: string }>;
+  return new Map(rows.map((r) => [r.name, r.classification]));
+}
+
+// Build a SQL condition that excludes categories matching given classifications.
+export function buildClassificationExcludeSQL(
+  classifications: readonly string[],
+  tableAlias: string = "t",
+): { sql: string; params: Record<string, string> } {
+  if (classifications.length === 0) {
+    return { sql: "1=1", params: {} };
+  }
+  const placeholders = classifications.map((_, i) => `$excl_${i}`);
+  const params: Record<string, string> = {};
+  classifications.forEach((c, i) => { params[`$excl_${i}`] = c; });
+  const sql = `COALESCE(${tableAlias}.category, '') NOT IN (
+    SELECT name FROM categories WHERE classification IN (${placeholders.join(", ")})
+  )`;
+  return { sql, params };
+}
+
+// Build a SQL condition that includes only categories matching given classifications.
+export function buildClassificationIncludeSQL(
+  classifications: readonly string[],
+  tableAlias: string = "t",
+): { sql: string; params: Record<string, string> } {
+  if (classifications.length === 0) {
+    return { sql: "1=1", params: {} };
+  }
+  const placeholders = classifications.map((_, i) => `$incl_${i}`);
+  const params: Record<string, string> = {};
+  classifications.forEach((c, i) => { params[`$incl_${i}`] = c; });
+  const sql = `COALESCE(${tableAlias}.category, 'Uncategorized') IN (
+    SELECT name FROM categories WHERE classification IN (${placeholders.join(", ")})
+  )`;
+  return { sql, params };
+}
+
+// Ensure a category exists, creating it with the given classification if not.
+export function ensureCategoryWithClassification(
+  name: string,
+  defaultClassification: Classification = "expense",
+): void {
+  const db = getDatabase();
+  db.prepare(
+    "INSERT OR IGNORE INTO categories (name, classification) VALUES ($name, $classification)",
+  ).run({ $name: name, $classification: defaultClassification });
 }
 
 export function categoryExists(name: string): boolean {
@@ -242,7 +314,26 @@ export function applyCategoryRules(options?: ApplyRulesOptions): ApplyRulesResul
     }
   }
 
-  // 6. Set remaining NULLs to 'Uncategorized' (skip for from-category scope)
+  // 6. Ensure categories exist in the categories table with inferred classification
+  if (!dryRun && assignments.size > 0) {
+    // Collect unique categories from assignments and infer classification
+    // from dominant transaction direction
+    const categoryTxAmounts = new Map<string, number[]>();
+    for (const [txId, category] of assignments) {
+      const tx = transactions.find((t) => t.id === txId);
+      if (tx) {
+        if (!categoryTxAmounts.has(category)) categoryTxAmounts.set(category, []);
+        categoryTxAmounts.get(category)!.push(tx.chargedAmount);
+      }
+    }
+    for (const [category, amounts] of categoryTxAmounts) {
+      const avgAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+      const classification = inferClassification(avgAmount);
+      ensureCategoryWithClassification(category, classification);
+    }
+  }
+
+  // 7. Set remaining NULLs to 'Uncategorized' (skip for from-category scope)
   let uncategorized = 0;
   if (scope !== "from-category") {
     if (dryRun) {
@@ -325,8 +416,14 @@ export function renameCategory(oldName: string, newName: string): RenameResult {
       .prepare("UPDATE category_rules SET category = $new WHERE category = $old")
       .run({ $old: oldName, $new: newName });
 
-    // Update categories table: ensure new exists, remove old
-    db.prepare("INSERT OR IGNORE INTO categories (name) VALUES ($name)").run({ $name: newName });
+    // Update categories table: ensure new exists (inheriting old classification), remove old
+    const oldRow = db
+      .prepare("SELECT classification FROM categories WHERE name = $name")
+      .get({ $name: oldName }) as { classification: string } | null;
+    const oldClassification = oldRow?.classification ?? "expense";
+    db.prepare(
+      "INSERT OR IGNORE INTO categories (name, classification) VALUES ($name, $classification)",
+    ).run({ $name: newName, $classification: oldClassification });
     db.prepare("DELETE FROM categories WHERE name = $name").run({ $name: oldName });
 
     db.run("COMMIT");
@@ -485,6 +582,7 @@ export function bulkImportCategoryRules(
 
 export interface CategoryWithSource {
   category: string;
+  classification: string;
   transactionCount: number;
   totalAmount: number;
   ruleCount: number;
@@ -497,6 +595,7 @@ export function listCategoriesWithSource(): CategoryWithSource[] {
     .prepare(
       `SELECT
          cat.category,
+         COALESCE(c.classification, 'expense') AS classification,
          COALESCE(tc.transaction_count, 0) AS transaction_count,
          COALESCE(tc.total_amount, 0) AS total_amount,
          COALESCE(rc.rule_count, 0) AS rule_count,
@@ -512,6 +611,7 @@ export function listCategoriesWithSource(): CategoryWithSource[] {
          UNION
          SELECT name AS category FROM categories
        ) cat
+       LEFT JOIN categories c ON c.name = cat.category
        LEFT JOIN (
          SELECT COALESCE(category, 'Uncategorized') AS category,
                 COUNT(*) AS transaction_count,
@@ -528,6 +628,7 @@ export function listCategoriesWithSource(): CategoryWithSource[] {
     )
     .all() as Array<{
     category: string;
+    classification: string;
     transaction_count: number;
     total_amount: number;
     rule_count: number;
@@ -536,6 +637,7 @@ export function listCategoriesWithSource(): CategoryWithSource[] {
 
   return rows.map((r) => ({
     category: r.category,
+    classification: r.classification,
     transactionCount: r.transaction_count,
     totalAmount: r.total_amount,
     ruleCount: r.rule_count,

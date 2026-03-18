@@ -10,7 +10,8 @@ import {
   countTransactions,
   deleteTransaction,
 } from "../../db/repositories/transactions.js";
-import { CC_BILLING_CATEGORY, type TransactionWithContext } from "../../types/index.js";
+import type { TransactionWithContext } from "../../types/index.js";
+import { getClassificationMap } from "../../db/repositories/categories.js";
 import {
   isJsonMode,
   printJson,
@@ -26,17 +27,36 @@ import {
 } from "../output.js";
 import { buildFilters } from "../filter-utils.js";
 
-/** Format a transaction row for the table */
+// Classification-based display tags (only for non-expense categories)
+const CLASSIFICATION_TAGS: Record<string, string> = {
+  cc_billing: "[cc]",
+  transfer: "[xfer]",
+  investment: "[inv]",
+  debt: "[debt]",
+  savings: "[save]",
+};
+
+// Cached per command invocation
+let _classificationMap: Map<string, string> | null = null;
+function getClassificationTag(category: string | null): string {
+  if (!category) return "";
+  if (!_classificationMap) _classificationMap = getClassificationMap();
+  const classification = _classificationMap.get(category);
+  if (!classification || classification === "expense" || classification === "income") return "";
+  return " " + (CLASSIFICATION_TAGS[classification] ?? `[${classification}]`);
+}
+
+// Format a transaction row for the table
 function txRow(tx: TransactionWithContext, masked: boolean): string[] {
   const installment = formatInstallments(
     tx.installmentNumber,
     tx.installmentTotal,
   );
   const displayDesc = tx.descriptionEn ?? tx.description;
-  const ccTag = tx.category === CC_BILLING_CATEGORY ? " [CC]" : "";
+  const tag = getClassificationTag(tx.category);
   const desc = installment
-    ? `${displayDesc} ${installment}${ccTag}`
-    : `${displayDesc}${ccTag}`;
+    ? `${displayDesc} ${installment}${tag}`
+    : `${displayDesc}${tag}`;
 
   return [
     formatDate(tx.date),

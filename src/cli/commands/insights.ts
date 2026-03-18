@@ -17,6 +17,7 @@ import {
   detectTrendWarnings,
   type Insight,
 } from "../../core/insights.js";
+import { addClassificationOptions, parseClassificationFlags } from "../filter-utils.js";
 import {
   isJsonMode,
   printJson,
@@ -42,11 +43,14 @@ function formatInsight(insight: Insight, noColor: boolean): string {
 }
 
 export function registerInsightsCommand(program: Command): void {
-  program
+  const cmd = program
     .command("insights")
     .description("Financial alerts and recommendations based on spending patterns")
-    .option("--months <n>", "Lookback period in months", parseInt, 3)
-    .action((opts) => {
+    .option("--months <n>", "Lookback period in months", parseInt, 3);
+
+  addClassificationOptions(cmd);
+
+  cmd.action((opts) => {
       const monthCount = opts.months ?? 3;
       if (isNaN(monthCount) || monthCount < 1) {
         printError("BAD_ARGS", "--months must be a positive integer");
@@ -58,7 +62,8 @@ export function registerInsightsCommand(program: Command): void {
         const from = subMonths(now, monthCount).toISOString().slice(0, 10);
         const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
-        const insightOpts = { from, currentMonthStart };
+        const { excludeClassifications } = parseClassificationFlags(opts);
+        const insightOpts = { from, currentMonthStart, excludeClassifications };
 
         // Gather all raw data
         const categoryData = getCategoryByMonth(insightOpts);

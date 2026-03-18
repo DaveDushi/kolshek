@@ -35,6 +35,8 @@ bun -e "import envPaths from 'env-paths'; console.log(envPaths('kolshek').config
 ```
 Store this path — you will use it in Step 7.
 
+**Build classification exclusion list:** Run `kolshek categorize classify list --json` to get all categories and their classifications. By default, exclude categories classified as `cc_billing` and `transfer` from expense analysis (these are internal movements, not real spending). Ask the user if they want to adjust — they may want to also exclude `investment`, `debt`, `savings`, or include categories that are normally excluded. Build `$EXCLUDE_SQL` from their choices, e.g.: `category NOT IN (SELECT name FROM categories WHERE classification IN ('cc_billing', 'transfer'))`. If the user wants no exclusions, omit this clause entirely.
+
 ## Step 1: Establish Analysis Window
 
 Ask the user:
@@ -141,9 +143,9 @@ kolshek trends $MONTHS --json
 kolshek insights --months $MONTHS --json
 ```
 
-Run top 20 largest transactions:
+Run top 20 largest transactions (apply `$EXCLUDE_SQL` from Before You Start):
 ```
-kolshek query "SELECT COALESCE(description_en, description) as merchant, ROUND(ABS(charged_amount), 2) as amount, date, category FROM transactions WHERE charged_amount < 0 AND COALESCE(category, '') != 'CC Billing' AND date >= '$FROM' ORDER BY ABS(charged_amount) DESC LIMIT 20" --json
+kolshek query "SELECT COALESCE(description_en, description) as merchant, ROUND(ABS(charged_amount), 2) as amount, date, category FROM transactions WHERE charged_amount < 0 AND $EXCLUDE_SQL AND date >= '$FROM' ORDER BY ABS(charged_amount) DESC LIMIT 20" --json
 ```
 
 Present:

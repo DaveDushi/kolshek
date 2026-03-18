@@ -3,6 +3,7 @@
 import type { Command } from "commander";
 import { parseMonthToRange } from "../date-utils.js";
 import { getIncomeReport } from "../../db/repositories/income.js";
+import { addClassificationOptions, parseClassificationFlags } from "../filter-utils.js";
 import {
   isJsonMode,
   printJson,
@@ -16,13 +17,16 @@ import {
 } from "../output.js";
 
 export function registerIncomeCommand(program: Command): void {
-  program
+  const cmd = program
     .command("income [month]")
     .description("Income breakdown with salary detection (bank accounts only by default)")
     .option("--salary-only", "Show only salary/wage transactions")
     .option("--include-refunds", "Also show CC refunds (separate section)")
-    .option("-m, --month-offset <n>", "Months ago (e.g., -m 3 for 3 months ago)", parseInt)
-    .action((month: string | undefined, opts) => {
+    .option("-m, --month-offset <n>", "Months ago (e.g., -m 3 for 3 months ago)", parseInt);
+
+  addClassificationOptions(cmd);
+
+  cmd.action((month: string | undefined, opts) => {
       if (opts.monthOffset) month = `-${opts.monthOffset}`;
       const range = parseMonthToRange(month);
 
@@ -32,11 +36,13 @@ export function registerIncomeCommand(program: Command): void {
       }
 
       try {
+        const { excludeClassifications } = parseClassificationFlags(opts);
         const result = getIncomeReport({
           from: range.from,
           to: range.to,
           salaryOnly: opts.salaryOnly,
           includeRefunds: opts.includeRefunds,
+          excludeClassifications,
         });
 
         if (isJsonMode()) {

@@ -3,6 +3,7 @@
 import type { Command } from "commander";
 import { z } from "zod";
 import type { RuleConditions, CategoryRuleInput } from "../../types/index.js";
+import { BUILTIN_CLASSIFICATIONS, isValidClassification } from "../../types/index.js";
 import {
   addCategoryRule,
   findRuleByConditions,
@@ -19,7 +20,10 @@ import {
   reassignCategoryDryRun,
   bulkReassignCategories,
   bulkReassignCategoriesDryRun,
+  setCategoryClassification,
+  getClassificationMap,
 } from "../../db/repositories/categories.js";
+import { getDatabase } from "../../db/database.js";
 import { formatConditions } from "../../core/rules.js";
 import {
   isJsonMode,
@@ -816,9 +820,10 @@ Output columns:
       }
 
       const table = createTable(
-        ["Category", "Transactions", "Total Amount", "Rules", "Source"],
+        ["Category", "Class", "Transactions", "Total Amount", "Rules", "Source"],
         categories.map((c) => [
           c.category,
+          c.classification,
           String(c.transactionCount),
           formatCurrency(c.totalAmount),
           String(c.ruleCount),
@@ -826,5 +831,152 @@ Output columns:
         ]),
       );
       console.log(table);
+    });
+
+  // --- categorize classify ---
+  const classifyCmd = catCmd
+    .command("classify")
+    .description("Manage category classifications (expense, income, cc_billing, transfer, etc.)");
+
+  classifyCmd
+    .command("set <category> <classification>")
+    .description("Set the classification for a category")
+    .addHelpText("after", `
+Built-in classifications: ${BUILTIN_CLASSIFICATIONS.join(", ")}
+You can also use custom classification names (lowercase, alphanumeric + underscores).
+
+Examples:
+  kolshek categorize classify set "CC Billing" cc_billing
+  kolshek categorize classify set "Groceries" expense
+  kolshek categorize classify set "Salary" income
+  kolshek categorize classify set "Bank Transfer" transfer
+`)
+    .action((category: string, classification: string) => {
+      if (!isValidClassification(classification)) {
+        printError("BAD_ARGS", `Invalid classification: "${classification}". Must be lowercase alphanumeric with underscores.`);
+        process.exit(ExitCode.BadArgs);
+      }
+
+      const updated = setCategoryClassification(category, classification);
+
+      if (isJsonMode()) {
+        printJson(jsonSuccess({ category, classification, updated }));
+        return;
+      }
+
+      if (updated) {
+        success(`"${category}" classified as ${classification}.`);
+      } else {
+        warn(`Category "${category}" not found.`);
+      }
+    });
+
+  classifyCmd
+    .command("list")
+    .description("Show all categories with their classifications")
+    .action(() => {
+      const categories = listCategoriesWithSource();
+
+      if (isJsonMode()) {
+        printJson(jsonSuccess({
+          categories: categories.map((c) => ({
+            category: c.category,
+            classification: c.classification,
+            transactionCount: c.transactionCount,
+            totalAmount: c.totalAmount,
+          })),
+        }));
+        return;
+      }
+
+      if (categories.length === 0) {
+        info("No categories found.");
+        return;
+      }
+
+      const table = createTable(
+        ["Category", "Classification", "Transactions", "Total Amount"],
+        categories.map((c) => [
+          c.category,
+          c.classification,
+          String(c.transactionCount),
+          formatCurrency(c.totalAmount),
+        ]),
+      );
+      console.log(table);
+    });
+
+  classifyCmd
+    .command("auto")
+    .description("Auto-classify categories based on dominant transaction direction")
+    .option("--dry-run", "Preview changes without modifying data")
+    .action((opts) => {
+      const db = getDatabase();
+      const currentMap = getClassificationMap();
+
+      // Skip categories already classified as non-default types (user has set them)
+      const skipClassifications = new Set(["cc_billing", "transfer", "investment", "debt", "savings"]);
+
+      // Get dominant direction per category
+      const rows = db.prepare(`
+        SELECT
+          COALESCE(t.category, 'Uncategorized') AS category,
+          SUM(CASE WHEN t.charged_amount > 0 THEN 1 ELSE 0 END) AS credit_count,
+          SUM(CASE WHEN t.charged_amount < 0 THEN 1 ELSE 0 END) AS debit_count,
+          SUM(t.charged_amount) AS total_amount
+        FROM transactions t
+        GROUP BY category
+      `).all() as Array<{
+        category: string;
+        credit_count: number;
+        debit_count: number;
+        total_amount: number;
+      }>;
+
+      const changes: Array<{ category: string; from: string; to: string }> = [];
+
+      for (const r of rows) {
+        const currentClass = currentMap.get(r.category) ?? "expense";
+        if (skipClassifications.has(currentClass)) continue;
+
+        const total = r.credit_count + r.debit_count;
+        if (total === 0) continue;
+
+        const creditRatio = r.credit_count / total;
+        const inferred = creditRatio > 0.8 ? "income" : "expense";
+
+        if (inferred !== currentClass) {
+          changes.push({ category: r.category, from: currentClass, to: inferred });
+        }
+      }
+
+      if (isJsonMode()) {
+        printJson(jsonSuccess({ dryRun: !!opts.dryRun, changes, count: changes.length }));
+        return;
+      }
+
+      if (changes.length === 0) {
+        info("All categories already have correct classifications.");
+        return;
+      }
+
+      if (opts.dryRun) {
+        const table = createTable(
+          ["Category", "Current", "Proposed"],
+          changes.map((c) => [c.category, c.from, c.to]),
+        );
+        console.log(table);
+        info(`\nDry run: ${changes.length} category(s) would be reclassified.`);
+        return;
+      }
+
+      for (const c of changes) {
+        setCategoryClassification(c.category, c.to);
+      }
+
+      success(`Auto-classified ${changes.length} category(s).`);
+      for (const c of changes) {
+        info(`  "${c.category}": ${c.from} → ${c.to}`);
+      }
     });
 }

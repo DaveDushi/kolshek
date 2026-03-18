@@ -4,3 +4,4 @@ export * from "./transaction.js";
 export * from "./config.js";
 export * from "./schedule.js";
 export * from "./category-rule.js";
+export * from "./classification.js";

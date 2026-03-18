@@ -1,8 +1,8 @@
 // Spending analysis queries — grouped expense breakdowns by month.
 
 import { getDatabase } from "../database.js";
-import { CC_BILLING_CATEGORY } from "../../types/transaction.js";
-import { EXCLUDE_LIFESTYLE_SQL } from "./spending-excludes.js";
+import { buildClassificationExcludeSQL } from "./categories.js";
+import { DEFAULT_SPENDING_EXCLUDES } from "../../types/index.js";
 
 export type SpendingGroupBy = "category" | "merchant" | "provider";
 
@@ -32,7 +32,7 @@ export interface SpendingOpts {
   category?: string;
   providerType?: string;
   top?: number;
-  lifestyle?: boolean;
+  excludeClassifications?: readonly string[];
 }
 
 export function getSpendingReport(opts: SpendingOpts): SpendingResult {
@@ -42,21 +42,15 @@ export function getSpendingReport(opts: SpendingOpts): SpendingResult {
     $to: opts.to,
   };
 
-  // --lifestyle uses the user-defined exclusion list (spending_excludes table).
-  // Default only excludes CC Billing (backward compatible).
-  const exclusionCondition = opts.lifestyle
-    ? EXCLUDE_LIFESTYLE_SQL
-    : "COALESCE(t.category, '') != $ccBilling";
-
-  if (!opts.lifestyle) {
-    params.$ccBilling = CC_BILLING_CATEGORY;
-  }
+  const excludeClassifications = opts.excludeClassifications ?? DEFAULT_SPENDING_EXCLUDES;
+  const { sql: excludeSQL, params: excludeParams } = buildClassificationExcludeSQL(excludeClassifications);
+  Object.assign(params, excludeParams);
 
   const conditions = [
     "t.charged_amount < 0",
     "t.date >= $from",
     "t.date <= $to",
-    exclusionCondition,
+    excludeSQL,
   ];
 
   if (opts.category) {

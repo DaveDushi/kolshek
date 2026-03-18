@@ -1,11 +1,55 @@
-/**
- * Shared CLI filter-building utilities.
- */
+// Shared CLI filter-building utilities.
 
+import type { Command } from "commander";
 import type { TransactionFilters, TransactionStatus } from "../types/index.js";
+import { isValidClassification } from "../types/index.js";
 import { resolveProviders } from "../db/repositories/providers.js";
 import { printError, ExitCode } from "./output.js";
 import { parseDateToString as parseDate } from "./date-utils.js";
+
+// Add --exclude and --include classification flags to a commander Command.
+export function addClassificationOptions(cmd: Command): Command {
+  return cmd
+    .option("--exclude <classifications>", "Comma-separated classifications to exclude (e.g., cc_billing,transfer)")
+    .option("--include <classifications>", "Only include these classifications (mutually exclusive with --exclude)");
+}
+
+// Parse --exclude / --include flags into excludeClassifications array.
+// Returns undefined if neither flag is set (let the repository use its default).
+export function parseClassificationFlags(
+  opts: Record<string, unknown>,
+): { excludeClassifications?: string[]; includeClassifications?: string[] } {
+  const result: { excludeClassifications?: string[]; includeClassifications?: string[] } = {};
+
+  if (opts.exclude && opts.include) {
+    printError("BAD_ARGS", "--exclude and --include are mutually exclusive");
+    process.exit(ExitCode.BadArgs);
+  }
+
+  if (opts.exclude) {
+    const values = String(opts.exclude).split(",").map((s) => s.trim()).filter(Boolean);
+    for (const v of values) {
+      if (!isValidClassification(v)) {
+        printError("BAD_ARGS", `Invalid classification: "${v}". Must be lowercase alphanumeric with underscores.`);
+        process.exit(ExitCode.BadArgs);
+      }
+    }
+    result.excludeClassifications = values;
+  }
+
+  if (opts.include) {
+    const values = String(opts.include).split(",").map((s) => s.trim()).filter(Boolean);
+    for (const v of values) {
+      if (!isValidClassification(v)) {
+        printError("BAD_ARGS", `Invalid classification: "${v}". Must be lowercase alphanumeric with underscores.`);
+        process.exit(ExitCode.BadArgs);
+      }
+    }
+    result.includeClassifications = values;
+  }
+
+  return result;
+}
 
 /** Build TransactionFilters from CLI options */
 export function buildFilters(opts: Record<string, unknown>): TransactionFilters {
