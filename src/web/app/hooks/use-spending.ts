@@ -7,14 +7,18 @@ import type { SpendingItem, SpendingResult } from "@/types/api";
 export function useSpending(
   month: string,
   groupBy: string,
-  lifestyle?: boolean
+  lifestyle?: boolean,
+  exclude?: string[],
 ) {
   return useQuery({
-    queryKey: queryKeys.spending.report(month, groupBy),
+    queryKey: queryKeys.spending.report(month, groupBy, exclude),
     queryFn: async (): Promise<SpendingItem[]> => {
       const params = new URLSearchParams({ month, groupBy });
       if (lifestyle !== undefined) {
         params.set("lifestyle", String(lifestyle));
+      }
+      if (exclude) {
+        params.set("exclude", exclude.join(","));
       }
       const result = await api.get<SpendingResult>(`/api/v2/spending?${params.toString()}`);
       // Transform backend shape to frontend SpendingItem[]

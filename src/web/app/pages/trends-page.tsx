@@ -7,10 +7,12 @@ import {
   useFixedVariable,
 } from "@/hooks/use-trends";
 import { useCategoryList } from "@/hooks/use-categories";
-import { formatCurrency, formatMonth } from "@/lib/format";
+import { formatMonth } from "@/lib/format";
+import { REPORT_DEFAULT_EXCLUDES } from "@/lib/classification";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
+import { ClassificationFilter } from "@/components/shared/classification-filter";
 import { CashflowTrend } from "@/components/trends/cashflow-trend";
 import { CategoryTrend as CategoryTrendChart } from "@/components/trends/category-trend";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +41,7 @@ type Period = "3" | "6" | "12";
 export function TrendsPage() {
   const [months, setMonths] = useState<Period>("6");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [excluded, setExcluded] = useState<string[]>([...REPORT_DEFAULT_EXCLUDES]);
 
   const monthsNum = Number(months);
 
@@ -61,6 +64,13 @@ export function TrendsPage() {
         </div>
       </PageHeader>
 
+      {/* Classification filter */}
+      <ClassificationFilter
+        excluded={excluded}
+        onChange={setExcluded}
+        defaults={REPORT_DEFAULT_EXCLUDES}
+      />
+
       <Tabs defaultValue="cashflow">
         <TabsList>
           <TabsTrigger value="cashflow">Cashflow</TabsTrigger>
@@ -69,19 +79,20 @@ export function TrendsPage() {
         </TabsList>
 
         <TabsContent value="cashflow">
-          <CashflowTab months={monthsNum} />
+          <CashflowTab months={monthsNum} exclude={excluded} />
         </TabsContent>
 
         <TabsContent value="category">
           <CategoryTab
             months={monthsNum}
+            exclude={excluded}
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
           />
         </TabsContent>
 
         <TabsContent value="fixed-variable">
-          <FixedVariableTab months={monthsNum} />
+          <FixedVariableTab months={monthsNum} exclude={excluded} />
         </TabsContent>
       </Tabs>
     </div>
@@ -90,8 +101,8 @@ export function TrendsPage() {
 
 // -- Cashflow Tab --
 
-function CashflowTab({ months }: { months: number }) {
-  const { data, isLoading } = useTotalTrends(months);
+function CashflowTab({ months, exclude }: { months: number; exclude: string[] }) {
+  const { data, isLoading } = useTotalTrends(months, exclude);
 
   if (isLoading) {
     return (
@@ -185,15 +196,17 @@ function CashflowTab({ months }: { months: number }) {
 
 function CategoryTab({
   months,
+  exclude,
   selectedCategory,
   onCategoryChange,
 }: {
   months: number;
+  exclude: string[];
   selectedCategory: string;
   onCategoryChange: (cat: string) => void;
 }) {
   const { data: categories } = useCategoryList();
-  const { data: trend, isLoading } = useCategoryTrend(selectedCategory, months);
+  const { data: trend, isLoading } = useCategoryTrend(selectedCategory, months, exclude);
 
   return (
     <div className="space-y-4">
@@ -253,8 +266,8 @@ function CategoryTab({
 
 // -- Fixed vs Variable Tab --
 
-function FixedVariableTab({ months }: { months: number }) {
-  const { data, isLoading } = useFixedVariable(months);
+function FixedVariableTab({ months, exclude }: { months: number; exclude: string[] }) {
+  const { data, isLoading } = useFixedVariable(months, exclude);
 
   if (isLoading) {
     return (

@@ -36,7 +36,8 @@ export const queryKeys = {
   },
   spending: {
     all: ["spending"] as const,
-    report: (month: string, groupBy: string) => [...queryKeys.spending.all, "report", month, groupBy] as const,
+    report: (month: string, groupBy: string, exclude?: string[]) =>
+      [...queryKeys.spending.all, "report", month, groupBy, exclude ?? null] as const,
   },
   income: {
     all: ["income"] as const,
@@ -44,12 +45,16 @@ export const queryKeys = {
   },
   trends: {
     all: ["trends"] as const,
-    total: (months: number) => [...queryKeys.trends.all, "total", months] as const,
-    category: (cat: string, months: number) => [...queryKeys.trends.all, "category", cat, months] as const,
-    fixedVariable: (months: number) => [...queryKeys.trends.all, "fixed-variable", months] as const,
+    total: (months: number, exclude?: string[]) =>
+      [...queryKeys.trends.all, "total", months, exclude ?? null] as const,
+    category: (cat: string, months: number, exclude?: string[]) =>
+      [...queryKeys.trends.all, "category", cat, months, exclude ?? null] as const,
+    fixedVariable: (months: number, exclude?: string[]) =>
+      [...queryKeys.trends.all, "fixed-variable", months, exclude ?? null] as const,
   },
   insights: {
     all: ["insights"] as const,
-    list: (months: number) => [...queryKeys.insights.all, "list", months] as const,
+    list: (months: number, exclude?: string[]) =>
+      [...queryKeys.insights.all, "list", months, exclude ?? null] as const,
   },
 };

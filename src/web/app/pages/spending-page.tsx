@@ -2,10 +2,12 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, ShoppingCart } from "lucide-react";
 import { useSpending } from "@/hooks/use-spending";
-import { getCurrentMonth, formatCurrency, formatMonth } from "@/lib/format";
+import { getCurrentMonth, formatMonth } from "@/lib/format";
+import { SPENDING_DEFAULT_EXCLUDES } from "@/lib/classification";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
+import { ClassificationFilter } from "@/components/shared/classification-filter";
 import { SpendingChart } from "@/components/spending/spending-chart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,9 +41,9 @@ type GroupBy = "category" | "merchant" | "provider";
 export function SpendingPage() {
   const [month, setMonth] = useState(getCurrentMonth);
   const [groupBy, setGroupBy] = useState<GroupBy>("category");
-  const [lifestyle, setLifestyle] = useState(false);
+  const [excluded, setExcluded] = useState<string[]>([...SPENDING_DEFAULT_EXCLUDES]);
 
-  const { data: items, isLoading } = useSpending(month, groupBy, lifestyle);
+  const { data: items, isLoading } = useSpending(month, groupBy, undefined, excluded);
 
   const totalAmount = items?.reduce((sum, i) => sum + i.amount, 0) ?? 0;
   const totalCount = items?.reduce((sum, i) => sum + i.count, 0) ?? 0;
@@ -93,20 +95,14 @@ export function SpendingPage() {
           </Select>
         </div>
 
-        {/* Lifestyle toggle */}
-        <div className="flex items-center gap-2 pb-0.5">
-          <input
-            type="checkbox"
-            id="lifestyle-toggle"
-            checked={lifestyle}
-            onChange={(e) => setLifestyle(e.target.checked)}
-            className="h-4 w-4 rounded border-input"
-          />
-          <Label htmlFor="lifestyle-toggle" className="text-sm cursor-pointer">
-            Lifestyle only
-          </Label>
-        </div>
       </div>
+
+      {/* Classification filter */}
+      <ClassificationFilter
+        excluded={excluded}
+        onChange={setExcluded}
+        defaults={SPENDING_DEFAULT_EXCLUDES}
+      />
 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-2">

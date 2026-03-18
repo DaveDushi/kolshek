@@ -164,6 +164,29 @@ async function parseJsonBody(req: Request): Promise<Record<string, unknown>> {
   }
 }
 
+// Parse ?exclude= and ?include= query params for classification filtering.
+// Falls back to endpoint-specific defaults when neither is provided.
+function parseClassificationParams(
+  url: URL,
+  defaultExclusions: readonly string[],
+): readonly string[] {
+  const excludeParam = url.searchParams.get("exclude");
+  const includeParam = url.searchParams.get("include");
+
+  if (excludeParam !== null) {
+    if (excludeParam === "") return [];
+    return excludeParam.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+
+  if (includeParam !== null) {
+    if (includeParam === "") return defaultExclusions;
+    const included = new Set(includeParam.split(",").map((s) => s.trim()).filter(Boolean));
+    return BUILTIN_CLASSIFICATIONS.filter((c) => !included.has(c));
+  }
+
+  return defaultExclusions;
+}
+
 export function startDashboard(port: number) {
   const server = Bun.serve({
     port,
@@ -425,7 +448,8 @@ export function startDashboard(port: number) {
           try {
             const from = url.searchParams.get("from") ?? undefined;
             const to = url.searchParams.get("to") ?? undefined;
-            return json(getMonthlyReport({ from, to }, undefined, DEFAULT_REPORT_EXCLUDES));
+            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
+            return json(getMonthlyReport({ from, to }, undefined, excl));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("MONTHLY_REPORT_FAILED", msg, 500);
@@ -437,7 +461,8 @@ export function startDashboard(port: number) {
           try {
             const from = url.searchParams.get("from") ?? undefined;
             const to = url.searchParams.get("to") ?? undefined;
-            return json(getCategoryReport({ from, to }, undefined, DEFAULT_REPORT_EXCLUDES));
+            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
+            return json(getCategoryReport({ from, to }, undefined, excl));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("CATEGORY_REPORT_FAILED", msg, 500);
@@ -447,7 +472,8 @@ export function startDashboard(port: number) {
         // GET /api/v2/reports/balance
         if (method === "GET" && path === "/api/v2/reports/balance") {
           try {
-            return json(getBalanceReport(DEFAULT_REPORT_EXCLUDES));
+            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
+            return json(getBalanceReport(excl));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("BALANCE_REPORT_FAILED", msg, 500);
@@ -456,7 +482,7 @@ export function startDashboard(port: number) {
 
         // --- Spending v2 ---
 
-        // GET /api/v2/spending?month=&groupBy=&lifestyle=
+        // GET /api/v2/spending?month=&groupBy=&exclude=
         if (method === "GET" && path === "/api/v2/spending") {
           try {
             const sp = url.searchParams;
@@ -468,7 +494,8 @@ export function startDashboard(port: number) {
             const lastDay = new Date(year, mon, 0).getDate();
             const to = `${month}-${String(lastDay).padStart(2, "0")}`;
 
-            return json(getSpendingReport({ from, to, groupBy, excludeClassifications: DEFAULT_SPENDING_EXCLUDES }));
+            const excl = parseClassificationParams(url, DEFAULT_SPENDING_EXCLUDES);
+            return json(getSpendingReport({ from, to, groupBy, excludeClassifications: excl }));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("SPENDING_REPORT_FAILED", msg, 500);
@@ -487,7 +514,8 @@ export function startDashboard(port: number) {
             const lastDay = new Date(year, mon, 0).getDate();
             const to = `${month}-${String(lastDay).padStart(2, "0")}`;
 
-            return json(getIncomeReport({ from, to, excludeClassifications: DEFAULT_INCOME_EXCLUDES }));
+            const excl = parseClassificationParams(url, DEFAULT_INCOME_EXCLUDES);
+            return json(getIncomeReport({ from, to, excludeClassifications: excl }));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("INCOME_REPORT_FAILED", msg, 500);
@@ -504,7 +532,8 @@ export function startDashboard(port: number) {
             const from = new Date(now.getFullYear(), now.getMonth() - months, 1)
               .toISOString()
               .slice(0, 10);
-            return json(getTotalTrends({ from }, undefined, DEFAULT_REPORT_EXCLUDES));
+            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
+            return json(getTotalTrends({ from }, undefined, excl));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("TRENDS_TOTAL_FAILED", msg, 500);
@@ -521,7 +550,8 @@ export function startDashboard(port: number) {
             const from = new Date(now.getFullYear(), now.getMonth() - months, 1)
               .toISOString()
               .slice(0, 10);
-            return json(getCategoryTrends({ from }, category, undefined, DEFAULT_REPORT_EXCLUDES));
+            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
+            return json(getCategoryTrends({ from }, category, undefined, excl));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("TRENDS_CATEGORY_FAILED", msg, 500);
@@ -536,7 +566,8 @@ export function startDashboard(port: number) {
             const from = new Date(now.getFullYear(), now.getMonth() - months, 1)
               .toISOString()
               .slice(0, 10);
-            return json(getFixedVariableTrends({ from }, undefined, DEFAULT_REPORT_EXCLUDES));
+            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
+            return json(getFixedVariableTrends({ from }, undefined, excl));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("TRENDS_FIXED_VAR_FAILED", msg, 500);
@@ -555,7 +586,8 @@ export function startDashboard(port: number) {
               .toISOString()
               .slice(0, 10);
 
-            const opts = { from, currentMonthStart };
+            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
+            const opts = { from, currentMonthStart, excludeClassifications: excl };
 
             // Fetch raw data from repositories
             const categoryByMonth = getCategoryByMonth(opts);
