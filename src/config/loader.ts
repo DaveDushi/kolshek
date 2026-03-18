@@ -27,6 +27,7 @@ export async function ensureDirectories(): Promise<void> {
   await Promise.all([
     mkdir(paths.config, { recursive: true, mode }),
     mkdir(paths.data, { recursive: true, mode }),
+    mkdir(paths.cache, { recursive: true, mode }),
   ]);
   // On Windows, chmod is a no-op — use icacls to restrict directory access
   restrictPathToOwner(paths.config);

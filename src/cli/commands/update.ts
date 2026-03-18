@@ -44,7 +44,7 @@ function getBinaryName(): string | null {
   return null;
 }
 
-async function fetchLatestRelease(): Promise<GithubRelease> {
+export async function fetchLatestRelease(): Promise<GithubRelease> {
   const res = await fetch(API_URL, {
     headers: { Accept: "application/vnd.github+json" },
   });
@@ -54,11 +54,11 @@ async function fetchLatestRelease(): Promise<GithubRelease> {
   return res.json() as Promise<GithubRelease>;
 }
 
-function parseVersion(tag: string): string {
+export function parseVersion(tag: string): string {
   return tag.replace(/^v/, "");
 }
 
-function isNewer(latest: string, current: string): boolean {
+export function isNewer(latest: string, current: string): boolean {
   const l = latest.split(".").map(Number);
   const c = current.split(".").map(Number);
   for (let i = 0; i < 3; i++) {
