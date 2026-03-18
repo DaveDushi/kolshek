@@ -259,7 +259,11 @@ export function SyncPanel({
         {isDone && (
           <div className="pt-4 border-t space-y-3">
             <div className="text-sm text-center">
-              {totals.added === 0 && totals.updated === 0 ? (
+              {hasErrors ? (
+                <span className="text-destructive">
+                  Some providers failed to sync
+                </span>
+              ) : totals.added === 0 && totals.updated === 0 ? (
                 <span className="text-muted-foreground">
                   Everything is up to date
                 </span>
