@@ -178,8 +178,7 @@ export function Sidebar() {
             onClick={() => navigate("/")}
             className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
           >
-            <img src="/logo.png" alt="KolShek" className="h-7 w-7 rounded-md" />
-            <span className="brand-text text-[15px]">KolShek</span>
+            <img src="/logo.png" alt="KolShek" className="h-10 w-10 rounded-md" />
           </button>
         </div>
 
