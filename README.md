@@ -211,6 +211,10 @@ bun test                   # Run tests
 bun run typecheck          # Type check
 ```
 
+## Disclaimer
+
+KolShek stores your bank credentials and financial data locally on your machine. By using this tool, you accept responsibility for securing your device and reviewing the code you run. This is an open-source project maintained by volunteers — it comes with no warranty, and is not affiliated with any financial institution. Use at your own risk.
+
 ## License
 
 [MIT](LICENSE)
