@@ -1,9 +1,8 @@
-/**
- * Aggregate SQL queries for financial reports.
- */
+// Aggregate SQL queries for financial reports.
 
 import { getDatabase } from "../database.js";
-import { CC_BILLING_CATEGORY } from "../../types/transaction.js";
+import { buildClassificationExcludeSQL } from "./categories.js";
+import { DEFAULT_REPORT_EXCLUDES } from "../../types/index.js";
 
 export interface DateRange {
   from?: string;
@@ -12,7 +11,7 @@ export interface DateRange {
 
 type SqlParams = Record<string, string | number | null>;
 
-/** Build WHERE conditions for date range and optional provider type filter */
+// Build WHERE conditions for date range and optional provider type filter
 function buildDateConditions(
   range: DateRange,
   providerType?: string,
@@ -47,9 +46,7 @@ function whereClause(conditions: string[]): string {
 export interface MonthlyRow {
   month: string;
   income: number;
-  bankExpenses: number;
-  ccExpenses: number;
-  ccCharge: number;
+  expenses: number;
   net: number;
   transactionCount: number;
 }
@@ -57,25 +54,26 @@ export interface MonthlyRow {
 export function getMonthlyReport(
   range: DateRange,
   providerType?: string,
+  excludeClassifications?: readonly string[],
 ): MonthlyRow[] {
   const db = getDatabase();
   const { conditions, params } = buildDateConditions(range, providerType);
-  params.$ccBilling = CC_BILLING_CATEGORY;
+
+  const excl = excludeClassifications ?? DEFAULT_REPORT_EXCLUDES;
+  const { sql: excludeSQL, params: excludeParams } = buildClassificationExcludeSQL(excl);
+  Object.assign(params, excludeParams);
+
+  // Add the classification exclude as a condition
+  conditions.push(excludeSQL);
 
   const sql = `
     SELECT
       strftime('%Y-%m', t.date) AS month,
       SUM(CASE WHEN t.charged_amount > 0 THEN t.charged_amount ELSE 0 END) AS income,
-      SUM(CASE WHEN t.charged_amount < 0 AND p.type = 'bank'
-                AND COALESCE(t.category, '') != $ccBilling
-           THEN ABS(t.charged_amount) ELSE 0 END) AS bank_expenses,
-      SUM(CASE WHEN t.charged_amount < 0 AND p.type = 'credit_card'
-           THEN ABS(t.charged_amount) ELSE 0 END) AS cc_expenses,
-      SUM(CASE WHEN t.category = $ccBilling
-           THEN ABS(t.charged_amount) ELSE 0 END) AS cc_charge,
-      SUM(CASE WHEN COALESCE(t.category, '') != $ccBilling
-           THEN t.charged_amount ELSE 0 END) AS net,
-      COUNT(CASE WHEN COALESCE(t.category, '') != $ccBilling THEN 1 END) AS transaction_count
+      SUM(CASE WHEN t.charged_amount < 0
+           THEN ABS(t.charged_amount) ELSE 0 END) AS expenses,
+      SUM(t.charged_amount) AS net,
+      COUNT(*) AS transaction_count
     FROM transactions t
     JOIN accounts a ON t.account_id = a.id
     JOIN providers p ON a.provider_id = p.id
@@ -87,9 +85,7 @@ export function getMonthlyReport(
   const rows = db.prepare(sql).all(params) as Array<{
     month: string;
     income: number;
-    bank_expenses: number;
-    cc_expenses: number;
-    cc_charge: number;
+    expenses: number;
     net: number;
     transaction_count: number;
   }>;
@@ -97,9 +93,7 @@ export function getMonthlyReport(
   return rows.map((r) => ({
     month: r.month,
     income: r.income,
-    bankExpenses: r.bank_expenses,
-    ccExpenses: r.cc_expenses,
-    ccCharge: r.cc_charge,
+    expenses: r.expenses,
     net: r.net,
     transactionCount: r.transaction_count,
   }));
@@ -119,14 +113,18 @@ export interface CategoryRow {
 export function getCategoryReport(
   range: DateRange,
   providerType?: string,
+  excludeClassifications?: readonly string[],
 ): CategoryRow[] {
   const db = getDatabase();
   const { conditions, params } = buildDateConditions(range, providerType);
-  params.$ccBilling = CC_BILLING_CATEGORY;
 
-  // Expenses only, excluding CC billing (internal transfers)
+  const excl = excludeClassifications ?? DEFAULT_REPORT_EXCLUDES;
+  const { sql: excludeSQL, params: excludeParams } = buildClassificationExcludeSQL(excl);
+  Object.assign(params, excludeParams);
+
+  // Expenses only, excluding by classification
   conditions.push("t.charged_amount < 0");
-  conditions.push("COALESCE(t.category, '') != $ccBilling");
+  conditions.push(excludeSQL);
 
   const sql = `
     SELECT
@@ -173,14 +171,18 @@ export function getMerchantReport(
   range: DateRange,
   limit: number = 20,
   providerType?: string,
+  excludeClassifications?: readonly string[],
 ): MerchantRow[] {
   const db = getDatabase();
   const { conditions, params } = buildDateConditions(range, providerType);
-  params.$ccBilling = CC_BILLING_CATEGORY;
 
-  // Expenses only, excluding CC billing (internal transfers)
+  const excl = excludeClassifications ?? DEFAULT_REPORT_EXCLUDES;
+  const { sql: excludeSQL, params: excludeParams } = buildClassificationExcludeSQL(excl);
+  Object.assign(params, excludeParams);
+
+  // Expenses only, excluding by classification
   conditions.push("t.charged_amount < 0");
-  conditions.push("COALESCE(t.category, '') != $ccBilling");
+  conditions.push(excludeSQL);
 
   params.$limit = limit;
 
@@ -230,8 +232,19 @@ export interface BalanceRow {
   recentIncome30d: number;
 }
 
-export function getBalanceReport(): BalanceRow[] {
+export function getBalanceReport(
+  excludeClassifications?: readonly string[],
+): BalanceRow[] {
   const db = getDatabase();
+  const excl = excludeClassifications ?? DEFAULT_REPORT_EXCLUDES;
+  const { sql: excludeSQL, params: excludeParams } = buildClassificationExcludeSQL(excl, "t2");
+
+  // Remap params for the subquery context (avoid collision)
+  const excludeParams3: Record<string, string> = {};
+  const excludeSQL3 = excludeSQL.replace(/\$excl_/g, "$excl3_");
+  for (const [k, v] of Object.entries(excludeParams)) {
+    excludeParams3[k.replace("$excl_", "$excl3_")] = v;
+  }
 
   const sql = `
     SELECT
@@ -247,7 +260,7 @@ export function getBalanceReport(): BalanceRow[] {
          FROM transactions t2
          WHERE t2.account_id = a.id
            AND t2.charged_amount < 0
-           AND COALESCE(t2.category, '') != 'CC Billing'
+           AND ${excludeSQL}
            AND t2.date >= date('now', '-30 days')),
         0
       ) AS recent_expenses_30d,
@@ -256,6 +269,7 @@ export function getBalanceReport(): BalanceRow[] {
          FROM transactions t3
          WHERE t3.account_id = a.id
            AND t3.charged_amount > 0
+           AND ${excludeSQL3}
            AND t3.date >= date('now', '-30 days')),
         0
       ) AS recent_income_30d
@@ -264,7 +278,7 @@ export function getBalanceReport(): BalanceRow[] {
     ORDER BY p.type, p.display_name, a.account_number
   `;
 
-  const rows = db.prepare(sql).all() as Array<{
+  const rows = db.prepare(sql).all({ ...excludeParams, ...excludeParams3 }) as Array<{
     provider: string;
     provider_alias: string;
     provider_type: string;

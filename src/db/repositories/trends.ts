@@ -1,7 +1,8 @@
 // Trends queries — multi-month cashflow analysis.
 
 import { getDatabase } from "../database.js";
-import { CC_BILLING_CATEGORY } from "../../types/transaction.js";
+import { buildClassificationExcludeSQL } from "./categories.js";
+import { DEFAULT_REPORT_EXCLUDES } from "../../types/index.js";
 import { getMonthlyReport, type MonthlyRow, type DateRange } from "./reports.js";
 
 // --- Total mode ---
@@ -11,20 +12,22 @@ export interface TrendTotal extends MonthlyRow {
   incomeChange: number | null;
 }
 
-export function getTotalTrends(range: DateRange, providerType?: string): TrendTotal[] {
-  const months = getMonthlyReport(range, providerType);
+export function getTotalTrends(
+  range: DateRange,
+  providerType?: string,
+  excludeClassifications?: readonly string[],
+): TrendTotal[] {
+  const months = getMonthlyReport(range, providerType, excludeClassifications);
   // months come DESC — reverse for chronological MoM calc, then reverse back
   const chrono = [...months].reverse();
 
   return chrono.map((m, i): TrendTotal => {
     const prev = i > 0 ? chrono[i - 1] : null;
-    const totalExpenses = m.bankExpenses + m.ccExpenses;
-    const prevExpenses = prev ? prev.bankExpenses + prev.ccExpenses : null;
 
     return {
       ...m,
-      expenseChange: prevExpenses != null && prevExpenses > 0
-        ? Math.round(((totalExpenses - prevExpenses) / prevExpenses) * 10000) / 100
+      expenseChange: prev != null && prev.expenses > 0
+        ? Math.round(((m.expenses - prev.expenses) / prev.expenses) * 10000) / 100
         : null,
       incomeChange: prev != null && prev.income > 0
         ? Math.round(((m.income - prev.income) / prev.income) * 10000) / 100
@@ -46,15 +49,19 @@ export function getCategoryTrends(
   range: DateRange,
   category: string,
   providerType?: string,
+  excludeClassifications?: readonly string[],
 ): CategoryTrend[] {
   const db = getDatabase();
+  const excl = excludeClassifications ?? DEFAULT_REPORT_EXCLUDES;
+  const { sql: excludeSQL, params: excludeParams } = buildClassificationExcludeSQL(excl);
+
   const params: Record<string, string | number> = {
-    $ccBilling: CC_BILLING_CATEGORY,
+    ...excludeParams,
     $category: category,
   };
   const conditions = [
     "t.charged_amount < 0",
-    "COALESCE(t.category, '') != $ccBilling",
+    excludeSQL,
     "COALESCE(t.category, 'Uncategorized') = $category",
   ];
 
@@ -104,12 +111,19 @@ export interface FixedVariableMonth {
   fixedMerchants: number;
 }
 
-export function getFixedVariableTrends(range: DateRange, providerType?: string): FixedVariableMonth[] {
+export function getFixedVariableTrends(
+  range: DateRange,
+  providerType?: string,
+  excludeClassifications?: readonly string[],
+): FixedVariableMonth[] {
   const db = getDatabase();
-  const params: Record<string, string | number> = { $ccBilling: CC_BILLING_CATEGORY };
+  const excl = excludeClassifications ?? DEFAULT_REPORT_EXCLUDES;
+  const { sql: excludeSQL, params: excludeParams } = buildClassificationExcludeSQL(excl);
+
+  const params: Record<string, string | number> = { ...excludeParams };
   const conditions = [
     "t.charged_amount < 0",
-    "COALESCE(t.category, '') != $ccBilling",
+    excludeSQL,
   ];
 
   if (range.from) { conditions.push("t.date >= $from"); params.$from = range.from; }

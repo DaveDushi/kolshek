@@ -1,7 +1,8 @@
 // Income queries — bank income + optional CC refunds.
 
 import { getDatabase } from "../database.js";
-import { CC_BILLING_CATEGORY } from "../../types/transaction.js";
+import { buildClassificationExcludeSQL } from "./categories.js";
+import { DEFAULT_INCOME_EXCLUDES } from "../../types/index.js";
 import { classifyIncome, type IncomeType } from "../../core/income.js";
 
 export interface IncomeTransaction {
@@ -30,11 +31,12 @@ export interface IncomeResult {
   summary: IncomeSummary;
 }
 
-interface IncomeOpts {
+export interface IncomeOpts {
   from: string;
   to: string;
   salaryOnly?: boolean;
   includeRefunds?: boolean;
+  excludeClassifications?: readonly string[];
 }
 
 export function getIncomeReport(opts: IncomeOpts): IncomeResult {
@@ -42,14 +44,17 @@ export function getIncomeReport(opts: IncomeOpts): IncomeResult {
   const params: Record<string, string | number> = {
     $from: opts.from,
     $to: opts.to,
-    $ccBilling: CC_BILLING_CATEGORY,
   };
+
+  const excludeClassifications = opts.excludeClassifications ?? DEFAULT_INCOME_EXCLUDES;
+  const { sql: excludeSQL, params: excludeParams } = buildClassificationExcludeSQL(excludeClassifications);
+  Object.assign(params, excludeParams);
 
   const conditions = [
     "t.charged_amount > 0",
     "t.date >= $from",
     "t.date <= $to",
-    "COALESCE(t.category, '') != $ccBilling",
+    excludeSQL,
   ];
 
   // Default: bank only. With --include-refunds: all providers

@@ -1,6 +1,4 @@
-/**
- * kolshek reports — Preset financial analysis for AI agents.
- */
+// kolshek reports — Preset financial analysis for AI agents.
 
 import type { Command } from "commander";
 import { subDays } from "date-fns";
@@ -12,6 +10,7 @@ import {
   getBalanceReport,
 } from "../../db/repositories/reports.js";
 import type { DateRange } from "../../db/repositories/reports.js";
+import { addClassificationOptions, parseClassificationFlags } from "../filter-utils.js";
 import {
   isJsonMode,
   printJson,
@@ -23,7 +22,7 @@ import {
   ExitCode,
 } from "../output.js";
 
-/** Parse --from/--to opts into a DateRange, defaulting to last 90 days */
+// Parse --from/--to opts into a DateRange, defaulting to last 90 days
 function buildDateRange(opts: Record<string, unknown>): DateRange {
   const range: DateRange = {};
 
@@ -58,176 +57,188 @@ export function registerReportsCommand(program: Command): void {
     .description("Financial analysis reports");
 
   // --- reports monthly ---
-  reportsCmd
+  const monthlyCmd = reportsCmd
     .command("monthly")
     .description("Monthly income/expenses/net breakdown")
     .option("--from <date>", "Start date")
     .option("--to <date>", "End date")
-    .option("--type <type>", "Filter by provider type (bank|credit_card)")
-    .action((opts) => {
-      const range = buildDateRange(opts);
-      const months = getMonthlyReport(range, opts.type);
+    .option("--type <type>", "Filter by provider type (bank|credit_card)");
 
-      const totals = months.reduce(
-        (acc, m) => ({
-          income: acc.income + m.income,
-          bankExpenses: acc.bankExpenses + m.bankExpenses,
-          ccExpenses: acc.ccExpenses + m.ccExpenses,
-          ccCharge: acc.ccCharge + m.ccCharge,
-          net: acc.net + m.net,
-        }),
-        { income: 0, bankExpenses: 0, ccExpenses: 0, ccCharge: 0, net: 0 },
-      );
+  addClassificationOptions(monthlyCmd);
 
-      if (isJsonMode()) {
-        printJson(jsonSuccess({ months, totals, range }));
-        return;
-      }
+  monthlyCmd.action((opts) => {
+    const range = buildDateRange(opts);
+    const { excludeClassifications } = parseClassificationFlags(opts);
+    const months = getMonthlyReport(range, opts.type, excludeClassifications);
 
-      if (months.length === 0) {
-        info("No transactions in the selected range.");
-        return;
-      }
+    const totals = months.reduce(
+      (acc, m) => ({
+        income: acc.income + m.income,
+        expenses: acc.expenses + m.expenses,
+        net: acc.net + m.net,
+      }),
+      { income: 0, expenses: 0, net: 0 },
+    );
 
-      const table = createTable(
-        ["Month", "Income", "Bank Exp.", "CC Exp.", "CC Charge", "Net", "Txns"],
-        months.map((m) => [
-          m.month,
-          formatCurrency(m.income),
-          formatCurrency(-m.bankExpenses),
-          formatCurrency(-m.ccExpenses),
-          formatCurrency(-m.ccCharge),
-          formatCurrency(m.net),
-          String(m.transactionCount),
-        ]),
-      );
-      console.log(table);
-      info(
-        `\nTotals — Income: ${formatCurrency(totals.income)}, Bank Exp: ${formatCurrency(-totals.bankExpenses)}, CC Exp: ${formatCurrency(-totals.ccExpenses)}, CC Charge: ${formatCurrency(-totals.ccCharge)}, Net: ${formatCurrency(totals.net)}`,
-      );
-    });
+    if (isJsonMode()) {
+      printJson(jsonSuccess({ months, totals, range }));
+      return;
+    }
+
+    if (months.length === 0) {
+      info("No transactions in the selected range.");
+      return;
+    }
+
+    const table = createTable(
+      ["Month", "Income", "Expenses", "Net", "Txns"],
+      months.map((m) => [
+        m.month,
+        formatCurrency(m.income),
+        formatCurrency(-m.expenses),
+        formatCurrency(m.net),
+        String(m.transactionCount),
+      ]),
+    );
+    console.log(table);
+    info(
+      `\nTotals — Income: ${formatCurrency(totals.income)}, Expenses: ${formatCurrency(-totals.expenses)}, Net: ${formatCurrency(totals.net)}`,
+    );
+  });
 
   // --- reports categories ---
-  reportsCmd
+  const categoriesCmd = reportsCmd
     .command("categories")
     .description("Expense breakdown by category")
     .option("--from <date>", "Start date")
     .option("--to <date>", "End date")
-    .option("--type <type>", "Filter by provider type (bank|credit_card)")
-    .action((opts) => {
-      const range = buildDateRange(opts);
-      const categories = getCategoryReport(range, opts.type);
-      const totalSpend = categories.reduce(
-        (sum, c) => sum + c.totalAmount,
-        0,
-      );
+    .option("--type <type>", "Filter by provider type (bank|credit_card)");
 
-      if (isJsonMode()) {
-        printJson(jsonSuccess({ categories, totalSpend, range }));
-        return;
-      }
+  addClassificationOptions(categoriesCmd);
 
-      if (categories.length === 0) {
-        info("No expenses in the selected range.");
-        return;
-      }
+  categoriesCmd.action((opts) => {
+    const range = buildDateRange(opts);
+    const { excludeClassifications } = parseClassificationFlags(opts);
+    const categories = getCategoryReport(range, opts.type, excludeClassifications);
+    const totalSpend = categories.reduce(
+      (sum, c) => sum + c.totalAmount,
+      0,
+    );
 
-      const table = createTable(
-        ["Category", "Amount", "Transactions", "%"],
-        categories.map((c) => [
-          c.category,
-          formatCurrency(-c.totalAmount),
-          String(c.transactionCount),
-          `${c.percentage}%`,
-        ]),
-      );
-      console.log(table);
-      info(`\nTotal spend: ${formatCurrency(-totalSpend)}`);
-    });
+    if (isJsonMode()) {
+      printJson(jsonSuccess({ categories, totalSpend, range }));
+      return;
+    }
+
+    if (categories.length === 0) {
+      info("No expenses in the selected range.");
+      return;
+    }
+
+    const table = createTable(
+      ["Category", "Amount", "Transactions", "%"],
+      categories.map((c) => [
+        c.category,
+        formatCurrency(-c.totalAmount),
+        String(c.transactionCount),
+        `${c.percentage}%`,
+      ]),
+    );
+    console.log(table);
+    info(`\nTotal spend: ${formatCurrency(-totalSpend)}`);
+  });
 
   // --- reports merchants ---
-  reportsCmd
+  const merchantsCmd = reportsCmd
     .command("merchants")
     .description("Top merchants by spend")
     .option("--from <date>", "Start date")
     .option("--to <date>", "End date")
     .option("--type <type>", "Filter by provider type (bank|credit_card)")
-    .option("--limit <n>", "Number of merchants to show", parseInt, 20)
-    .action((opts) => {
-      const range = buildDateRange(opts);
-      const limit = opts.limit ?? 20;
-      const merchants = getMerchantReport(range, limit, opts.type);
+    .option("--limit <n>", "Number of merchants to show", parseInt, 20);
 
-      if (isJsonMode()) {
-        printJson(jsonSuccess({ merchants, range, limit }));
-        return;
-      }
+  addClassificationOptions(merchantsCmd);
 
-      if (merchants.length === 0) {
-        info("No expenses in the selected range.");
-        return;
-      }
+  merchantsCmd.action((opts) => {
+    const range = buildDateRange(opts);
+    const { excludeClassifications } = parseClassificationFlags(opts);
+    const limit = opts.limit ?? 20;
+    const merchants = getMerchantReport(range, limit, opts.type, excludeClassifications);
 
-      const table = createTable(
-        ["Merchant", "Total", "Transactions", "Average"],
-        merchants.map((m) => [
-          m.merchant.length > 35
-            ? m.merchant.slice(0, 32) + "..."
-            : m.merchant,
-          formatCurrency(-m.totalAmount),
-          String(m.transactionCount),
-          formatCurrency(-m.averageAmount),
-        ]),
-      );
-      console.log(table);
-      info(`\nTop ${merchants.length} merchant(s) by spend.`);
-    });
+    if (isJsonMode()) {
+      printJson(jsonSuccess({ merchants, range, limit }));
+      return;
+    }
+
+    if (merchants.length === 0) {
+      info("No expenses in the selected range.");
+      return;
+    }
+
+    const table = createTable(
+      ["Merchant", "Total", "Transactions", "Average"],
+      merchants.map((m) => [
+        m.merchant.length > 35
+          ? m.merchant.slice(0, 32) + "..."
+          : m.merchant,
+        formatCurrency(-m.totalAmount),
+        String(m.transactionCount),
+        formatCurrency(-m.averageAmount),
+      ]),
+    );
+    console.log(table);
+    info(`\nTop ${merchants.length} merchant(s) by spend.`);
+  });
 
   // --- reports balance ---
-  reportsCmd
+  const balanceCmd = reportsCmd
     .command("balance")
-    .description("Account balances with 30-day activity summary")
-    .action(() => {
-      const accounts = getBalanceReport();
+    .description("Account balances with 30-day activity summary");
 
-      if (isJsonMode()) {
-        const totalBalance = accounts.reduce(
-          (sum, a) => sum + (a.balance ?? 0),
-          0,
-        );
-        printJson(jsonSuccess({ accounts, totalBalance }));
-        return;
-      }
+  addClassificationOptions(balanceCmd);
 
-      if (accounts.length === 0) {
-        info("No accounts found.");
-        return;
-      }
+  balanceCmd.action((opts) => {
+    const { excludeClassifications } = parseClassificationFlags(opts);
+    const accounts = getBalanceReport(excludeClassifications);
 
-      const table = createTable(
-        [
-          "Provider",
-          "Type",
-          "Account",
-          "Balance",
-          "30d Expenses",
-          "30d Income",
-        ],
-        accounts.map((a) => [
-          a.providerAlias,
-          a.providerType,
-          a.accountNumber,
-          a.balance != null ? formatCurrency(a.balance, a.currency) : "N/A",
-          formatCurrency(-a.recentExpenses30d, a.currency),
-          formatCurrency(a.recentIncome30d, a.currency),
-        ]),
-      );
-      console.log(table);
-
+    if (isJsonMode()) {
       const totalBalance = accounts.reduce(
         (sum, a) => sum + (a.balance ?? 0),
         0,
       );
-      info(`\nTotal balance: ${formatCurrency(totalBalance)}`);
-    });
+      printJson(jsonSuccess({ accounts, totalBalance }));
+      return;
+    }
+
+    if (accounts.length === 0) {
+      info("No accounts found.");
+      return;
+    }
+
+    const table = createTable(
+      [
+        "Provider",
+        "Type",
+        "Account",
+        "Balance",
+        "30d Expenses",
+        "30d Income",
+      ],
+      accounts.map((a) => [
+        a.providerAlias,
+        a.providerType,
+        a.accountNumber,
+        a.balance != null ? formatCurrency(a.balance, a.currency) : "N/A",
+        formatCurrency(-a.recentExpenses30d, a.currency),
+        formatCurrency(a.recentIncome30d, a.currency),
+      ]),
+    );
+    console.log(table);
+
+    const totalBalance = accounts.reduce(
+      (sum, a) => sum + (a.balance ?? 0),
+      0,
+    );
+    info(`\nTotal balance: ${formatCurrency(totalBalance)}`);
+  });
 }

@@ -268,6 +268,15 @@ INSERT OR IGNORE INTO categories (name)
   SELECT COALESCE(category, 'Uncategorized') FROM transactions
   UNION
   SELECT category FROM category_rules;`],
+
+  ["012_category_classification.sql", `-- Add classification column to categories.
+ALTER TABLE categories ADD COLUMN classification TEXT NOT NULL DEFAULT 'expense';
+
+-- Auto-classify known categories
+UPDATE categories SET classification = 'cc_billing' WHERE name = 'CC Billing';
+
+-- Drop the spending_excludes table (replaced by classification system)
+DROP TABLE IF EXISTS spending_excludes;`],
 ];
 
 // Run all pending SQL migrations.
