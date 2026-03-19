@@ -1,7 +1,7 @@
-// AI agent config panel — provider, model, API key, skills
+// AI agent config panel — clean, card-based settings layout
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Save, AlertTriangle, Check, X, Loader2 } from "lucide-react";
+import { AlertTriangle, Check, X, Loader2, Shield } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -19,10 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Alert } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +62,7 @@ const DEFAULT_URLS: Record<string, string> = {
   openrouter: "https://openrouter.ai/api/v1",
 };
 
-// Suggested models per provider (updated March 2026)
+// Suggested models per provider
 const PROVIDER_MODELS: Record<string, string[]> = {
   ollama: [
     "qwen3:8b", "qwen3:32b", "qwen3-coder:30b", "qwen3.5:9b",
@@ -100,26 +98,22 @@ export function ConfigPanel({
   const [apiKey, setApiKey] = useState("");
   const [saved, setSaved] = useState(false);
 
-  // Load current config
   const { data: config } = useQuery<AiConfigResponse>({
     queryKey: ["agent", "config"],
     queryFn: () => api.get("/api/v2/agent/config"),
   });
 
-  // Check Ollama status
   const { data: ollamaStatus } = useQuery<OllamaStatus>({
     queryKey: ["agent", "status"],
     queryFn: () => api.get("/api/v2/agent/status"),
     refetchInterval: open ? 10000 : false,
   });
 
-  // Load skills list
   const { data: skills } = useQuery<SkillInfo[]>({
     queryKey: ["agent", "skills"],
     queryFn: () => api.get("/api/v2/agent/skills"),
   });
 
-  // Populate form from loaded config
   useEffect(() => {
     if (config) {
       setProvider(config.provider);
@@ -128,7 +122,6 @@ export function ConfigPanel({
     }
   }, [config]);
 
-  // Save config mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
       const body: Record<string, string> = { provider, model };
@@ -152,7 +145,6 @@ export function ConfigPanel({
     setProvider(value);
     setBaseUrl(DEFAULT_URLS[value] || "");
     setApiKey("");
-    // Auto-select first suggested model for the new provider
     const models = PROVIDER_MODELS[value];
     if (models?.length) {
       setModel(models[0]);
@@ -177,163 +169,163 @@ export function ConfigPanel({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[360px] sm:w-[400px] flex flex-col">
-        <SheetHeader>
-          <SheetTitle>Agent Settings</SheetTitle>
-          <SheetDescription>Configure your AI provider and model</SheetDescription>
+      <SheetContent className="w-[380px] sm:w-[420px] flex flex-col gap-0 p-0">
+        <SheetHeader className="px-6 pt-6 pb-4">
+          <SheetTitle className="text-base">Settings</SheetTitle>
+          <SheetDescription className="text-xs">
+            Configure your AI provider and model
+          </SheetDescription>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 -mx-6 px-6">
-          <div className="space-y-5 pb-4">
-            {/* Ollama status */}
-            {provider === "ollama" && (
-              <div className="flex items-center gap-2 text-xs">
-                <span
-                  className={cn(
-                    "h-2 w-2 rounded-full",
-                    ollamaStatus?.connected ? "bg-green-500" : "bg-red-500"
-                  )}
-                />
-                <span className="text-muted-foreground">
-                  {ollamaStatus?.connected
-                    ? `Ollama connected (${ollamaStatus.models.length} model${ollamaStatus.models.length === 1 ? "" : "s"})`
-                    : "Ollama not detected"}
-                </span>
-              </div>
-            )}
+        <ScrollArea className="flex-1">
+          <div className="px-6 pb-6 space-y-6">
+            {/* --- Provider section --- */}
+            <section className="space-y-3">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                Provider
+              </p>
 
-            {/* Privacy warning for cloud providers */}
-            {isCloud && (
-              <Alert className="text-xs">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                <div className="ml-2">
-                  Your messages and query results will be sent to{" "}
-                  {PROVIDERS.find((p) => p.value === provider)?.label}.
-                  Use Ollama to keep everything local.
+              {/* Ollama status indicator */}
+              {provider === "ollama" && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 rounded-full",
+                      ollamaStatus?.connected ? "bg-green-500" : "bg-red-500"
+                    )}
+                  />
+                  <span className="text-muted-foreground">
+                    {ollamaStatus?.connected
+                      ? `Connected (${ollamaStatus.models.length} model${ollamaStatus.models.length === 1 ? "" : "s"})`
+                      : "Not detected"}
+                  </span>
                 </div>
-              </Alert>
-            )}
+              )}
 
-            {/* Provider */}
-            <div className="space-y-2">
-              <Label className="text-xs">Provider</Label>
-              <Select value={provider} onValueChange={handleProviderChange}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PROVIDERS.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              {/* Cloud privacy note */}
+              {isCloud && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-500/8 border border-amber-500/20 p-2.5 text-xs text-amber-700 dark:text-amber-400">
+                  <Shield className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    Messages will be sent to {PROVIDERS.find((p) => p.value === provider)?.label}.
+                    Use Ollama to keep data local.
+                  </span>
+                </div>
+              )}
 
-            {/* Model */}
-            <div className="space-y-2">
-              <Label className="text-xs">Model</Label>
-              {(() => {
-                // Build model list: for Ollama, merge live models with suggestions
-                const suggestions = PROVIDER_MODELS[provider] || [];
-                const liveModels = provider === "ollama" && ollamaStatus?.models?.length
-                  ? ollamaStatus.models
-                  : [];
-                // Deduplicated, live models first
-                const allModels = [...new Set([...liveModels, ...suggestions])];
-
-                return (
-                  <Select value={model} onValueChange={setModel}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a model" />
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Service</Label>
+                  <Select value={provider} onValueChange={handleProviderChange}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {liveModels.length > 0 && suggestions.length > 0 && (
-                        <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-                          Installed
-                        </p>
-                      )}
-                      {liveModels.map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {m}
+                      {PROVIDERS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>
+                          {p.label}
                         </SelectItem>
                       ))}
-                      {liveModels.length > 0 && suggestions.length > 0 && (
-                        <p className="px-2 py-1 mt-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-                          Suggested
-                        </p>
-                      )}
-                      {suggestions
-                        .filter((m) => !liveModels.includes(m))
-                        .map((m) => (
-                          <SelectItem key={m} value={m}>
-                            {m}
-                          </SelectItem>
-                        ))}
                     </SelectContent>
                   </Select>
-                );
-              })()}
-            </div>
+                </div>
 
-            {/* Base URL */}
-            <div className="space-y-2">
-              <Label className="text-xs">Base URL</Label>
-              <Input
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder={DEFAULT_URLS[provider]}
-                className="text-xs font-mono"
-              />
-            </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Model</Label>
+                  {(() => {
+                    const suggestions = PROVIDER_MODELS[provider] || [];
+                    const liveModels = provider === "ollama" && ollamaStatus?.models?.length
+                      ? ollamaStatus.models
+                      : [];
 
-            {/* API Key */}
-            {requiresKey && (
-              <div className="space-y-2">
-                <Label className="text-xs">
-                  API Key
-                  {config?.hasApiKey && (
-                    <Badge variant="secondary" className="ml-2 text-[10px]">
-                      Saved
-                    </Badge>
-                  )}
-                </Label>
-                <Input
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={config?.hasApiKey ? "Key saved in keychain" : "Enter API key"}
-                />
+                    return (
+                      <Select value={model} onValueChange={setModel}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Select a model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {liveModels.length > 0 && suggestions.length > 0 && (
+                            <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                              Installed
+                            </p>
+                          )}
+                          {liveModels.map((m) => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))}
+                          {liveModels.length > 0 && suggestions.length > 0 && (
+                            <p className="px-2 py-1 mt-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                              Suggested
+                            </p>
+                          )}
+                          {suggestions
+                            .filter((m) => !liveModels.includes(m))
+                            .map((m) => (
+                              <SelectItem key={m} value={m}>{m}</SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    );
+                  })()}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Base URL</Label>
+                  <Input
+                    value={baseUrl}
+                    onChange={(e) => setBaseUrl(e.target.value)}
+                    placeholder={DEFAULT_URLS[provider]}
+                    className="h-9 text-xs font-mono"
+                  />
+                </div>
+
+                {requiresKey && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-muted-foreground">API Key</Label>
+                      {config?.hasApiKey && (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                          Saved
+                        </Badge>
+                      )}
+                    </div>
+                    <Input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder={config?.hasApiKey ? "Key saved in keychain" : "Enter API key"}
+                      className="h-9"
+                    />
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* Save button */}
-            <Button
-              onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending || !model}
-              className="w-full"
-              size="sm"
-            >
-              {saveMutation.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-              ) : saved ? (
-                <Check className="h-3.5 w-3.5 mr-2" />
-              ) : (
-                <Save className="h-3.5 w-3.5 mr-2" />
-              )}
-              {saved ? "Saved" : "Save Settings"}
-            </Button>
+              <Button
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending || !model}
+                className="w-full h-9"
+                size="sm"
+              >
+                {saveMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                ) : saved ? (
+                  <Check className="h-3.5 w-3.5 mr-2" />
+                ) : null}
+                {saved ? "Saved" : "Save"}
+              </Button>
+            </section>
 
-            <Separator />
+            {/* --- Skills section --- */}
+            <section className="space-y-3">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                  Skills
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Domain knowledge injected into context. Disable unused skills to save tokens.
+                </p>
+              </div>
 
-            {/* Skills */}
-            <div className="space-y-2">
-              <Label className="text-xs">Skills</Label>
-              <p className="text-[11px] text-muted-foreground">
-                Domain knowledge injected into the agent's context. Disable unused skills to save tokens.
-              </p>
-              <div className="space-y-1">
+              <div className="rounded-lg border border-border overflow-hidden divide-y divide-border">
                 {skills?.map((skill) => {
                   const isActive = enabledSkills.includes(skill.name);
                   return (
@@ -341,30 +333,27 @@ export function ConfigPanel({
                       key={skill.name}
                       onClick={() => toggleSkill(skill.name)}
                       className={cn(
-                        "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors",
+                        "flex w-full items-center gap-2.5 px-3 py-2.5 text-xs transition-colors",
                         "hover:bg-accent/50",
-                        isActive
-                          ? "text-foreground"
-                          : "text-muted-foreground"
+                        isActive ? "text-foreground" : "text-muted-foreground"
                       )}
                     >
-                      <span
+                      <div
                         className={cn(
-                          "h-2 w-2 rounded-full shrink-0",
-                          isActive ? "bg-primary" : "bg-muted-foreground/30"
+                          "flex h-4 w-4 items-center justify-center rounded border shrink-0 transition-colors",
+                          isActive
+                            ? "bg-primary border-primary"
+                            : "border-border"
                         )}
-                      />
-                      <span className="flex-1 text-left">{skill.name}</span>
-                      {isActive ? (
-                        <Check className="h-3 w-3 text-primary" />
-                      ) : (
-                        <X className="h-3 w-3 text-muted-foreground/40" />
-                      )}
+                      >
+                        {isActive && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                      </div>
+                      <span className="flex-1 text-left capitalize">{skill.name}</span>
                     </button>
                   );
                 })}
               </div>
-            </div>
+            </section>
           </div>
         </ScrollArea>
       </SheetContent>

@@ -1,7 +1,6 @@
-// Chat container — message list with auto-scroll, empty state, and input
-import { useRef, useEffect } from "react";
-import { Bot, Sparkles } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+// Chat container — message list with smart scroll, centered empty state, and input
+import { useRef, useEffect, useCallback } from "react";
+import { Bot } from "lucide-react";
 import type { AgentMessage } from "@/hooks/use-agent";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
@@ -15,10 +14,10 @@ interface ChatContainerProps {
 }
 
 const SUGGESTIONS = [
-  "How much did I spend last month?",
-  "Show my top 5 expense categories",
-  "Any unusual transactions recently?",
-  "What's my savings rate?",
+  { title: "Monthly spending", prompt: "How much did I spend last month?" },
+  { title: "Top categories", prompt: "Show my top 5 expense categories" },
+  { title: "Unusual activity", prompt: "Any unusual transactions recently?" },
+  { title: "Savings rate", prompt: "What's my savings rate?" },
 ];
 
 export function ChatContainer({
@@ -28,62 +27,87 @@ export function ChatContainer({
   onSend,
   onStop,
 }: ChatContainerProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const userScrolledRef = useRef(false);
 
-  // Auto-scroll to bottom when new messages arrive or content streams
+  // Smart auto-scroll: only scroll if user hasn't scrolled up
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!userScrolledRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
+
+  const handleSend = useCallback(
+    (text: string) => {
+      userScrolledRef.current = false;
+      onSend(text);
+    },
+    [onSend]
+  );
+
+  // Detect user scrolling away from bottom
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    userScrolledRef.current = distanceFromBottom > 100;
+  }, []);
 
   const isEmpty = messages.length === 0;
 
   return (
     <div className="flex flex-1 flex-col min-h-0">
-      <ScrollArea className="flex-1">
-        <div className="max-w-3xl mx-auto px-4 py-4">
-          {isEmpty ? (
-            <div className="flex flex-col items-center justify-center py-16 space-y-6 animate-fade-in">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <Bot className="h-7 w-7" />
-              </div>
-              <div className="text-center space-y-1.5">
-                <h2 className="text-lg font-semibold text-foreground">
-                  Financial Assistant
-                </h2>
-                <p className="text-sm text-muted-foreground max-w-sm">
-                  Ask questions about your transactions, spending, and financial data.
-                  The agent queries your local database to find answers.
-                </p>
-              </div>
-
-              {/* Suggestion chips */}
-              <div className="flex flex-wrap justify-center gap-2 max-w-md">
-                {SUGGESTIONS.map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => onSend(suggestion)}
-                    disabled={disabled}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Sparkles className="h-3 w-3" />
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
+      {isEmpty ? (
+        // Empty state — flex-centered, takes all available space
+        <div className="flex-1 flex flex-col items-center justify-center px-4 animate-fade-in">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-4">
+            <Bot className="h-6 w-6" />
+          </div>
+          <h2 className="text-base font-medium text-foreground mb-1">
+            Financial Assistant
+          </h2>
+          <p className="text-sm text-muted-foreground text-center max-w-xs mb-6">
+            Ask questions about your transactions and spending.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-md">
+            {SUGGESTIONS.map((s) => (
+              <button
+                key={s.prompt}
+                onClick={() => handleSend(s.prompt)}
+                disabled={disabled}
+                className="rounded-xl border border-border bg-card hover:bg-accent/50 p-3.5 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="block text-[13px] font-medium text-foreground">
+                  {s.title}
+                </span>
+                <span className="block text-xs text-muted-foreground mt-0.5">
+                  {s.prompt}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        // Scrollable message area — native overflow for reliable height behavior
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto"
+        >
+          <div className="max-w-3xl mx-auto px-4 md:px-6 py-6">
+            <div className="space-y-6">
               {messages.map((msg) => (
                 <ChatMessage key={msg.id} message={msg} />
               ))}
             </div>
-          )}
-          <div ref={bottomRef} />
+            <div ref={bottomRef} />
+          </div>
         </div>
-      </ScrollArea>
+      )}
 
       <ChatInput
-        onSend={onSend}
+        onSend={handleSend}
         onStop={onStop}
         isStreaming={isStreaming}
         disabled={disabled}
