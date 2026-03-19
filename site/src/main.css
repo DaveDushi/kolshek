@@ -1048,48 +1048,6 @@ body {
   line-height: 1.5;
 }
 
-/* Big download button */
-.gs-download-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 0.875rem 1.25rem;
-  background: linear-gradient(135deg, #4f46e5, #6366f1);
-  color: #fff;
-  border-radius: 0.625rem;
-  font-size: 1rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 150ms;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
-}
-
-.gs-download-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
-}
-
-.gs-download-label {
-  display: block;
-}
-
-.gs-download-meta {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 400;
-  opacity: 0.7;
-}
-
-/* Other platforms row */
-.gs-other-platforms {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.375rem;
-  margin-top: 0.75rem;
-}
-
 .gs-alt-link {
   font-size: 0.75rem;
   color: #818cf8;
@@ -1188,6 +1146,45 @@ body {
   background: rgba(99, 102, 241, 0.1);
   color: #818cf8;
   box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
+}
+
+/* Install tabs (macOS/Linux vs Windows) */
+.gs-install-tabs {
+  display: flex;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+}
+
+.gs-install-tab {
+  padding: 0.375rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.gs-install-tab:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.gs-install-tab.active {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.1);
+  color: #818cf8;
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
+}
+
+.gs-install-cmd {
+  display: none;
+}
+
+.gs-install-cmd.active {
+  display: block;
 }
 
 /* Docs link */

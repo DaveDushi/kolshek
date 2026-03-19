@@ -181,6 +181,33 @@ document.querySelectorAll(".gs-plugin-pill").forEach(function (pill) {
   });
 });
 
+// ── Install tab switcher (macOS/Linux vs Windows) ────────────
+document.querySelectorAll(".gs-install-tab[data-install]").forEach(function (tab) {
+  tab.addEventListener("click", function () {
+    // Find the parent container to scope the toggle
+    var parent = tab.closest(".gs-step");
+    if (!parent) return;
+    parent.querySelectorAll(".gs-install-tab").forEach(function (t) {
+      t.classList.toggle("active", t.dataset.install === tab.dataset.install);
+    });
+    parent.querySelectorAll(".gs-install-cmd").forEach(function (c) {
+      c.classList.toggle("active", c.id === "gs-install-" + tab.dataset.install);
+    });
+  });
+});
+
+// Auto-detect OS and activate the right install tab
+(function () {
+  var ua = navigator.userAgent || "";
+  var plat = navigator.platform || "";
+  var isWindows = /Win/i.test(plat) || /Windows/i.test(ua);
+  if (isWindows) {
+    document.querySelectorAll('.gs-install-tab[data-install$="windows"], .gs-install-tab[data-install$="windows-m"]').forEach(function (tab) {
+      tab.click();
+    });
+  }
+})();
+
 // ── Getting Started path switcher ─────────────────────────────
 document.querySelectorAll(".gs-path-tab[data-gs-path]").forEach(function (tab) {
   tab.addEventListener("click", function () {
@@ -377,29 +404,7 @@ document.querySelectorAll("#theme-cycle, .theme-cycle-mobile").forEach(function 
   btn.addEventListener("click", cycleTheme);
 });
 
-// ── OS auto-detection for download button ────────────────────
-(function () {
-  var ua = navigator.userAgent || "";
-  var plat = navigator.platform || "";
-  var btn = document.getElementById("dl-auto");
-  var label = document.getElementById("dl-auto-label");
-  var base = "https://github.com/DaveDushi/kolshek/releases/latest/download/";
-
-  if (/Mac/i.test(plat)) {
-    // Check for Apple Silicon via WebGL renderer or default to arm64
-    var isArm =
-      /arm/i.test(ua) ||
-      (navigator.userAgentData &&
-        navigator.userAgentData.architecture === "arm");
-    if (btn)
-      btn.href = base + (isArm ? "kolshek-macos-arm64" : "kolshek-macos-x64");
-    if (label) label.textContent = "Download for macOS";
-  } else if (/Linux/i.test(plat)) {
-    if (btn) btn.href = base + "kolshek-linux-x64";
-    if (label) label.textContent = "Download for Linux";
-  }
-  // Windows is the default, no change needed
-})();
+// ── OS auto-detection (legacy download button removed — handled by install tabs above) ──
 
 // ── Footer year ──────────────────────────────────────────────
 var yearEl = document.getElementById("footer-year");
@@ -413,10 +418,8 @@ if (yearEl) yearEl.textContent = new Date().getFullYear();
 
   function applyVersion(tag) {
     var heroEl = document.getElementById("hero-version");
-    var metaEl = document.getElementById("dl-auto-meta");
     var footerEl = document.getElementById("footer-version");
     if (heroEl) heroEl.textContent = tag;
-    if (metaEl) metaEl.textContent = tag;
     if (footerEl) footerEl.textContent = "KolShek " + tag;
   }
 
