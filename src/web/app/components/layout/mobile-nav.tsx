@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Languages,
   Building2,
+  Bot,
   RefreshCw,
   Sun,
   Moon,
@@ -138,6 +139,11 @@ export function MobileNav() {
             {untranslatedCount}
           </Badge>
         ) : null,
+    },
+    {
+      label: "Agent",
+      path: "/agent",
+      icon: Bot,
     },
     {
       label: "Providers",

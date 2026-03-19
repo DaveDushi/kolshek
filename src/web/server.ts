@@ -4,6 +4,18 @@
 
 import { resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import { createAgentStream } from "./ai/stream.js";
+import { discoverSkills, buildSystemPrompt } from "./ai/skills.js";
+import {
+  loadAiConfig,
+  saveAiConfig,
+  saveAiApiKey,
+  getAiApiKey,
+  hasAiApiKey,
+  checkOllamaStatus,
+} from "./ai/config.js";
+import { PROVIDER_REGISTRY } from "./ai/types.js";
+import type { AiProviderConfig, AiProviderType, AgentChatRequest } from "./ai/types.js";
 import {
   listProviders,
   createProvider,
@@ -1099,6 +1111,107 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         // GET /api/v2/fetch/events — SSE stream for fetch progress
         if (method === "GET" && path === "/api/v2/fetch/events") {
           return fetchEventsSSE();
+        }
+
+        // =================================================================
+        // --- AI Agent API ---
+
+        // POST /api/v2/agent/chat — stream an agent conversation via SSE
+        if (method === "POST" && path === "/api/v2/agent/chat") {
+          const body = await parseJsonBody(req) as unknown as AgentChatRequest;
+          if (!body.messages || !Array.isArray(body.messages) || body.messages.length === 0) {
+            return jsonError("BAD_REQUEST", "messages array is required", 400);
+          }
+
+          // Resolve provider config: request overrides > stored config > defaults
+          const storedConfig = await loadAiConfig();
+          const reqConfig = body.config || {};
+          const providerType = (reqConfig.provider || storedConfig?.provider || "ollama") as AiProviderType;
+          const registry = PROVIDER_REGISTRY[providerType];
+          if (!registry) {
+            return jsonError("BAD_REQUEST", `Unknown provider: ${providerType}`, 400);
+          }
+
+          const model = reqConfig.model || storedConfig?.model || "";
+          if (!model) {
+            return jsonError("BAD_REQUEST", "No model specified. Configure a model in the agent settings.", 400);
+          }
+
+          // Resolve API key: request body > keychain
+          let apiKey = reqConfig.apiKey || undefined;
+          if (!apiKey && registry.requiresKey) {
+            const stored = await getAiApiKey(providerType);
+            if (stored) apiKey = stored;
+          }
+          if (!apiKey && registry.requiresKey) {
+            return jsonError("BAD_REQUEST", `API key required for ${registry.label}. Add one in agent settings.`, 400);
+          }
+
+          const providerConfig: AiProviderConfig = {
+            type: providerType,
+            baseUrl: reqConfig.baseUrl || storedConfig?.baseUrl || registry.baseUrl,
+            model,
+            apiKey,
+          };
+
+          // Build system prompt with skills
+          const skills = await discoverSkills();
+          const systemPrompt = buildSystemPrompt(skills, body.enabledSkills);
+
+          // Convert frontend messages to ChatMessage format
+          const messages = [
+            { role: "system" as const, content: systemPrompt },
+            ...body.messages.map((m) => ({
+              role: m.role as "user" | "assistant",
+              content: m.content,
+            })),
+          ];
+
+          return createAgentStream(providerConfig, messages, cors);
+        }
+
+        // GET /api/v2/agent/config — get current AI configuration
+        if (method === "GET" && path === "/api/v2/agent/config") {
+          const config = await loadAiConfig();
+          const provider = config?.provider || "ollama";
+          const hasKey = await hasAiApiKey(provider);
+          return json({
+            provider,
+            model: config?.model || "",
+            baseUrl: config?.baseUrl || PROVIDER_REGISTRY[provider as AiProviderType]?.baseUrl || "",
+            hasApiKey: hasKey,
+          });
+        }
+
+        // PUT /api/v2/agent/config — save AI configuration
+        if (method === "PUT" && path === "/api/v2/agent/config") {
+          const body = await parseJsonBody(req);
+          const provider = body.provider as string;
+          if (!provider || !PROVIDER_REGISTRY[provider as AiProviderType]) {
+            return jsonError("BAD_REQUEST", "Invalid provider", 400);
+          }
+          await saveAiConfig({
+            provider: provider as AiProviderType,
+            model: (body.model as string) || "",
+            baseUrl: body.baseUrl as string | undefined,
+          });
+          if (body.apiKey && typeof body.apiKey === "string") {
+            await saveAiApiKey(provider, body.apiKey);
+          }
+          return json({ saved: true });
+        }
+
+        // GET /api/v2/agent/skills — list available skills
+        if (method === "GET" && path === "/api/v2/agent/skills") {
+          const skills = await discoverSkills();
+          return json(skills.map((s) => ({ name: s.name, filename: s.filename })));
+        }
+
+        // GET /api/v2/agent/status — check Ollama connectivity
+        if (method === "GET" && path === "/api/v2/agent/status") {
+          const config = await loadAiConfig();
+          const status = await checkOllamaStatus(config?.baseUrl);
+          return json(status);
         }
 
         // --- React SPA fallback (never for /api/ routes) ---
