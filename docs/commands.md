@@ -179,6 +179,8 @@ Monthly income/expenses/net breakdown.
 | `--from <date>` | Start date |
 | `--to <date>` | End date |
 | `--type <type>` | Filter by provider type (`bank` \| `credit_card`) |
+| `--exclude <classifications>` | Comma-separated classifications to exclude |
+| `--include <classifications>` | Only include these classifications (mutually exclusive with --exclude) |
 
 #### `reports categories`
 
@@ -189,6 +191,8 @@ Expense breakdown by category.
 | `--from <date>` | Start date |
 | `--to <date>` | End date |
 | `--type <type>` | Filter by provider type (`bank` \| `credit_card`) |
+| `--exclude <classifications>` | Comma-separated classifications to exclude |
+| `--include <classifications>` | Only include these classifications (mutually exclusive with --exclude) |
 
 #### `reports merchants`
 
@@ -200,10 +204,17 @@ Top merchants by spend.
 | `--to <date>` | End date |
 | `--type <type>` | Filter by provider type (`bank` \| `credit_card`) |
 | `--limit <n>` | Number of merchants to show (default: 20) |
+| `--exclude <classifications>` | Comma-separated classifications to exclude |
+| `--include <classifications>` | Only include these classifications (mutually exclusive with --exclude) |
 
 #### `reports balance`
 
 Account balances with 30-day activity summary.
+
+| Option | Description |
+|--------|-------------|
+| `--exclude <classifications>` | Comma-separated classifications to exclude |
+| `--include <classifications>` | Only include these classifications (mutually exclusive with --exclude) |
 
 ---
 
@@ -290,6 +301,26 @@ Force-reassign transactions matching a pattern to a new category.
 
 Show categories with transaction counts, totals, and source.
 
+#### `categorize classify`
+
+Manage category classifications (expense, income, cc_billing, transfer, etc.).
+
+##### `categorize classify set <category> <classification>`
+
+Set the classification for a category.
+
+##### `categorize classify list`
+
+Show all categories with their classifications.
+
+##### `categorize classify auto`
+
+Auto-classify categories based on dominant transaction direction.
+
+| Option | Description |
+|--------|-------------|
+| `--dry-run` | Preview changes without modifying data |
+
 ---
 
 ### `translate` (alias: `tr`)
@@ -354,7 +385,7 @@ Manage AI agent integrations.
 
 #### `plugin install <tool>`
 
-Install AI plugin for a tool (`claude-code`, `openclaw`, `cursor`, `gemini-cli`, `antigravity`, `opencode`, `aider`, `windsurf`).
+Install AI plugin for a tool (`claude-code`, `opencode`, `codex`, `openclaw`).
 
 #### `plugin list`
 
@@ -372,24 +403,9 @@ Spending breakdown by category, merchant, or provider.
 | `--category <name>` | Filter to a specific category |
 | `--top <n>` | Limit to top N groups |
 | `--type <type>` | Filter by provider type (`bank` \| `credit_card`) |
-| `--lifestyle` | Exclude categories marked as non-spending |
+| `--exclude <classifications>` | Comma-separated classifications to exclude |
+| `--include <classifications>` | Only include these classifications (mutually exclusive with --exclude) |
 | `-m, --month-offset <n>` | Months ago (e.g. `-m 3` for 3 months ago) |
-
-#### `spending exclude`
-
-Manage categories excluded from lifestyle spending view.
-
-##### `spending exclude add <category>`
-
-Mark a category as non-spending.
-
-##### `spending exclude remove <category>`
-
-Remove a category from the exclusion list.
-
-##### `spending exclude list`
-
-Show all excluded categories.
 
 ---
 
@@ -402,6 +418,8 @@ Income breakdown with salary detection (bank accounts only by default).
 | `--salary-only` | Show only salary/wage transactions |
 | `--include-refunds` | Also show CC refunds (separate section) |
 | `-m, --month-offset <n>` | Months ago (e.g. `-m 3` for 3 months ago) |
+| `--exclude <classifications>` | Comma-separated classifications to exclude |
+| `--include <classifications>` | Only include these classifications (mutually exclusive with --exclude) |
 
 ---
 
@@ -414,6 +432,8 @@ Multi-month cashflow and spending trend analysis. Default: 6 months.
 | `--mode <mode>` | Analysis mode: `total` (default), `category`, `fixed-variable` |
 | `--category <name>` | Track specific category (implies `--mode category`) |
 | `--type <type>` | Filter by provider type (`bank` \| `credit_card`) |
+| `--exclude <classifications>` | Comma-separated classifications to exclude |
+| `--include <classifications>` | Only include these classifications (mutually exclusive with --exclude) |
 
 ---
 
@@ -424,6 +444,19 @@ Financial alerts and recommendations based on spending patterns.
 | Option | Description |
 |--------|-------------|
 | `--months <n>` | Lookback period in months (default: 3) |
+| `--exclude <classifications>` | Comma-separated classifications to exclude |
+| `--include <classifications>` | Only include these classifications (mutually exclusive with --exclude) |
+
+---
+
+### `dashboard`
+
+Open the settings dashboard in your browser.
+
+| Option | Description |
+|--------|-------------|
+| `-p, --port <port>` | Port to listen on (default: 3000) |
+| `--no-open` | Don't auto-open the browser |
 
 ---
 
