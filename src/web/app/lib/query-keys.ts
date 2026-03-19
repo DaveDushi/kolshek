@@ -52,6 +52,10 @@ export const queryKeys = {
     fixedVariable: (months: number, exclude?: string[]) =>
       [...queryKeys.trends.all, "fixed-variable", months, exclude ?? null] as const,
   },
+  schedule: {
+    all: ["schedule"] as const,
+    status: () => [...queryKeys.schedule.all, "status"] as const,
+  },
   insights: {
     all: ["insights"] as const,
     list: (months: number, exclude?: string[]) =>

@@ -30,7 +30,21 @@ import { getAccountsByProvider } from "../db/repositories/accounts.js";
 import {
   getLatestCompletedSyncLog,
   hasSuccessfulSync,
+  listRecentSyncLogs,
+  countSyncLogsSince,
 } from "../db/repositories/sync-log.js";
+import {
+  readScheduleConfig,
+  writeScheduleConfig,
+  deleteScheduleConfig,
+  resolveBinaryPath,
+} from "../config/schedule.js";
+import {
+  registerSchedule,
+  unregisterSchedule,
+  checkScheduleRegistered,
+  currentPlatform,
+} from "../core/scheduler/index.js";
 import { computeAuthStatus } from "../core/auth-status.js";
 import {
   listCategoryRules,
@@ -1079,6 +1093,97 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("TRANSLATION_TRANSLATE_FAILED", msg, 500);
+          }
+        }
+
+        // =================================================================
+        // --- Schedule API ---
+
+        // GET /api/v2/schedule — current schedule status + sync history
+        if (method === "GET" && path === "/api/v2/schedule") {
+          try {
+            const config = await readScheduleConfig();
+            const osRegistered = await checkScheduleRegistered();
+
+            const schedule: Record<string, unknown> = { registered: osRegistered };
+            let missedRuns = 0;
+
+            if (config) {
+              schedule.intervalHours = config.intervalHours;
+              schedule.registeredAt = config.registeredAt;
+              schedule.platform = config.platform;
+
+              // Estimate next run
+              if (osRegistered) {
+                const registeredDate = new Date(config.registeredAt);
+                const intervalMs = config.intervalHours * 60 * 60 * 1000;
+                const now = Date.now();
+                const elapsed = now - registeredDate.getTime();
+                const periods = Math.ceil(elapsed / intervalMs);
+                const nextRun = new Date(registeredDate.getTime() + periods * intervalMs);
+                schedule.nextRunAt = nextRun.toISOString();
+
+                // Compute missed runs
+                const expectedRuns = Math.floor(elapsed / intervalMs);
+                const actualRuns = countSyncLogsSince(config.registeredAt);
+                missedRuns = Math.max(0, Math.min(expectedRuns - actualRuns, 10));
+              }
+            }
+
+            const syncHistory = listRecentSyncLogs(30);
+
+            return json({ schedule, syncHistory, missedRuns });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("SCHEDULE_STATUS_FAILED", msg, 500);
+          }
+        }
+
+        // POST /api/v2/schedule — enable or update schedule
+        if (method === "POST" && path === "/api/v2/schedule") {
+          try {
+            const body = await parseJsonBody(req);
+            // Accept fractional hours (e.g. 0.5 = 30min). Minimum 5 minutes (5/60).
+            const raw = Number(body.intervalHours);
+            const MIN_HOURS = 5 / 60; // 5 minutes
+            if (!raw || isNaN(raw) || raw < MIN_HOURS || raw > 168) {
+              return jsonError("BAD_INTERVAL", "intervalHours must be between 0.084 (5 min) and 168 (1 week).");
+            }
+            // Round to nearest minute to avoid floating point weirdness
+            const intervalHours = Math.round(raw * 60) / 60;
+
+            const binaryPath = await resolveBinaryPath();
+            const config = {
+              intervalHours,
+              registeredAt: new Date().toISOString(),
+              platform: currentPlatform(),
+              binaryPath,
+            };
+
+            await registerSchedule(config);
+            await writeScheduleConfig(config);
+
+            return json({
+              registered: true,
+              intervalHours: config.intervalHours,
+              registeredAt: config.registeredAt,
+              platform: config.platform,
+            });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("SCHEDULE_SET_FAILED", msg, 500);
+          }
+        }
+
+        // DELETE /api/v2/schedule — disable schedule
+        if (method === "DELETE" && path === "/api/v2/schedule") {
+          try {
+            await unregisterSchedule();
+            await deleteScheduleConfig();
+            return json({ removed: true });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("SCHEDULE_REMOVE_FAILED", msg, 500);
           }
         }
 
