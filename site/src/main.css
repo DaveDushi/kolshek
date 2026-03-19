@@ -1830,12 +1830,12 @@ body {
 .dash-bar {
   flex: 1;
   height: var(--h);
-  background: var(--border);
+  background: rgba(99, 102, 241, 0.25);
   border-radius: 0.125rem 0.125rem 0 0;
 }
 
 .dash-bar-current {
-  background: var(--color-primary-500);
+  background: #6366f1;
 }
 
 .dash-donut-row {
@@ -2036,8 +2036,13 @@ body {
 .dash-trend-bar {
   width: 100%;
   height: var(--h);
-  background: var(--border);
+  background: rgba(99, 102, 241, 0.25);
   border-radius: 0.125rem 0.125rem 0 0;
+}
+
+.dash-bar-current.dash-trend-bar,
+.dash-trend-col:last-child .dash-trend-bar {
+  background: #6366f1;
 }
 
 .dash-trend-summary {

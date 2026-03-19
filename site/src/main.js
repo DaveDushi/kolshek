@@ -39,7 +39,12 @@ function switchDashPage(page) {
   });
 }
 
-document.querySelectorAll(".dash-nav-item[data-dash-page], .dash-mobile-pill[data-dash-page]").forEach(function (item) {
+document.querySelectorAll(".dash-nav-item[data-dash-page]").forEach(function (item) {
+  item.addEventListener("mouseenter", function () {
+    switchDashPage(item.dataset.dashPage);
+  });
+});
+document.querySelectorAll(".dash-mobile-pill[data-dash-page]").forEach(function (item) {
   item.addEventListener("click", function () {
     switchDashPage(item.dataset.dashPage);
   });
@@ -281,13 +286,15 @@ window.submitFeedback = async function (event) {
     form.reset();
     if (fbCharCount) fbCharCount.textContent = "0 / 2,000";
 
-    if (data.url) {
-      statusEl.innerHTML =
-        'Issue created: <a href="' +
-        data.url +
-        '" target="_blank" rel="noopener" class="text-primary-400 underline underline-offset-2">' +
-        data.url +
-        "</a>";
+    if (data.url && /^https:\/\/github\.com\//.test(data.url)) {
+      var link = document.createElement("a");
+      link.href = data.url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.className = "text-primary-400 underline underline-offset-2";
+      link.textContent = data.url;
+      statusEl.textContent = "Issue created: ";
+      statusEl.appendChild(link);
       statusEl.className = "text-sm text-body mt-4";
       statusEl.classList.remove("hidden");
     }
