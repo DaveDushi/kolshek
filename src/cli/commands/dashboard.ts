@@ -8,7 +8,7 @@ export function registerDashboardCommand(program: Command): void {
   program
     .command("dashboard")
     .description("Open the settings dashboard in your browser")
-    .option("-p, --port <port>", "Port to listen on", "3000")
+    .option("-p, --port <port>", "Port to listen on", "45091")
     .option("--no-open", "Don't auto-open the browser")
     .action(async (opts: { port: string; open: boolean }) => {
       const port = Number(opts.port);
