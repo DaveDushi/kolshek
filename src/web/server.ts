@@ -1174,12 +1174,17 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         if (method === "GET" && path === "/api/v2/agent/config") {
           const config = await loadAiConfig();
           const provider = config?.provider || "ollama";
-          const hasKey = await hasAiApiKey(provider);
+          // Check saved keys for all providers that need them
+          const [hasOpenai, hasGroq, hasOpenrouter] = await Promise.all([
+            hasAiApiKey("openai"),
+            hasAiApiKey("groq"),
+            hasAiApiKey("openrouter"),
+          ]);
           return json({
             provider,
             model: config?.model || "",
             baseUrl: config?.baseUrl || PROVIDER_REGISTRY[provider as AiProviderType]?.baseUrl || "",
-            hasApiKey: hasKey,
+            savedKeys: { openai: hasOpenai, groq: hasGroq, openrouter: hasOpenrouter },
           });
         }
 

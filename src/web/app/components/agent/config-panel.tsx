@@ -35,7 +35,7 @@ interface AiConfigResponse {
   provider: string;
   model: string;
   baseUrl: string;
-  hasApiKey: boolean;
+  savedKeys: Record<string, boolean>;
 }
 
 interface OllamaStatus {
@@ -97,6 +97,7 @@ export function ConfigPanel({
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [saved, setSaved] = useState(false);
+  const [editingKey, setEditingKey] = useState(false);
 
   const { data: config } = useQuery<AiConfigResponse>({
     queryKey: ["agent", "config"],
@@ -136,6 +137,7 @@ export function ConfigPanel({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agent", "config"] });
       setApiKey("");
+      setEditingKey(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     },
@@ -145,6 +147,7 @@ export function ConfigPanel({
     setProvider(value);
     setBaseUrl(DEFAULT_URLS[value] || "");
     setApiKey("");
+    setEditingKey(false);
     // For Ollama, prefer first installed model; fall back to suggested list
     if (value === "ollama" && ollamaStatus?.models?.length) {
       setModel(ollamaStatus.models[0]);
@@ -167,6 +170,13 @@ export function ConfigPanel({
 
   const requiresKey = PROVIDERS.find((p) => p.value === provider)?.requiresKey ?? false;
   const isCloud = provider !== "ollama";
+
+  // Only show Save when something has actually changed
+  const hasChanges =
+    provider !== (config?.provider || "ollama") ||
+    model !== (config?.model || "") ||
+    (provider === "ollama" && baseUrl !== (config?.baseUrl || DEFAULT_URLS.ollama)) ||
+    apiKey.length > 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -283,38 +293,51 @@ export function ConfigPanel({
 
                 {requiresKey && (
                   <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs text-muted-foreground">API Key</Label>
-                      {config?.hasApiKey && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                          Saved
-                        </Badge>
-                      )}
-                    </div>
-                    <Input
-                      type="password"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder={config?.hasApiKey ? "Key saved in keychain" : "Enter API key"}
-                      className="h-9"
-                    />
+                    <Label className="text-xs text-muted-foreground">API Key</Label>
+                    {config?.savedKeys?.[provider] && !editingKey ? (
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 flex items-center gap-2 h-9 px-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
+                          <Check className="h-3 w-3 text-green-600 dark:text-green-400 shrink-0" />
+                          <span>Saved in keychain</span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-9 text-xs shrink-0"
+                          onClick={() => setEditingKey(true)}
+                        >
+                          Change
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input
+                        type="password"
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        placeholder="Enter API key"
+                        className="h-9"
+                        autoFocus={editingKey}
+                      />
+                    )}
                   </div>
                 )}
               </div>
 
-              <Button
-                onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending || !model}
-                className="w-full h-9"
-                size="sm"
-              >
-                {saveMutation.isPending ? (
-                  <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                ) : saved ? (
-                  <Check className="h-3.5 w-3.5 mr-2" />
-                ) : null}
-                {saved ? "Saved" : "Save"}
-              </Button>
+              {(hasChanges || saved) && (
+                <Button
+                  onClick={() => saveMutation.mutate()}
+                  disabled={saveMutation.isPending || !model || (!hasChanges && !saved)}
+                  className="w-full h-9"
+                  size="sm"
+                >
+                  {saveMutation.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                  ) : saved ? (
+                    <Check className="h-3.5 w-3.5 mr-2" />
+                  ) : null}
+                  {saved ? "Saved" : "Save"}
+                </Button>
+              )}
             </section>
 
             {/* --- Skills section --- */}

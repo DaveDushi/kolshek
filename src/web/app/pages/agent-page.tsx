@@ -12,7 +12,7 @@ interface AiConfigResponse {
   provider: string;
   model: string;
   baseUrl: string;
-  hasApiKey: boolean;
+  savedKeys: Record<string, boolean>;
 }
 
 export function AgentPage() {
