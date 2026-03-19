@@ -317,7 +317,7 @@
                                     d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
                                 />
                             </svg>
-                            AI Agent
+                            <span class="hidden md:inline">AI Agent</span><span class="md:hidden">Agent</span>
                         </button>
                         <button
                             class="hero-demo-tab"
@@ -336,7 +336,7 @@
                                 <polyline points="4 17 10 11 4 5" />
                                 <line x1="12" y1="19" x2="20" y2="19" />
                             </svg>
-                            Command Line
+                            <span class="hidden md:inline">Command Line</span><span class="md:hidden">CLI</span>
                         </button>
                         <button
                             class="hero-demo-tab"
@@ -725,6 +725,14 @@
 
                             <!-- Main content -->
                             <div class="dash-main">
+                                <!-- Mobile page nav (visible when sidebar is hidden) -->
+                                <div class="dash-mobile-nav">
+                                    <button class="dash-mobile-pill active" data-dash-page="overview">Dashboard</button>
+                                    <button class="dash-mobile-pill" data-dash-page="transactions">Transactions</button>
+                                    <button class="dash-mobile-pill" data-dash-page="spending">Spending</button>
+                                    <button class="dash-mobile-pill" data-dash-page="trends">Trends</button>
+                                    <button class="dash-mobile-pill" data-dash-page="insights">Insights</button>
+                                </div>
                                 <!-- PAGE: Dashboard overview -->
                                 <div class="dash-page active" id="dash-overview">
                                     <div class="dash-header">

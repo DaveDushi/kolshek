@@ -1853,6 +1853,34 @@ body {
 .dash-page { display: none; flex-direction: column; gap: 0.5rem; flex: 1; }
 .dash-page.active { display: flex; }
 
+/* Mobile page nav — horizontal scrolling pills, hidden on desktop */
+.dash-mobile-nav {
+  display: none;
+  gap: 0.25rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dash-mobile-pill {
+  font-size: 0.5625rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+
+.dash-mobile-pill.active {
+  background: var(--white-soft);
+  color: var(--text-heading);
+  border-color: var(--border-hover);
+}
+
 .dash-filter-badge {
   font-size: 0.5625rem;
   color: var(--text-muted);
@@ -1986,6 +2014,7 @@ body {
 
 @media (max-width: 767px) {
   .dash-sidebar { display: none; }
+  .dash-mobile-nav { display: flex; }
   .dash-mock { min-height: 320px; }
   .dash-grid-top, .dash-grid-bottom { grid-template-columns: 1fr; }
 }

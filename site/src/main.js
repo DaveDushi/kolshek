@@ -27,15 +27,21 @@ document.querySelectorAll(".hero-demo-tab").forEach(function (tab) {
 });
 
 // ── Dashboard mock page switcher ─────────────────────────────
-document.querySelectorAll(".dash-nav-item[data-dash-page]").forEach(function (item) {
+function switchDashPage(page) {
+  document.querySelectorAll(".dash-nav-item").forEach(function (n) {
+    n.classList.toggle("active", n.dataset.dashPage === page);
+  });
+  document.querySelectorAll(".dash-mobile-pill").forEach(function (p) {
+    p.classList.toggle("active", p.dataset.dashPage === page);
+  });
+  document.querySelectorAll(".dash-page").forEach(function (p) {
+    p.classList.toggle("active", p.id === "dash-" + page);
+  });
+}
+
+document.querySelectorAll(".dash-nav-item[data-dash-page], .dash-mobile-pill[data-dash-page]").forEach(function (item) {
   item.addEventListener("click", function () {
-    var page = item.dataset.dashPage;
-    document.querySelectorAll(".dash-nav-item").forEach(function (n) {
-      n.classList.toggle("active", n.dataset.dashPage === page);
-    });
-    document.querySelectorAll(".dash-page").forEach(function (p) {
-      p.classList.toggle("active", p.id === "dash-" + page);
-    });
+    switchDashPage(item.dataset.dashPage);
   });
 });
 
