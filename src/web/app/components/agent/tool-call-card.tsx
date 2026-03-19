@@ -10,24 +10,24 @@ interface ToolCallCardProps {
 
 // Brief summary of the tool result for collapsed view
 function summarizeResult(name: string, result?: string): string {
-  if (!result) return "Running...";
+  if (result === undefined) return "Running...";
+  if (result === "") return "Done (empty)";
   try {
     const parsed = JSON.parse(result);
     if (parsed.error) return `Error: ${parsed.error}`;
+    if (parsed.tables) return `${parsed.count ?? parsed.tables.length} table(s)`;
     if (parsed.rows) return `${parsed.count ?? parsed.rows.length} row(s)`;
+    if (parsed.success !== undefined) return parsed.message || "Done";
     if (Array.isArray(parsed)) return `${parsed.length} result(s)`;
     return "Done";
   } catch {
-    // Plain text result (e.g., schema)
-    const lines = result.split("\n").length;
-    if (name === "get_schema") return `${lines} line(s)`;
-    return result.length > 50 ? result.slice(0, 47) + "..." : result;
+    return result.length > 60 ? result.slice(0, 57) + "..." : result;
   }
 }
 
 export function ToolCallCard({ toolCall }: ToolCallCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const isLoading = !toolCall.result;
+  const isLoading = toolCall.result === undefined;
 
   return (
     <div className="my-1.5 rounded-lg border border-border bg-surface-sunken overflow-hidden text-xs">

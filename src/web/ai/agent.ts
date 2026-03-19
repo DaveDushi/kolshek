@@ -4,7 +4,7 @@
 // a final text response or max iterations reached.
 
 import type { ChatMessage, AiProviderConfig, AgentSSEEvent } from "./types.js";
-import { TOOL_DEFS, executeTool } from "./tools.js";
+import { TOOL_DEFS, executeToolAsync } from "./tools.js";
 import { streamChat } from "./providers.js";
 
 const MAX_ITERATIONS = 10;
@@ -62,8 +62,8 @@ export async function runAgentLoop(
           arguments: toolCall.function.arguments,
         });
 
-        // Execute the tool
-        const result = executeTool(toolCall.function.name, args);
+        // Execute the tool (async for subprocess-based tools like run_command)
+        const result = await executeToolAsync(toolCall.function.name, args);
 
         // Emit tool_result event
         onEvent({

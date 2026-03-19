@@ -1,6 +1,8 @@
-// AI agent tools — read-only database queries exposed to the LLM.
-// Reuses SQL validation logic from src/cli/commands/query.ts.
+// AI agent tools — database queries + CLI command execution.
+// Read tools run in-process for speed. Write operations go through
+// the CLI subprocess with --json for full validation and structured output.
 
+import { join } from "node:path";
 import { getDatabase } from "../../db/database.js";
 import { getMonthlyReport, getCategoryReport, getBalanceReport } from "../../db/repositories/reports.js";
 import { searchTransactions } from "../../db/repositories/transactions.js";
@@ -48,6 +50,12 @@ function capResult(data: unknown, maxBytes: number = 8192): string {
   if (json.length <= maxBytes) return json;
   return json.slice(0, maxBytes) + "\n...(truncated)";
 }
+
+// CLI entry point path (resolved relative to this file: ai/ → web/ → src/ → cli/index.ts)
+const CLI_ENTRY = join(import.meta.dir, "..", "..", "cli", "index.ts");
+
+// Commands blocked from agent execution (destructive or interactive)
+const BLOCKED_COMMANDS = new Set(["init", "fetch", "dashboard", "update", "schedule", "plugin"]);
 
 // Tool definitions sent to the LLM
 export const TOOL_DEFS: ToolDef[] = [
@@ -127,6 +135,52 @@ export const TOOL_DEFS: ToolDef[] = [
       parameters: { type: "object", properties: {} },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "run_command",
+      description: `Run a KolShek CLI command. Returns JSON output. Use this for write operations and advanced commands.
+
+Available commands:
+- categorize rule add <category> --description <pattern> [--mode substring|exact|regex] [--memo <pattern>] [--direction debit|credit] [--amount-min N] [--amount-max N] [--priority N]
+- categorize rule list
+- categorize rule remove <id>
+- categorize apply [--scope uncategorized|all] [--dry-run]
+- categorize rename <old> <new> [--dry-run]
+- categorize reassign --pattern <pattern> --to <category> [--dry-run]
+- categorize list
+- categorize classify set <category> <classification>
+- translate rule add <english> --match <hebrew_pattern>
+- translate rule list
+- translate rule remove <id>
+- translate apply
+- transactions list [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--category <cat>] [--limit N]
+- transactions set-category <id> <category>
+- accounts
+- reports monthly [--from YYYY-MM-DD] [--to YYYY-MM-DD]
+- reports category [--from YYYY-MM-DD] [--to YYYY-MM-DD]
+- spending [month] [--by category|merchant|provider]
+- income [month]
+- trends [months]
+- insights
+
+Examples:
+  categorize rule add Groceries --description "שופרסל" --mode substring
+  translate rule add "Shufersal" --match "שופרסל"
+  categorize apply --scope uncategorized
+  transactions set-category 42 Groceries`,
+      parameters: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description: "The CLI command and arguments (without the 'kolshek' prefix). Example: 'categorize rule add Groceries --description \"שופרסל\"'",
+          },
+        },
+        required: ["command"],
+      },
+    },
+  },
 ];
 
 // Tool executor — runs a named tool with parsed arguments, returns result string
@@ -145,6 +199,8 @@ export function executeTool(name: string, args: Record<string, unknown>): string
         return executeSearchTransactions(args.keyword as string, args.limit as number | undefined);
       case "list_accounts":
         return executeListAccounts();
+      case "run_command":
+        return executeRunCommand(args.command as string);
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -152,6 +208,15 @@ export function executeTool(name: string, args: Record<string, unknown>): string
     const msg = err instanceof Error ? err.message : String(err);
     return JSON.stringify({ error: msg });
   }
+}
+
+// Async version for tools that need subprocess execution
+export async function executeToolAsync(name: string, args: Record<string, unknown>): Promise<string> {
+  if (name === "run_command") {
+    return await executeRunCommandAsync(args.command as string);
+  }
+  // All other tools are synchronous
+  return executeTool(name, args);
 }
 
 function executeQuery(sql: string): string {
@@ -184,9 +249,10 @@ function executeQuery(sql: string): string {
 function executeGetSchema(): string {
   const db = getDatabase();
   const tables = db
-    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '_%' ORDER BY name")
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name NOT GLOB '_*' ORDER BY name")
     .all() as Array<{ sql: string }>;
-  return tables.map((t) => t.sql).join(";\n\n");
+  const schemas = tables.map((t) => t.sql);
+  return capResult({ tables: schemas, count: schemas.length });
 }
 
 function executeMonthlyReport(from?: string, to?: string): string {
@@ -207,4 +273,91 @@ function executeSearchTransactions(keyword: string, limit?: number): string {
 function executeListAccounts(): string {
   const rows = getBalanceReport();
   return capResult(rows);
+}
+
+// Synchronous wrapper — should not be called, use executeToolAsync instead
+function executeRunCommand(_command: string): string {
+  return JSON.stringify({ error: "run_command requires async execution" });
+}
+
+// Parse a command string into argv tokens (handles quoted strings)
+function parseCommandArgs(command: string): string[] {
+  const args: string[] = [];
+  let current = "";
+  let inQuote: string | null = null;
+
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+    if (inQuote) {
+      if (ch === inQuote) {
+        inQuote = null;
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"' || ch === "'") {
+      inQuote = ch;
+    } else if (ch === " " || ch === "\t") {
+      if (current) {
+        args.push(current);
+        current = "";
+      }
+    } else {
+      current += ch;
+    }
+  }
+  if (current) args.push(current);
+  return args;
+}
+
+async function executeRunCommandAsync(command: string): Promise<string> {
+  if (!command || !command.trim()) {
+    return JSON.stringify({ error: "command is required" });
+  }
+
+  const argv = parseCommandArgs(command.trim());
+  const rootCmd = argv[0];
+
+  if (BLOCKED_COMMANDS.has(rootCmd)) {
+    return JSON.stringify({ error: `Command "${rootCmd}" is not available from the agent. Blocked commands: ${[...BLOCKED_COMMANDS].join(", ")}` });
+  }
+
+  try {
+    const proc = Bun.spawn(["bun", "run", CLI_ENTRY, "--json", "--non-interactive", ...argv], {
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env },
+    });
+
+    const stdout = await new Response(proc.stdout).text();
+    const stderr = await new Response(proc.stderr).text();
+    const exitCode = await proc.exited;
+
+    if (exitCode !== 0) {
+      // Try to parse JSON error from stdout first (--json mode outputs there)
+      if (stdout.trim()) {
+        try {
+          JSON.parse(stdout.trim());
+          return capResult(stdout.trim());
+        } catch {
+          // not JSON
+        }
+      }
+      return JSON.stringify({
+        error: `Command failed (exit ${exitCode})`,
+        stderr: stderr.slice(0, 1000) || undefined,
+        stdout: stdout.slice(0, 1000) || undefined,
+      });
+    }
+
+    // Return the JSON output from the CLI
+    const output = stdout.trim();
+    if (!output) {
+      return JSON.stringify({ success: true, message: "Command completed with no output" });
+    }
+
+    return capResult(output);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return JSON.stringify({ error: `Failed to run command: ${msg}` });
+  }
 }

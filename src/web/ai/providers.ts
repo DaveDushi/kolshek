@@ -4,6 +4,11 @@
 
 import type { ChatMessage, ToolDef, ToolCall, AiProviderConfig } from "./types.js";
 
+// Global counter for unique tool call IDs across agent loop iterations.
+// LLMs sometimes return index-only IDs (e.g. "call_0") which collide
+// when the agent loops multiple times. This counter ensures uniqueness.
+let toolCallIdCounter = 0;
+
 // A chunk parsed from the SSE stream
 export interface StreamChunk {
   type: "text" | "tool_call_start" | "tool_call_delta" | "done";
@@ -118,7 +123,7 @@ export async function streamChat(
 
             if (!toolCalls.has(idx)) {
               // New tool call
-              const id = (tc.id as string) || `call_${idx}`;
+              const id = (tc.id as string) || `call_${++toolCallIdCounter}`;
               const name = fn?.name as string || "";
               toolCalls.set(idx, { id, name, args: "" });
               onChunk({
