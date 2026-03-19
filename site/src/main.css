@@ -1117,6 +1117,48 @@ body {
   color: var(--text-label);
 }
 
+/* Getting Started path tabs */
+.gs-path-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.gs-path-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.gs-path-tab:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.gs-path-tab.active {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.1);
+  color: #818cf8;
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
+}
+
+.gs-path {
+  display: none;
+}
+
+.gs-path.active {
+  display: block;
+}
+
 /* Plugin picker pills */
 .gs-plugin-pills {
   display: flex;
@@ -1853,6 +1895,34 @@ body {
 .dash-page { display: none; flex-direction: column; gap: 0.5rem; flex: 1; }
 .dash-page.active { display: flex; }
 
+/* Mobile page nav — horizontal scrolling pills, hidden on desktop */
+.dash-mobile-nav {
+  display: none;
+  gap: 0.25rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dash-mobile-pill {
+  font-size: 0.5625rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+
+.dash-mobile-pill.active {
+  background: var(--white-soft);
+  color: var(--text-heading);
+  border-color: var(--border-hover);
+}
+
 .dash-filter-badge {
   font-size: 0.5625rem;
   color: var(--text-muted);
@@ -1986,6 +2056,7 @@ body {
 
 @media (max-width: 767px) {
   .dash-sidebar { display: none; }
+  .dash-mobile-nav { display: flex; }
   .dash-mock { min-height: 320px; }
   .dash-grid-top, .dash-grid-bottom { grid-template-columns: 1fr; }
 }

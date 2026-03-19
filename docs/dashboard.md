@@ -8,11 +8,16 @@ The settings dashboard provides a browser UI for managing providers, categories,
 kolshek dashboard
 ```
 
-This opens a local web server (default: `http://localhost:5556`) with three pages:
+This opens a local web server (default: `http://localhost:3000`) with a React SPA dashboard featuring 8 pages:
 
-- **Providers** — add, edit, remove, and test bank/credit card connections; fetch transactions with real-time progress
-- **Categories** — create category rules, view spending breakdowns, reassign transactions between categories
+- **Dashboard** — net worth overview, cashflow chart, spending breakdown, automated insights, and recent transactions
+- **Transactions** — browse, search, and filter all transactions with pagination
+- **Spending** — monthly spending breakdown by category, merchant, or provider
+- **Trends** — multi-month cashflow and spending trend analysis with charts
+- **Insights** — financial alerts and recommendations based on spending patterns
+- **Categories** — create category rules, view spending breakdowns, manage classifications
 - **Translations** — manage Hebrew-to-English merchant name mappings; see untranslated descriptions grouped by frequency
+- **Providers** — add, edit, remove, and test bank/credit card connections; fetch transactions with real-time sync progress
 
 ## Features
 
@@ -42,9 +47,9 @@ This opens a local web server (default: `http://localhost:5556`) with three page
 
 The dashboard is built with:
 
-- **Bun.serve()** — lightweight HTTP server bound to localhost
-- **HTMX** — dynamic page updates without a JS framework
-- **Tailwind CSS v4** — built at startup via `@tailwindcss/cli`
-- **SSE** — real-time fetch progress streaming
+- **Bun.serve()** — lightweight HTTP server bound to localhost (127.0.0.1)
+- **React** — full SPA with client-side routing via react-router
+- **Tailwind CSS v4** — utility-first styling with Recharts for data visualization
+- **SSE** — real-time per-provider sync progress streaming
 
 All data stays local. The server only accepts connections from `localhost`.

@@ -19,8 +19,8 @@ Run `kolshek plugin list` to see all available integrations and their install st
 |------|----------|----------|
 | Claude Code | `~/.claude/plugins/kolshek/` | Full plugin (skills, hooks, references) |
 | OpenCode | `.opencode/skills/kolshek-*/` | Skills with embedded CLI reference |
-| Codex | `.agents/skills/kolshek-*/` + `AGENTS.md` | Skills + agent discovery index |
-| OpenClaw | `.agents/skills/kolshek-*/` | Skills (agentskills.io format) |
+| Codex | `~/.codex/skills/kolshek-*/` + `AGENTS.md` | Skills + agent discovery index |
+| OpenClaw | `~/.openclaw/workspace/skills/kolshek-*/` | Skills (agentskills.io format) |
 
 ### Skills Included
 

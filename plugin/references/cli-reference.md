@@ -95,7 +95,6 @@ kolshek translate rule add <english> --match <pattern> [--json]
 kolshek translate rule list [--json]
 kolshek translate rule remove <id> [--json]
 kolshek translate apply [--json]
-kolshek translate seed [--json]
 kolshek translate rule import [file] [--json]
 ```
 

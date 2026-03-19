@@ -22,12 +22,12 @@ An open-source CLI that pulls transactions from Israeli banks and credit cards i
 
 ## Features
 
-- **Web dashboard** — HTMX-powered settings UI for managing providers, categories, and translations with real-time fetch progress via SSE
+- **Web dashboard** — React SPA with 8 pages for managing providers, categories, translations, spending, trends, insights, and transactions with real-time sync progress
 - **Built for AI agents** — first-class plugins for Claude Code, OpenCode, Codex, and OpenClaw. Let your AI assistant query your finances, analyze spending, generate reports, and spot anomalies
 - **`kolshek query`** — read-only SQL so agents (or you) can ask anything
 - **`kolshek db`** — schema introspection for agents to self-discover your tables
 - **`--json` on every command** — structured output agents can parse and act on
-- **17 Israeli banks & credit cards** — all major institutions supported
+- **18 Israeli banks & credit cards** — all major institutions supported
 - **100% local** — SQLite database, nothing leaves your machine
 - **OS keychain** — credentials stored in Windows Credential Manager, macOS Keychain, or Linux secret-tool
 - **Reports** — monthly summaries, category breakdowns, balance history
@@ -210,6 +210,10 @@ bun run dev -- <command>   # Run in dev mode
 bun test                   # Run tests
 bun run typecheck          # Type check
 ```
+
+## Disclaimer
+
+KolShek stores your bank credentials and financial data locally on your machine. By using this tool, you accept responsibility for securing your device and reviewing the code you run. This is an open-source project maintained by volunteers — it comes with no warranty, and is not affiliated with any financial institution. Use at your own risk.
 
 ## License
 
