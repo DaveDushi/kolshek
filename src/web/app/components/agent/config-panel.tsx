@@ -145,13 +145,14 @@ export function ConfigPanel({
     setProvider(value);
     setBaseUrl(DEFAULT_URLS[value] || "");
     setApiKey("");
-    const models = PROVIDER_MODELS[value];
-    if (models?.length) {
-      setModel(models[0]);
+    // For Ollama, prefer first installed model; fall back to suggested list
+    if (value === "ollama" && ollamaStatus?.models?.length) {
+      setModel(ollamaStatus.models[0]);
     } else {
-      setModel("");
+      const models = PROVIDER_MODELS[value];
+      setModel(models?.length ? models[0] : "");
     }
-  }, []);
+  }, [ollamaStatus]);
 
   const toggleSkill = useCallback(
     (name: string) => {
@@ -268,15 +269,17 @@ export function ConfigPanel({
                   })()}
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Base URL</Label>
-                  <Input
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                    placeholder={DEFAULT_URLS[provider]}
-                    className="h-9 text-xs font-mono"
-                  />
-                </div>
+                {provider === "ollama" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Base URL</Label>
+                    <Input
+                      value={baseUrl}
+                      onChange={(e) => setBaseUrl(e.target.value)}
+                      placeholder={DEFAULT_URLS[provider]}
+                      className="h-9 text-xs font-mono"
+                    />
+                  </div>
+                )}
 
                 {requiresKey && (
                   <div className="space-y-1.5">
