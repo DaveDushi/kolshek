@@ -25,6 +25,7 @@ import {
   completeSyncLog,
   getLatestCompletedSyncLog,
   hasSuccessfulSync,
+  countConsecutiveFailures,
 } from "../../db/repositories/sync-log.js";
 import {
   storeCredentials,
@@ -78,10 +79,12 @@ export function registerProvidersCommand(program: Command): void {
           const hasCreds = await hasCredentials(p.alias);
           const latestSync = getLatestCompletedSyncLog(p.id);
           const everSucceeded = hasSuccessfulSync(p.id);
+          const failures = countConsecutiveFailures(p.id);
           return computeAuthStatus(
             hasCreds,
             (latestSync?.status as "success" | "error") ?? null,
             everSucceeded,
+            failures,
           );
         }),
       );

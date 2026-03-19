@@ -1,32 +1,38 @@
-## v0.3.7
+## v0.3.8
 
 ### Features
 
-- **React dashboard with client-side routing**: Full SPA dashboard with 8 pages — overview, transactions, spending, trends, insights, categories, translations, and providers. Includes live sync progress panel, per-provider status tracking, and theme switching.
-- **Classification-based filtering**: Transactions are now classified (expense, income, transfer, cc_billing, etc.) with filtering support across all report and trend endpoints.
-- **Custom classifications**: Users can create and assign custom classifications beyond the built-in set via the dashboard classification panel.
-- **Real-time sync streaming**: Bank sync now streams per-provider SSE events (start → progress → result → done) with live reconnection support for late-joining clients.
+- **Transaction pagination**: Dashboard transaction table now supports server-side pagination with configurable page sizes (25/50/100), page number navigation with ellipsis, and scroll-to-top on page change.
+- **Provider credential update**: New dialog in the dashboard to update login credentials for existing providers without re-adding them.
+- **Per-provider sync**: Sync individual providers from the dashboard provider card menu instead of syncing all at once.
+- **Sync queue**: Multiple sync requests are queued and processed sequentially with deduplication and a max queue depth of 10.
+- **4-state auth status**: Providers now show one of four authentication states (no credentials, pending, connected, expired) based on credential and sync history.
+- **CLI update check**: Non-blocking version check with 24-hour cache notifies users when a new release is available.
+- **Getting started flow**: New setup page with separate tabs for agent-assisted and manual configuration paths.
+- **Mobile dashboard navigation**: Responsive page navigation and labels for mobile screens.
 
 ### Security
 
-- **Session authentication**: Dashboard requires a cryptographic token (generated at launch, exchanged for an HttpOnly/SameSite=Strict cookie) — no more open endpoints.
-- **CORS hardening**: Replaced wildcard `Access-Control-Allow-Origin: *` with an explicit origin allowlist and exact-match validation.
-- **CSRF protection**: All mutations reject requests with missing or non-allowlisted `Origin` headers.
-- **Path traversal prevention**: Static file serving validates resolved paths stay within the build output directory.
-- **Content-Security-Policy**: Added CSP header restricting scripts, styles, images, and connections to same-origin only.
-- **ReDoS prevention**: User-supplied regex patterns are validated for length, nested quantifiers, and excessive alternation before compilation.
-- **Error sanitization**: All API and SSE error responses strip file paths, stack traces, and internal details.
-- **Pagination limits**: Transaction endpoints capped at 500 rows per request to prevent database dumps.
-- **Windows permission fix**: Switched from Node's `child_process.spawnSync` to `Bun.spawnSync` for reliable `icacls` permission hardening.
+- **Timing-safe token comparison**: Session token validation now uses `crypto.timingSafeEqual` to prevent timing attacks.
+- **Single-use URL token**: The dashboard launch token in the URL is consumed on first use — replay from browser history is rejected.
+- **Dev-mode isolation**: `.dev-session` file and Vite CORS origins are now gated behind `KOLSHEK_DEV=1` environment variable, with automatic cleanup on exit.
+- **Secure cookie flag**: Session cookie now includes the `Secure` attribute.
+- **Self-update integrity**: Binary downloads are verified against SHA256 checksum sidecar files. Downloads abort on checksum mismatch or verification failure. HTTPS is enforced.
+- **XSS fix**: Site feedback form now uses DOM API with GitHub URL allowlist instead of `innerHTML`.
+- **Enhanced error sanitization**: Credential-like values in JSON format (`"password":"value"`) are now redacted in error responses, with an expanded keyword list.
+- **Provider ID validation**: Sync endpoint validates and coerces provider IDs to positive numbers, rejecting invalid input.
+- **SPA fallback hardening**: Security headers (CSP, X-Frame-Options, etc.) now applied to the SPA index.html fallback response.
+- **Update check timeout**: Background GitHub API check aborts after 5 seconds to prevent connection leaks.
 
 ### Bug Fixes
 
-- **Fixed sync endpoint mismatch**: Client and server now agree on `/api/v2/fetch` route and SSE event types (`start`, `progress`, `result`, `done`).
-- **Fixed SSE reconnection**: `GET /api/v2/fetch/events` now streams live events instead of returning a dead snapshot.
-- **Fixed Vite dev server auth**: Added `credentials: "include"` on client and `Access-Control-Allow-Credentials` on server for cross-origin cookie support.
-- **Fixed duplicate favicon route**: Removed dead code branch for `/favicon.png` that shadowed the `/favicon.ico` handler.
+- **Sync error visibility**: Error messages are now shown when individual providers fail during sync.
+- **Auth status threshold**: Providers require 2+ consecutive sync failures before showing "expired" status — a single transient failure no longer triggers a false alarm.
+- **Sync queue dedup**: Duplicate provider sync requests are deduplicated in the queue, and empty provider arrays are normalized.
+- **React performance**: Fixed `useCallback` dependency on unstable mutation object in credential update dialog.
+- **Dead code cleanup**: Removed unused `isSyncing` prop from provider grid components.
 
 ### Other
 
-- **Removed legacy HTMX partials**: Deleted all server-rendered HTML templates, styles, and layout files (~1,500 lines) in favor of the React SPA.
-- **Site polish**: Updated favicon, added GitHub stars badge, footer credits, and improved nav/chat/theme toggle on the docs site.
+- Security and liability disclaimer added to documentation.
+- Documentation synced with codebase.

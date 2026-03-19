@@ -2,6 +2,7 @@
 
 import { basename, dirname, join } from "path";
 import { existsSync, renameSync, unlinkSync, chmodSync } from "fs";
+import { createHash } from "crypto";
 import type { Command } from "commander";
 import chalk from "chalk";
 import {
@@ -44,9 +45,10 @@ function getBinaryName(): string | null {
   return null;
 }
 
-export async function fetchLatestRelease(): Promise<GithubRelease> {
+export async function fetchLatestRelease(signal?: AbortSignal): Promise<GithubRelease> {
   const res = await fetch(API_URL, {
     headers: { Accept: "application/vnd.github+json" },
+    signal,
   });
   if (!res.ok) {
     throw new Error(`GitHub API returned ${res.status}: ${res.statusText}`);
@@ -146,6 +148,16 @@ export function registerUpdateCommand(program: Command): void {
       const sizeMB = (asset.size / 1024 / 1024).toFixed(1);
       spinner.text = `Downloading v${latestVersion} (${sizeMB} MB)...`;
 
+      // Enforce HTTPS for binary download
+      if (!asset.browser_download_url.startsWith("https://")) {
+        spinner.stop();
+        printError("INSECURE_DOWNLOAD", "Refusing to download binary over insecure connection.", {
+          suggestions: [`Download manually from ${release.html_url}`],
+        });
+        process.exit(ExitCode.Error);
+        return;
+      }
+
       let buffer: ArrayBuffer;
       try {
         const res = await fetch(asset.browser_download_url);
@@ -162,6 +174,39 @@ export function registerUpdateCommand(program: Command): void {
         });
         process.exit(ExitCode.Error);
         return;
+      }
+
+      // Verify checksum if available (SHA256 sidecar file: binary.sha256)
+      const checksumAsset = release.assets.find((a) => a.name === binaryName + ".sha256");
+      if (checksumAsset) {
+        spinner.text = "Verifying checksum...";
+        try {
+          const csRes = await fetch(checksumAsset.browser_download_url);
+          if (!csRes.ok) {
+            throw new Error(`Checksum file returned ${csRes.status}`);
+          }
+          const csText = (await csRes.text()).trim().split(/\s+/)[0].toLowerCase();
+          const actual = createHash("sha256").update(Buffer.from(buffer)).digest("hex");
+          if (actual !== csText) {
+            spinner.stop();
+            printError("CHECKSUM_MISMATCH", "Downloaded binary does not match expected SHA256 checksum. The file may be corrupted or tampered with.", {
+              suggestions: [`Download manually from ${release.html_url}`, "Try again later"],
+            });
+            process.exit(ExitCode.Error);
+            return;
+          }
+        } catch (err) {
+          spinner.stop();
+          const msg = err instanceof Error ? err.message : String(err);
+          printError("CHECKSUM_FAILED", `Checksum verification failed: ${msg}. Aborting update for safety.`, {
+            retryable: true,
+            suggestions: ["Check your internet connection", `Download manually from ${release.html_url}`],
+          });
+          process.exit(ExitCode.Error);
+          return;
+        }
+      } else {
+        info("Note: No checksum file in this release. Skipping integrity verification.");
       }
 
       // Replace the current binary

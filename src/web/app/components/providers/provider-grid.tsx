@@ -47,7 +47,6 @@ interface ProviderGridProps {
   onSync: (options?: { providerId?: number; visible?: boolean }) => void;
   onDelete: (id: number) => void;
   onAuth: (id: number) => void;
-  isSyncing?: boolean;
 }
 
 // Confirmation dialog for provider deletion
@@ -95,13 +94,11 @@ function ProviderCardItem({
   onAuth,
   onDeleteRequest,
   onSync,
-  isSyncing,
 }: {
   provider: ProviderCardType;
   onAuth: (id: number) => void;
   onDeleteRequest: (provider: ProviderCardType) => void;
   onSync: (options?: { providerId?: number; visible?: boolean }) => void;
-  isSyncing?: boolean;
 }) {
   const Icon = provider.type === "bank" ? Building2 : CreditCard;
   const authStatus = provider.authStatus ?? (provider.hasCredentials ? "pending" : "no");
@@ -235,7 +232,6 @@ export function ProviderGrid({
   onSync,
   onDelete,
   onAuth,
-  isSyncing,
 }: ProviderGridProps) {
   const [deleteTarget, setDeleteTarget] = useState<ProviderCardType | null>(
     null
@@ -258,7 +254,6 @@ export function ProviderGrid({
             onAuth={onAuth}
             onDeleteRequest={setDeleteTarget}
             onSync={onSync}
-            isSyncing={isSyncing}
           />
         ))}
       </div>
