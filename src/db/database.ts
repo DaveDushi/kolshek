@@ -277,6 +277,28 @@ UPDATE categories SET classification = 'cc_billing' WHERE name = 'CC Billing';
 
 -- Drop the spending_excludes table (replaced by classification system)
 DROP TABLE IF EXISTS spending_excludes;`],
+
+  ["013_custom_pages.sql", `-- Custom dashboard pages: JSON widget definitions rendered at runtime.
+CREATE TABLE IF NOT EXISTS custom_pages (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  icon TEXT NOT NULL DEFAULT 'file-text',
+  description TEXT,
+  definition TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);`],
+
+  ["014_budgets.sql", `-- Budget targets per category for budget-vs-actual views.
+CREATE TABLE IF NOT EXISTS budgets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category TEXT NOT NULL,
+  month TEXT,
+  target_amount REAL NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(category, month)
+);`],
 ];
 
 // Run all pending SQL migrations.

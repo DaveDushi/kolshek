@@ -12,6 +12,7 @@ import { InsightsPage } from "./pages/insights-page";
 import { CategoriesPage } from "./pages/categories-page";
 import { TranslationsPage } from "./pages/translations-page";
 import { ProvidersPage } from "./pages/providers-page";
+import { CustomPage } from "./pages/custom-page";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,6 +43,7 @@ export function App() {
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/translations" element={<TranslationsPage />} />
                 <Route path="/providers" element={<ProvidersPage />} />
+                <Route path="/pages/:pageId" element={<CustomPage />} />
               </Routes>
             </ErrorBoundary>
           </AppShell>

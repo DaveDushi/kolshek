@@ -29,6 +29,7 @@ import { registerIncomeCommand } from "./commands/income.js";
 import { registerTrendsCommand } from "./commands/trends.js";
 import { registerInsightsCommand } from "./commands/insights.js";
 import { registerDashboardCommand } from "./commands/dashboard.js";
+import { registerPageCommand } from "./commands/page.js";
 import { registerUpdateCommand } from "./commands/update.js";
 import { getMostRecentSyncTime, listProviders } from "../db/repositories/providers.js";
 import { loadConfig } from "../config/loader.js";
@@ -159,6 +160,7 @@ registerIncomeCommand(program);
 registerTrendsCommand(program);
 registerInsightsCommand(program);
 registerDashboardCommand(program);
+registerPageCommand(program);
 registerUpdateCommand(program);
 
 // Parse and run
