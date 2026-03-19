@@ -176,6 +176,19 @@ document.querySelectorAll(".gs-plugin-pill").forEach(function (pill) {
   });
 });
 
+// ── Getting Started path switcher ─────────────────────────────
+document.querySelectorAll(".gs-path-tab[data-gs-path]").forEach(function (tab) {
+  tab.addEventListener("click", function () {
+    var path = tab.dataset.gsPath;
+    document.querySelectorAll(".gs-path-tab").forEach(function (t) {
+      t.classList.toggle("active", t.dataset.gsPath === path);
+    });
+    document.querySelectorAll(".gs-path").forEach(function (p) {
+      p.classList.toggle("active", p.id === "gs-path-" + path);
+    });
+  });
+});
+
 // ── Setup command selector ────────────────────────────────────
 function updateCmdCount() {
   var checked = document.querySelectorAll("#setup-commands input:checked");

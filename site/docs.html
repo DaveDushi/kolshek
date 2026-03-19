@@ -84,6 +84,7 @@
           <a href="#translate" class="docs-sidebar-link">translate</a>
           <a href="#schedule" class="docs-sidebar-link">schedule</a>
           <a href="#plugin" class="docs-sidebar-link">plugin</a>
+          <a href="#dashboard-cmd" class="docs-sidebar-link">dashboard</a>
           <a href="#spending" class="docs-sidebar-link">spending</a>
           <a href="#income" class="docs-sidebar-link">income</a>
           <a href="#trends" class="docs-sidebar-link">trends</a>
@@ -326,6 +327,8 @@ kolshek sql "SELECT category, SUM(chargedAmount) FROM transactions GROUP BY cate
               <tr><td><code>--from &lt;date&gt;</code></td><td>Start date</td></tr>
               <tr><td><code>--to &lt;date&gt;</code></td><td>End date</td></tr>
               <tr><td><code>--type &lt;type&gt;</code></td><td>Filter by provider type (<code>bank</code> | <code>credit_card</code>)</td></tr>
+              <tr><td><code>--exclude &lt;classifications&gt;</code></td><td>Comma-separated classifications to exclude</td></tr>
+              <tr><td><code>--include &lt;classifications&gt;</code></td><td>Only include these classifications (mutually exclusive with --exclude)</td></tr>
             </tbody>
           </table>
         </div>
@@ -339,6 +342,8 @@ kolshek sql "SELECT category, SUM(chargedAmount) FROM transactions GROUP BY cate
               <tr><td><code>--from &lt;date&gt;</code></td><td>Start date</td></tr>
               <tr><td><code>--to &lt;date&gt;</code></td><td>End date</td></tr>
               <tr><td><code>--type &lt;type&gt;</code></td><td>Filter by provider type (<code>bank</code> | <code>credit_card</code>)</td></tr>
+              <tr><td><code>--exclude &lt;classifications&gt;</code></td><td>Comma-separated classifications to exclude</td></tr>
+              <tr><td><code>--include &lt;classifications&gt;</code></td><td>Only include these classifications (mutually exclusive with --exclude)</td></tr>
             </tbody>
           </table>
         </div>
@@ -353,12 +358,23 @@ kolshek sql "SELECT category, SUM(chargedAmount) FROM transactions GROUP BY cate
               <tr><td><code>--to &lt;date&gt;</code></td><td>End date</td></tr>
               <tr><td><code>--type &lt;type&gt;</code></td><td>Filter by provider type (<code>bank</code> | <code>credit_card</code>)</td></tr>
               <tr><td><code>--limit &lt;n&gt;</code></td><td>Number of merchants to show (default: 20)</td></tr>
+              <tr><td><code>--exclude &lt;classifications&gt;</code></td><td>Comma-separated classifications to exclude</td></tr>
+              <tr><td><code>--include &lt;classifications&gt;</code></td><td>Only include these classifications (mutually exclusive with --exclude)</td></tr>
             </tbody>
           </table>
         </div>
 
         <h3 class="docs-h3">reports balance</h3>
         <p class="docs-p">Account balances with 30-day activity summary.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--exclude &lt;classifications&gt;</code></td><td>Comma-separated classifications to exclude</td></tr>
+              <tr><td><code>--include &lt;classifications&gt;</code></td><td>Only include these classifications (mutually exclusive with --exclude)</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <!-- ── categorize ────────────────────────────────────────── -->
@@ -455,6 +471,23 @@ kolshek sql "SELECT category, SUM(chargedAmount) FROM transactions GROUP BY cate
 
         <h3 class="docs-h3">categorize list</h3>
         <p class="docs-p">Show categories with transaction counts, totals, and source.</p>
+
+        <h3 class="docs-h3">categorize classify set &lt;category&gt; &lt;classification&gt;</h3>
+        <p class="docs-p">Set the classification for a category.</p>
+
+        <h3 class="docs-h3">categorize classify list</h3>
+        <p class="docs-p">Show all categories with their classifications.</p>
+
+        <h3 class="docs-h3">categorize classify auto</h3>
+        <p class="docs-p">Auto-classify categories based on dominant transaction direction.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--dry-run</code></td><td>Preview changes without modifying data</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <!-- ── translate ─────────────────────────────────────────── -->
@@ -517,12 +550,28 @@ kolshek sql "SELECT category, SUM(chargedAmount) FROM transactions GROUP BY cate
         <h3 class="docs-h3">plugin install &lt;tool&gt;</h3>
         <p class="docs-p">Install AI plugin for a tool.</p>
         <div class="docs-code"><pre><code>kolshek plugin install claude-code
-kolshek plugin install cursor
-kolshek plugin install gemini-cli</code></pre></div>
-        <p class="docs-p">Supported tools: <code>claude-code</code>, <code>openclaw</code>, <code>cursor</code>, <code>gemini-cli</code>, <code>antigravity</code>, <code>opencode</code>, <code>aider</code>, <code>windsurf</code>.</p>
+kolshek plugin install opencode
+kolshek plugin install codex
+kolshek plugin install openclaw</code></pre></div>
+        <p class="docs-p">Supported tools: <code>claude-code</code>, <code>opencode</code>, <code>codex</code>, <code>openclaw</code>.</p>
 
         <h3 class="docs-h3">plugin list</h3>
         <p class="docs-p">List available tool integrations.</p>
+      </section>
+
+      <!-- ── dashboard ───────────────────────────────────────────── -->
+      <section id="dashboard-cmd" class="docs-section">
+        <h2 class="docs-h2">dashboard</h2>
+        <p class="docs-p">Open the settings dashboard in your browser.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>-p, --port &lt;port&gt;</code></td><td>Port to listen on (default: 3000)</td></tr>
+              <tr><td><code>--no-open</code></td><td>Don't auto-open the browser</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <!-- ── spending ──────────────────────────────────────────── -->
@@ -540,20 +589,13 @@ kolshek spending -m 3         # 3 months ago</code></pre></div>
               <tr><td><code>--category &lt;name&gt;</code></td><td>Filter to a specific category</td></tr>
               <tr><td><code>--top &lt;n&gt;</code></td><td>Limit to top N groups</td></tr>
               <tr><td><code>--type &lt;type&gt;</code></td><td>Filter by provider type (<code>bank</code> | <code>credit_card</code>)</td></tr>
-              <tr><td><code>--lifestyle</code></td><td>Exclude categories marked as non-spending</td></tr>
+              <tr><td><code>--exclude &lt;classifications&gt;</code></td><td>Comma-separated classifications to exclude</td></tr>
+              <tr><td><code>--include &lt;classifications&gt;</code></td><td>Only include these classifications (mutually exclusive with --exclude)</td></tr>
               <tr><td><code>-m, --month-offset &lt;n&gt;</code></td><td>Months ago (e.g. <code>-m 3</code>)</td></tr>
             </tbody>
           </table>
         </div>
 
-        <h3 class="docs-h3">spending exclude add &lt;category&gt;</h3>
-        <p class="docs-p">Mark a category as non-spending.</p>
-
-        <h3 class="docs-h3">spending exclude remove &lt;category&gt;</h3>
-        <p class="docs-p">Remove a category from the exclusion list.</p>
-
-        <h3 class="docs-h3">spending exclude list</h3>
-        <p class="docs-p">Show all excluded categories.</p>
       </section>
 
       <!-- ── income ────────────────────────────────────────────── -->
@@ -567,6 +609,8 @@ kolshek spending -m 3         # 3 months ago</code></pre></div>
               <tr><td><code>--salary-only</code></td><td>Show only salary/wage transactions</td></tr>
               <tr><td><code>--include-refunds</code></td><td>Also show CC refunds (separate section)</td></tr>
               <tr><td><code>-m, --month-offset &lt;n&gt;</code></td><td>Months ago (e.g. <code>-m 3</code>)</td></tr>
+              <tr><td><code>--exclude &lt;classifications&gt;</code></td><td>Comma-separated classifications to exclude</td></tr>
+              <tr><td><code>--include &lt;classifications&gt;</code></td><td>Only include these classifications (mutually exclusive with --exclude)</td></tr>
             </tbody>
           </table>
         </div>
@@ -583,6 +627,8 @@ kolshek spending -m 3         # 3 months ago</code></pre></div>
               <tr><td><code>--mode &lt;mode&gt;</code></td><td>Analysis mode: <code>total</code> (default), <code>category</code>, <code>fixed-variable</code></td></tr>
               <tr><td><code>--category &lt;name&gt;</code></td><td>Track specific category (implies <code>--mode category</code>)</td></tr>
               <tr><td><code>--type &lt;type&gt;</code></td><td>Filter by provider type (<code>bank</code> | <code>credit_card</code>)</td></tr>
+              <tr><td><code>--exclude &lt;classifications&gt;</code></td><td>Comma-separated classifications to exclude</td></tr>
+              <tr><td><code>--include &lt;classifications&gt;</code></td><td>Only include these classifications (mutually exclusive with --exclude)</td></tr>
             </tbody>
           </table>
         </div>
@@ -597,6 +643,8 @@ kolshek spending -m 3         # 3 months ago</code></pre></div>
             <thead><tr><th>Option</th><th>Description</th></tr></thead>
             <tbody>
               <tr><td><code>--months &lt;n&gt;</code></td><td>Lookback period in months (default: 3)</td></tr>
+              <tr><td><code>--exclude &lt;classifications&gt;</code></td><td>Comma-separated classifications to exclude</td></tr>
+              <tr><td><code>--include &lt;classifications&gt;</code></td><td>Only include these classifications (mutually exclusive with --exclude)</td></tr>
             </tbody>
           </table>
         </div>
@@ -672,8 +720,9 @@ kolshek spending -m 3         # 3 months ago</code></pre></div>
 
         <h3 class="docs-h3">Install a Plugin</h3>
         <div class="docs-code"><pre><code>kolshek plugin install claude-code
-kolshek plugin install cursor
-kolshek plugin install gemini-cli</code></pre></div>
+kolshek plugin install opencode
+kolshek plugin install codex
+kolshek plugin install openclaw</code></pre></div>
         <p class="docs-p">Run <code>kolshek plugin list</code> to see all available integrations.</p>
 
         <h3 class="docs-h3">Structured Output</h3>
@@ -727,11 +776,16 @@ kolshek db schema transactions --json</code></pre></div>
 
         <h3 class="docs-h3">Quick Start</h3>
         <div class="docs-code"><pre><code>kolshek dashboard</code></pre></div>
-        <p class="docs-p">Opens a local web server (default: <code>http://localhost:5556</code>) with three pages:</p>
+        <p class="docs-p">Opens a local web server (default: <code>http://localhost:3000</code>) with a React SPA dashboard featuring 8 pages:</p>
         <ul class="docs-ul">
-          <li><strong>Providers</strong> — add, edit, remove, and test bank/credit card connections; fetch with real-time progress</li>
-          <li><strong>Categories</strong> — create category rules, view spending breakdowns, reassign transactions</li>
+          <li><strong>Dashboard</strong> — net worth overview, cashflow chart, spending breakdown, automated insights, recent transactions</li>
+          <li><strong>Transactions</strong> — browse, search, and filter all transactions with pagination</li>
+          <li><strong>Spending</strong> — monthly spending breakdown by category, merchant, or provider</li>
+          <li><strong>Trends</strong> — multi-month cashflow and spending trend analysis with charts</li>
+          <li><strong>Insights</strong> — financial alerts and recommendations based on spending patterns</li>
+          <li><strong>Categories</strong> — create category rules, view spending breakdowns, manage classifications</li>
           <li><strong>Translations</strong> — manage Hebrew-to-English merchant name mappings</li>
+          <li><strong>Providers</strong> — add, edit, remove, and test connections; fetch with real-time sync progress</li>
         </ul>
 
         <h3 class="docs-h3">Provider Management</h3>
@@ -757,7 +811,7 @@ kolshek db schema transactions --json</code></pre></div>
         </ul>
 
         <h3 class="docs-h3">Architecture</h3>
-        <p class="docs-p">Built with <strong>Bun.serve()</strong> (localhost-only HTTP server), <strong>HTMX</strong> (dynamic updates without a JS framework), <strong>Tailwind CSS v4</strong>, and <strong>SSE</strong> for real-time fetch progress. All data stays local.</p>
+        <p class="docs-p">Built with <strong>Bun.serve()</strong> (localhost-only HTTP server), <strong>React</strong> (full SPA with client-side routing), <strong>Tailwind CSS v4</strong> with <strong>Recharts</strong> for data visualization, and <strong>SSE</strong> for real-time per-provider sync progress. All data stays local.</p>
       </section>
 
       <!-- ── Changelog ──────────────────────────────────────────── -->
@@ -767,11 +821,37 @@ kolshek db schema transactions --json</code></pre></div>
         <h2 class="docs-h2">v0.3.7</h2>
         <h3 class="docs-h3">Features</h3>
         <ul class="docs-ul">
-          <li><strong>Full React dashboard</strong> &mdash; migrated from HTMX to a full React SPA with client-side routing. 8 pages: Dashboard, Transactions, Spending, Trends, Insights, Categories, Translations, Providers.</li>
-          <li><strong>Per-provider sync events</strong> &mdash; SSE now emits granular events per provider during sync, enabling real-time progress tracking in the dashboard.</li>
-          <li><strong>Cross-origin authentication</strong> &mdash; dashboard auth now works across origins, supporting the desktop app sidecar architecture.</li>
-          <li><strong>Dashboard analytics</strong> &mdash; net worth card, cashflow chart, spending donut, automated insights, and recent transactions view.</li>
-          <li><strong>Landing page polish</strong> &mdash; GitHub stars badge, trimmed favicon, theme toggle simplification, docs sidebar reorder, chat auto-scroll.</li>
+          <li><strong>React dashboard with client-side routing</strong> &mdash; Full SPA dashboard with 8 pages &mdash; overview, transactions, spending, trends, insights, categories, translations, and providers. Includes live sync progress panel, per-provider status tracking, and theme switching.</li>
+          <li><strong>Classification-based filtering</strong> &mdash; Transactions are now classified (expense, income, transfer, cc_billing, etc.) with filtering support across all report and trend endpoints.</li>
+          <li><strong>Custom classifications</strong> &mdash; Users can create and assign custom classifications beyond the built-in set via the dashboard classification panel.</li>
+          <li><strong>Real-time sync streaming</strong> &mdash; Bank sync now streams per-provider SSE events (start &rarr; progress &rarr; result &rarr; done) with live reconnection support for late-joining clients.</li>
+        </ul>
+
+        <h3 class="docs-h3">Security</h3>
+        <ul class="docs-ul">
+          <li><strong>Session authentication</strong> &mdash; Dashboard requires a cryptographic token (generated at launch, exchanged for an HttpOnly/SameSite=Strict cookie) &mdash; no more open endpoints.</li>
+          <li><strong>CORS hardening</strong> &mdash; Replaced wildcard <code class="docs-code">Access-Control-Allow-Origin: *</code> with an explicit origin allowlist and exact-match validation.</li>
+          <li><strong>CSRF protection</strong> &mdash; All mutations reject requests with missing or non-allowlisted <code class="docs-code">Origin</code> headers.</li>
+          <li><strong>Path traversal prevention</strong> &mdash; Static file serving validates resolved paths stay within the build output directory.</li>
+          <li><strong>Content-Security-Policy</strong> &mdash; Added CSP header restricting scripts, styles, images, and connections to same-origin only.</li>
+          <li><strong>ReDoS prevention</strong> &mdash; User-supplied regex patterns are validated for length, nested quantifiers, and excessive alternation before compilation.</li>
+          <li><strong>Error sanitization</strong> &mdash; All API and SSE error responses strip file paths, stack traces, and internal details.</li>
+          <li><strong>Pagination limits</strong> &mdash; Transaction endpoints capped at 500 rows per request to prevent database dumps.</li>
+          <li><strong>Windows permission fix</strong> &mdash; Switched from Node&rsquo;s <code class="docs-code">child_process.spawnSync</code> to <code class="docs-code">Bun.spawnSync</code> for reliable <code class="docs-code">icacls</code> permission hardening.</li>
+        </ul>
+
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li><strong>Fixed sync endpoint mismatch</strong> &mdash; Client and server now agree on <code class="docs-code">/api/v2/fetch</code> route and SSE event types (<code class="docs-code">start</code>, <code class="docs-code">progress</code>, <code class="docs-code">result</code>, <code class="docs-code">done</code>).</li>
+          <li><strong>Fixed SSE reconnection</strong> &mdash; <code class="docs-code">GET /api/v2/fetch/events</code> now streams live events instead of returning a dead snapshot.</li>
+          <li><strong>Fixed Vite dev server auth</strong> &mdash; Added <code class="docs-code">credentials: &quot;include&quot;</code> on client and <code class="docs-code">Access-Control-Allow-Credentials</code> on server for cross-origin cookie support.</li>
+          <li><strong>Fixed duplicate favicon route</strong> &mdash; Removed dead code branch for <code class="docs-code">/favicon.png</code> that shadowed the <code class="docs-code">/favicon.ico</code> handler.</li>
+        </ul>
+
+        <h3 class="docs-h3">Other</h3>
+        <ul class="docs-ul">
+          <li><strong>Removed legacy HTMX partials</strong> &mdash; Deleted all server-rendered HTML templates, styles, and layout files (~1,500 lines) in favor of the React SPA.</li>
+          <li><strong>Site polish</strong> &mdash; Updated favicon, added GitHub stars badge, footer credits, and improved nav/chat/theme toggle on the docs site.</li>
         </ul>
 
         <div class="docs-divider"></div>

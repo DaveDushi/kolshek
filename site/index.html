@@ -1022,7 +1022,7 @@
                 <div
                     class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 md:gap-5 stagger"
                 >
-                    <!-- 17 Providers (wide) -->
+                    <!-- 18 Providers (wide) -->
                     <div class="card fade-up lg:col-span-4 bento-wide">
                         <div class="feature-icon mb-4">
                             <svg
@@ -1043,7 +1043,7 @@
                             <h3
                                 class="text-base font-semibold text-heading mb-1.5"
                             >
-                                17 Banks & Credit Cards
+                                18 Banks & Credit Cards
                             </h3>
                             <p class="text-sm text-body">
                                 All major Israeli institutions — Hapoalim,
@@ -1076,7 +1076,7 @@
                         </h3>
                         <p class="text-sm text-body">
                             First-class plugins for Claude Code, OpenCode,
-                            Codex, and OpenClaw. 4 skills: init, categorize,
+                            Codex, and OpenClaw. 5 skills: init, translate, categorize,
                             analyze, review.
                         </p>
                     </div>
@@ -1458,185 +1458,149 @@
                     <h2
                         class="text-2xl md:text-3xl font-bold text-heading mb-3"
                     >
-                        Get started in 4 steps
+                        Get started
                     </h2>
                     <p class="text-body">
                         No account needed. Everything runs on your computer.
                     </p>
                 </div>
 
-                <div class="gs-steps fade-up">
-                    <!-- Step 1: Download -->
-                    <div class="gs-step">
-                        <div class="gs-num">1</div>
-                        <div class="gs-content">
-                            <h3 class="gs-title">Download KolShek</h3>
-                            <p class="gs-desc">
-                                Click the button for your system. The download
-                                starts immediately.
-                            </p>
+                <!-- Path tabs -->
+                <div class="gs-path-tabs fade-up">
+                    <button class="gs-path-tab active" data-gs-path="agent">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+                        With AI Agent
+                    </button>
+                    <button class="gs-path-tab" data-gs-path="manual">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                        Manual Setup
+                    </button>
+                </div>
 
-                            <!-- Auto-detected big button -->
-                            <a
-                                id="dl-auto"
-                                href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-windows-x64.exe"
-                                class="gs-download-btn"
-                            >
-                                <svg
-                                    width="20"
-                                    height="20"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="2"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                >
-                                    <path
-                                        d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
-                                    />
-                                    <polyline points="7 10 12 15 17 10" />
-                                    <line x1="12" y1="15" x2="12" y2="3" />
-                                </svg>
-                                <span>
-                                    <span
-                                        class="gs-download-label"
-                                        id="dl-auto-label"
-                                        >Download for Windows</span
-                                    >
-                                    <span
-                                        class="gs-download-meta"
-                                        id="dl-auto-meta"
-                                        ></span
-                                    >
-                                </span>
-                            </a>
+                <!-- PATH: With AI Agent (3 steps) -->
+                <div class="gs-path active" id="gs-path-agent">
+                    <div class="gs-steps fade-up">
+                        <!-- Step 1: Download -->
+                        <div class="gs-step">
+                            <div class="gs-num">1</div>
+                            <div class="gs-content">
+                                <h3 class="gs-title">Download KolShek</h3>
+                                <p class="gs-desc">Click the button for your system.</p>
+                                <a id="dl-auto" href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-windows-x64.exe" class="gs-download-btn">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                    <span>
+                                        <span class="gs-download-label" id="dl-auto-label">Download for Windows</span>
+                                        <span class="gs-download-meta" id="dl-auto-meta"></span>
+                                    </span>
+                                </a>
+                                <div class="gs-other-platforms">
+                                    <span class="text-xs text-faint">Other platforms:</span>
+                                    <a href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-macos-arm64" class="gs-alt-link">macOS (Apple Silicon)</a>
+                                    <a href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-macos-x64" class="gs-alt-link">macOS (Intel)</a>
+                                    <a href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-linux-x64" class="gs-alt-link">Linux x64</a>
+                                    <a href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-linux-arm64" class="gs-alt-link">Linux ARM</a>
+                                </div>
+                            </div>
+                        </div>
 
-                            <!-- Other platforms -->
-                            <div class="gs-other-platforms">
-                                <span class="text-xs text-faint"
-                                    >Other platforms:</span
-                                >
-                                <a
-                                    href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-macos-arm64"
-                                    class="gs-alt-link"
-                                    >macOS (Apple Silicon)</a
-                                >
-                                <a
-                                    href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-macos-x64"
-                                    class="gs-alt-link"
-                                    >macOS (Intel)</a
-                                >
-                                <a
-                                    href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-linux-x64"
-                                    class="gs-alt-link"
-                                    >Linux x64</a
-                                >
-                                <a
-                                    href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-linux-arm64"
-                                    class="gs-alt-link"
-                                    >Linux ARM</a
-                                >
+                        <!-- Step 2: Connect your bank -->
+                        <div class="gs-step">
+                            <div class="gs-num">2</div>
+                            <div class="gs-content">
+                                <h3 class="gs-title">Connect your bank</h3>
+                                <p class="gs-desc">Run the setup wizard to add your bank or credit card providers.</p>
+                                <div class="gs-cmd-block">
+                                    <code>kolshek init</code>
+                                    <button class="copy-btn" onclick="copyText(this, 'kolshek init')" title="Copy">
+                                        <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                        <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Install plugin -->
+                        <div class="gs-step">
+                            <div class="gs-num">3</div>
+                            <div class="gs-content">
+                                <h3 class="gs-title">Install the plugin</h3>
+                                <p class="gs-desc">Pick your AI tool and install the KolShek skill:</p>
+                                <div class="gs-plugin-pills" id="gs-plugin-pills">
+                                    <button class="gs-plugin-pill active" data-plugin="claude-code">Claude Code</button>
+                                    <button class="gs-plugin-pill" data-plugin="opencode">OpenCode</button>
+                                    <button class="gs-plugin-pill" data-plugin="codex">Codex</button>
+                                    <button class="gs-plugin-pill" data-plugin="openclaw">OpenClaw</button>
+                                </div>
+                                <div class="gs-cmd-block mt-3">
+                                    <code id="gs-plugin-cmd">kolshek plugin install claude-code</code>
+                                    <button class="copy-btn" id="gs-plugin-copy" onclick="copyText(this, document.getElementById('gs-plugin-cmd').textContent)" title="Copy">
+                                        <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                        <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 4: Ask your agent -->
+                        <div class="gs-step">
+                            <div class="gs-num">4</div>
+                            <div class="gs-content">
+                                <h3 class="gs-title">Ask your agent</h3>
+                                <p class="gs-desc">Your agent syncs, analyzes, and reports on your finances. Just ask:</p>
+                                <div class="gs-cmd-block">
+                                    <code>/kolshek:init</code>
+                                    <button class="copy-btn" onclick="copyText(this, '/kolshek:init')" title="Copy">
+                                        <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                        <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-faint mt-2">Then try <code class="text-xs bg-code-inline px-1.5 py-0.5 rounded font-mono">/kolshek:analyze</code> or <code class="text-xs bg-code-inline px-1.5 py-0.5 rounded font-mono">/kolshek:review</code></p>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Step 2: Connect your bank -->
-                    <div class="gs-step">
-                        <div class="gs-num">2</div>
-                        <div class="gs-content">
-                            <h3 class="gs-title">Connect your bank</h3>
-                            <p class="gs-desc">
-                                Open a terminal and run this command. A
-                                step-by-step wizard will guide you through
-                                connecting your bank or credit card.
-                            </p>
-                            <div class="gs-cmd-block">
-                                <code>kolshek init</code>
-                                <button
-                                    class="copy-btn"
-                                    onclick="copyText(this, 'kolshek init')"
-                                    title="Copy"
-                                >
-                                    <svg
-                                        class="w-4 h-4 copy-icon"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="2"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                        />
-                                    </svg>
-                                    <svg
-                                        class="w-4 h-4 check-icon hidden"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="2"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            d="M5 13l4 4L19 7"
-                                        />
-                                    </svg>
-                                </button>
+                <!-- PATH: Manual Setup (3 steps) -->
+                <div class="gs-path" id="gs-path-manual">
+                    <div class="gs-steps fade-up">
+                        <!-- Step 1: Download -->
+                        <div class="gs-step">
+                            <div class="gs-num">1</div>
+                            <div class="gs-content">
+                                <h3 class="gs-title">Download KolShek</h3>
+                                <p class="gs-desc">Click the button for your system.</p>
+                                <a href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-windows-x64.exe" class="gs-download-btn">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                    <span>
+                                        <span class="gs-download-label">Download for Windows</span>
+                                    </span>
+                                </a>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Step 3: See your finances -->
-                    <div class="gs-step">
-                        <div class="gs-num">3</div>
-                        <div class="gs-content">
-                            <h3 class="gs-title">See your finances</h3>
-                            <p class="gs-desc">
-                                Open a visual dashboard in your browser, or get a quick summary in the terminal.
-                            </p>
-                            <div class="gs-cmd-block">
-                                <code>kolshek dashboard</code>
-                                <button
-                                    class="copy-btn"
-                                    onclick="copyText(this, 'kolshek dashboard')"
-                                    title="Copy"
-                                >
-                                    <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                                    <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                </button>
+                        <!-- Step 2: Open the dashboard -->
+                        <div class="gs-step">
+                            <div class="gs-num">2</div>
+                            <div class="gs-content">
+                                <h3 class="gs-title">Open the dashboard</h3>
+                                <p class="gs-desc">Launch the web dashboard — add your bank accounts, view transactions, and track spending all from the browser.</p>
+                                <div class="gs-cmd-block">
+                                    <code>kolshek dashboard</code>
+                                    <button class="copy-btn" onclick="copyText(this, 'kolshek dashboard')" title="Copy">
+                                        <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                        <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-faint mt-2">Or use the CLI: <code class="text-xs bg-code-inline px-1.5 py-0.5 rounded font-mono">kolshek init</code></p>
                             </div>
-                            <p class="text-xs text-faint mt-2">Or use the CLI: <code class="text-xs bg-code-inline px-1.5 py-0.5 rounded font-mono">kolshek report monthly</code></p>
                         </div>
-                    </div>
 
-                    <!-- Step 4: Connect your AI tool -->
-                    <div class="gs-step">
-                        <div class="gs-num">4</div>
-                        <div class="gs-content">
-                            <h3 class="gs-title">Connect your AI tool</h3>
-                            <p class="gs-desc">
-                                Let your AI assistant query your finances directly. Pick your tool:
-                            </p>
-                            <div class="gs-plugin-pills" id="gs-plugin-pills">
-                                <button class="gs-plugin-pill active" data-plugin="claude-code">Claude Code</button>
-                                <button class="gs-plugin-pill" data-plugin="opencode">OpenCode</button>
-                                <button class="gs-plugin-pill" data-plugin="codex">Codex</button>
-                                <button class="gs-plugin-pill" data-plugin="openclaw">OpenClaw</button>
-                            </div>
-                            <div class="gs-cmd-block mt-3">
-                                <code id="gs-plugin-cmd">kolshek plugin install claude-code</code>
-                                <button
-                                    class="copy-btn"
-                                    id="gs-plugin-copy"
-                                    onclick="copyText(this, document.getElementById('gs-plugin-cmd').textContent)"
-                                    title="Copy"
-                                >
-                                    <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                                    <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                </button>
+                        <!-- Step 3: Connect & sync -->
+                        <div class="gs-step">
+                            <div class="gs-num">3</div>
+                            <div class="gs-content">
+                                <h3 class="gs-title">Connect & sync</h3>
+                                <p class="gs-desc">Add your bank or credit card from the dashboard settings page, then hit sync. Your transactions will appear automatically.</p>
                             </div>
                         </div>
                     </div>
