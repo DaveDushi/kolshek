@@ -277,6 +277,22 @@ UPDATE categories SET classification = 'cc_billing' WHERE name = 'CC Billing';
 
 -- Drop the spending_excludes table (replaced by classification system)
 DROP TABLE IF EXISTS spending_excludes;`],
+
+  ["013_reconciliation.sql", `-- Reconciliation decisions for fuzzy duplicate detection
+CREATE TABLE IF NOT EXISTS reconciliation_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tx_id_a INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    tx_id_b INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    decision TEXT NOT NULL CHECK (decision IN ('merged', 'dismissed')),
+    score REAL NOT NULL,
+    merged_into_tx_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+    decided_at TEXT NOT NULL DEFAULT (datetime('now')),
+    notes TEXT,
+    UNIQUE (tx_id_a, tx_id_b)
+);
+
+CREATE INDEX IF NOT EXISTS idx_recon_tx_a ON reconciliation_decisions (tx_id_a);
+CREATE INDEX IF NOT EXISTS idx_recon_tx_b ON reconciliation_decisions (tx_id_b);`],
 ];
 
 // Run all pending SQL migrations.

@@ -31,6 +31,8 @@ import { registerInsightsCommand } from "./commands/insights.js";
 import { registerDashboardCommand } from "./commands/dashboard.js";
 import { registerUpdateCommand } from "./commands/update.js";
 import { registerUninstallCommand } from "./commands/uninstall.js";
+import { registerImportCommand } from "./commands/import.js";
+import { registerReconcileCommand } from "./commands/reconcile.js";
 import { getMostRecentSyncTime, listProviders } from "../db/repositories/providers.js";
 import { loadConfig } from "../config/loader.js";
 import { syncProviders } from "../core/sync-engine.js";
@@ -100,7 +102,7 @@ program
       }
 
       // Auto-fetch if data is stale
-      const autoFetchTriggers = new Set(["list", "search", "accounts", "reports", "query", "summary", "spending", "income", "trends", "insights"]);
+      const autoFetchTriggers = new Set(["list", "search", "accounts", "reports", "query", "summary", "spending", "income", "trends", "insights", "reconcile"]);
       if (
         opts.autoFetch !== false &&
         autoFetchTriggers.has(commandName) &&
@@ -160,6 +162,8 @@ registerIncomeCommand(program);
 registerTrendsCommand(program);
 registerInsightsCommand(program);
 registerDashboardCommand(program);
+registerImportCommand(program);
+registerReconcileCommand(program);
 registerUpdateCommand(program);
 registerUninstallCommand(program);
 

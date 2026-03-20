@@ -57,4 +57,11 @@ export const queryKeys = {
     list: (months: number, exclude?: string[]) =>
       [...queryKeys.insights.all, "list", months, exclude ?? null] as const,
   },
+  reconciliation: {
+    all: ["reconciliation"] as const,
+    duplicates: (filters: Record<string, unknown>) =>
+      [...queryKeys.reconciliation.all, "duplicates", filters] as const,
+    history: (filters: Record<string, unknown>) =>
+      [...queryKeys.reconciliation.all, "history", filters] as const,
+  },
 };

@@ -9,6 +9,8 @@ import {
   TrendingUp,
   Tags,
   Languages,
+  Upload,
+  GitCompareArrows,
   Building2,
   Sun,
   Moon,
@@ -131,6 +133,8 @@ export function Sidebar() {
               </Badge>
             ) : null,
         },
+        { label: "Import", path: "/import", icon: Upload },
+        { label: "Reconcile", path: "/reconcile", icon: GitCompareArrows },
       ],
     },
     {

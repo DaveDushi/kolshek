@@ -10,6 +10,8 @@ import {
   Lightbulb,
   TrendingUp,
   Languages,
+  Upload,
+  GitCompareArrows,
   Building2,
   RefreshCw,
   Sun,
@@ -138,6 +140,16 @@ export function MobileNav() {
             {untranslatedCount}
           </Badge>
         ) : null,
+    },
+    {
+      label: "Import",
+      path: "/import",
+      icon: Upload,
+    },
+    {
+      label: "Reconcile",
+      path: "/reconcile",
+      icon: GitCompareArrows,
     },
     {
       label: "Providers",

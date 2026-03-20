@@ -248,3 +248,84 @@ export type BuiltinClassification =
 
 // Map of category name → classification
 export type ClassificationMap = Record<string, string>;
+
+// --- CSV Import ---
+
+export interface CsvImportPreview {
+  totalRows: number;
+  valid: number;
+  errors: Array<{ row: number; column?: string; message: string }>;
+  preview: CsvPreviewRow[];
+}
+
+export interface CsvPreviewRow {
+  date: string;
+  description: string;
+  chargedAmount: number;
+  chargedCurrency: string;
+  status: string;
+  category: string | null;
+  provider: string;
+  accountNumber: string;
+  isDuplicate: boolean;
+}
+
+export interface CsvImportResult {
+  imported: number;
+  updated: number;
+  duplicates: number;
+  errors: Array<{ row: number; message: string }>;
+}
+
+// --- Reconciliation ---
+
+export interface DuplicateCandidateApi {
+  txA: DuplicateTxSummaryApi;
+  txB: DuplicateTxSummaryApi;
+  score: number;
+  amountDiff: number;
+  dateDiffDays: number;
+  descriptionSimilarity: number;
+  sameAccount: boolean;
+}
+
+export interface DuplicateTxSummaryApi {
+  id: number;
+  date: string;
+  description: string;
+  descriptionEn: string | null;
+  chargedAmount: number;
+  chargedCurrency: string | null;
+  status: string;
+  category: string | null;
+  providerAlias: string;
+  accountNumber: string;
+}
+
+export interface ReconciliationRecordApi {
+  id: number;
+  txIdA: number;
+  txIdB: number;
+  decision: "merged" | "dismissed";
+  score: number;
+  mergedIntoTxId: number | null;
+  decidedAt: string;
+  notes: string | null;
+}
+
+export interface BalanceReconciliationApi {
+  accountId: number;
+  accountNumber: string;
+  providerAlias: string;
+  expectedBalance: number;
+  computedBalance: number;
+  discrepancy: number;
+  transactionCount: number;
+  dateRange: { from: string; to: string };
+  currency: string;
+}
+
+export interface DuplicatesResponse {
+  candidates: DuplicateCandidateApi[];
+  count: number;
+}

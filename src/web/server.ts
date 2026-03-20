@@ -90,6 +90,7 @@ import {
   detectTrendWarnings,
 } from "../core/insights.js";
 import { syncProviders } from "../core/sync-engine.js";
+import { getDatabase } from "../db/database.js";
 import type { RuleConditions } from "../types/category-rule.js";
 import type { TransactionFilters } from "../types/transaction.js";
 
@@ -1081,6 +1082,205 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
 
         // =================================================================
         // --- Fetch / Sync API ---
+
+        // === Import CSV ===
+
+        // POST /api/v2/import/csv — parse + validate CSV, return preview
+        if (method === "POST" && path === "/api/v2/import/csv") {
+          const formData = await req.formData();
+          const file = formData.get("file");
+          if (!file || !(file instanceof File)) {
+            return jsonError("BAD_REQUEST", "Missing 'file' field in form data.", 400);
+          }
+          const text = await file.text();
+          const { validateCsvImport } = await import("../core/csv-import.js");
+          const validation = validateCsvImport(text);
+
+          // Check for duplicates against DB
+          const { transactionHash } = await import("../core/sync-engine.js");
+          const { resolveProviders } = await import("../db/repositories/providers.js");
+          const { getDatabase } = await import("../db/database.js");
+          const db = getDatabase();
+
+          const preview = validation.transactions.slice(0, 50).map((tx) => {
+            let isDuplicate = false;
+            const providers = resolveProviders(tx.provider);
+            if (providers.length === 1) {
+              const hash = transactionHash(
+                { date: tx.date, chargedAmount: tx.chargedAmount, description: tx.description, memo: tx.memo },
+                providers[0].companyId,
+                tx.accountNumber,
+              );
+              const existing = db
+                .prepare("SELECT 1 FROM transactions t JOIN accounts a ON a.id = t.account_id WHERE a.account_number = $acct AND t.hash = $hash LIMIT 1")
+                .get({ $acct: tx.accountNumber, $hash: hash });
+              isDuplicate = !!existing;
+            }
+            return {
+              date: tx.date,
+              description: tx.description,
+              chargedAmount: tx.chargedAmount,
+              chargedCurrency: tx.chargedCurrency,
+              status: tx.status,
+              category: tx.category,
+              provider: tx.provider,
+              accountNumber: tx.accountNumber,
+              isDuplicate,
+            };
+          });
+
+          return json({
+            totalRows: validation.transactions.length + validation.errors.length,
+            valid: validation.transactions.length,
+            errors: validation.errors,
+            preview,
+          });
+        }
+
+        // POST /api/v2/import/csv/confirm — commit CSV import to DB
+        if (method === "POST" && path === "/api/v2/import/csv/confirm") {
+          const formData = await req.formData();
+          const file = formData.get("file");
+          const skipErrors = formData.get("skipErrors") === "true";
+          if (!file || !(file instanceof File)) {
+            return jsonError("BAD_REQUEST", "Missing 'file' field in form data.", 400);
+          }
+          const text = await file.text();
+          const { validateCsvImport, buildTransactionInput } = await import("../core/csv-import.js");
+          const { resolveProviders: resolve2 } = await import("../db/repositories/providers.js");
+          const { upsertAccount } = await import("../db/repositories/accounts.js");
+          const { upsertTransaction } = await import("../db/repositories/transactions.js");
+          const { getDatabase: getDb } = await import("../db/database.js");
+
+          const validation = validateCsvImport(text);
+          if (validation.errors.length > 0 && !skipErrors) {
+            return jsonError("VALIDATION_ERROR", `CSV has ${validation.errors.length} error(s).`, 400);
+          }
+
+          const db = getDb();
+          let imported = 0, updated = 0, duplicates = 0;
+          const importErrors: Array<{ row: number; message: string }> = [];
+
+          db.run("BEGIN");
+          try {
+            for (let i = 0; i < validation.transactions.length; i++) {
+              const tx = validation.transactions[i];
+              const providers = resolve2(tx.provider);
+              if (providers.length !== 1) {
+                importErrors.push({ row: i + 2, message: `Provider '${tx.provider}' not found or ambiguous.` });
+                continue;
+              }
+              const provider = providers[0];
+              const account = upsertAccount(provider.id, tx.accountNumber, provider.companyId);
+              const input = buildTransactionInput(tx, account.id, provider.companyId, tx.accountNumber);
+              const result = upsertTransaction(input);
+              if (result.action === "inserted") imported++;
+              else if (result.action === "updated") updated++;
+              else duplicates++;
+            }
+            db.run("COMMIT");
+          } catch (err) {
+            db.run("ROLLBACK");
+            return jsonError("IMPORT_ERROR", err instanceof Error ? err.message : String(err), 500);
+          }
+
+          return json({ imported, updated, duplicates, errors: importErrors });
+        }
+
+        // === Reconciliation ===
+
+        // GET /api/v2/reconciliation/duplicates — find fuzzy duplicate candidates
+        if (method === "GET" && path === "/api/v2/reconciliation/duplicates") {
+          const { computeFuzzyScore, rankDuplicates } = await import("../core/reconcile.js");
+          const { findFuzzyDuplicateCandidates } = await import("../db/repositories/reconciliation.js");
+          const tolerance = Number(url.searchParams.get("tolerance") ?? "1");
+          const dateWindow = Number(url.searchParams.get("dateWindow") ?? "3");
+          const crossAccount = url.searchParams.get("crossAccount") === "true";
+          const minScore = Number(url.searchParams.get("minScore") ?? "0.5");
+          const from = url.searchParams.get("from") ?? undefined;
+          const to = url.searchParams.get("to") ?? undefined;
+          const accountId = url.searchParams.get("accountId") ? Number(url.searchParams.get("accountId")) : undefined;
+
+          const config = { amountTolerance: tolerance, dateWindowDays: dateWindow, descriptionThreshold: 0.6, crossAccount };
+          const rawPairs = findFuzzyDuplicateCandidates(config, { from, to, accountId });
+          const candidates = rankDuplicates(
+            rawPairs.map((p) => computeFuzzyScore(p.txA, p.txB, config)).filter((c): c is NonNullable<typeof c> => c !== null),
+            minScore,
+          );
+
+          return json({ candidates, count: candidates.length });
+        }
+
+        // POST /api/v2/reconciliation/decide — record merge or dismiss decision
+        if (method === "POST" && path === "/api/v2/reconciliation/decide") {
+          const body = await parseJsonBody(req);
+          const txIdA = Number(body.txIdA);
+          const txIdB = Number(body.txIdB);
+          const decision = body.decision as string;
+          const keepTxId = body.keepTxId ? Number(body.keepTxId) : undefined;
+
+          if (!txIdA || !txIdB || (decision !== "merged" && decision !== "dismissed")) {
+            return jsonError("BAD_REQUEST", "Required: txIdA, txIdB, decision (merged|dismissed).", 400);
+          }
+
+          const { mergeDuplicate, recordReconciliationDecision } = await import("../db/repositories/reconciliation.js");
+
+          if (decision === "merged") {
+            if (!keepTxId) {
+              return jsonError("BAD_REQUEST", "keepTxId is required for merge decisions.", 400);
+            }
+            const deleteTxId = keepTxId === txIdA ? txIdB : txIdA;
+            const result = mergeDuplicate(keepTxId, deleteTxId, Number(body.score ?? 0));
+            return json({ decision: result.decision });
+          } else {
+            const record = recordReconciliationDecision(txIdA, txIdB, "dismissed", Number(body.score ?? 0));
+            return json({ decision: record });
+          }
+        }
+
+        // GET /api/v2/reconciliation/history — past reconciliation decisions
+        if (method === "GET" && path === "/api/v2/reconciliation/history") {
+          const { listReconciliationDecisions } = await import("../db/repositories/reconciliation.js");
+          const decision = url.searchParams.get("decision") as "merged" | "dismissed" | undefined;
+          const limit = Number(url.searchParams.get("limit") ?? "50");
+          const records = listReconciliationDecisions({ decision: decision || undefined, limit });
+          return json(records);
+        }
+
+        // POST /api/v2/reconciliation/balance — compute account balance
+        if (method === "POST" && path === "/api/v2/reconciliation/balance") {
+          const body = await parseJsonBody(req);
+          const accountId = Number(body.accountId);
+          const expectedBalance = Number(body.expectedBalance);
+          if (!accountId || isNaN(expectedBalance)) {
+            return jsonError("BAD_REQUEST", "Required: accountId, expectedBalance.", 400);
+          }
+
+          const { computeAccountBalance } = await import("../db/repositories/reconciliation.js");
+          const from = typeof body.from === "string" ? body.from : undefined;
+          const to = typeof body.to === "string" ? body.to : undefined;
+          const result = computeAccountBalance(accountId, from, to);
+
+          // Look up account info
+          const db = getDatabase();
+          const acctRow = db.prepare(
+            `SELECT a.account_number, a.currency, p.alias AS provider_alias
+             FROM accounts a JOIN providers p ON p.id = a.provider_id
+             WHERE a.id = $id`,
+          ).get({ $id: accountId }) as { account_number: string; currency: string; provider_alias: string } | null;
+
+          return json({
+            accountId,
+            accountNumber: acctRow?.account_number ?? "",
+            providerAlias: acctRow?.provider_alias ?? "",
+            expectedBalance,
+            computedBalance: result.sum,
+            discrepancy: expectedBalance - result.sum,
+            transactionCount: result.count,
+            dateRange: { from: result.from, to: result.to },
+            currency: acctRow?.currency ?? "ILS",
+          });
+        }
 
         // POST /api/v2/fetch — start a fetch (JSON body). Returns SSE stream.
         if (method === "POST" && path === "/api/v2/fetch") {
