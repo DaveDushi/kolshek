@@ -91,10 +91,17 @@ export function registerUpdateCommand(program: Command): void {
 
       let release: GithubRelease;
       try {
-        release = await fetchLatestRelease();
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30_000);
+        try {
+          release = await fetchLatestRelease(controller.signal);
+        } finally {
+          clearTimeout(timeout);
+        }
       } catch (err) {
         spinner.stop();
-        const msg = err instanceof Error ? err.message : String(err);
+        const isTimeout = err instanceof DOMException && err.name === "AbortError";
+        const msg = isTimeout ? "Request timed out (30s)" : err instanceof Error ? err.message : String(err);
         printError("UPDATE_CHECK_FAILED", `Failed to check for updates: ${msg}`, {
           retryable: true,
           suggestions: ["Check your internet connection", "Try again later"],
@@ -133,6 +140,9 @@ export function registerUpdateCommand(program: Command): void {
         return;
       }
 
+      // Progress: past the check phase
+      spinner.text = "Preparing download...";
+
       // Find the matching asset
       const asset = release.assets.find((a) => a.name === binaryName);
       if (!asset) {
@@ -160,14 +170,21 @@ export function registerUpdateCommand(program: Command): void {
 
       let buffer: ArrayBuffer;
       try {
-        const res = await fetch(asset.browser_download_url);
-        if (!res.ok) {
-          throw new Error(`Download failed: ${res.status} ${res.statusText}`);
+        const dlController = new AbortController();
+        const dlTimeout = setTimeout(() => dlController.abort(), 120_000);
+        try {
+          const res = await fetch(asset.browser_download_url, { signal: dlController.signal });
+          if (!res.ok) {
+            throw new Error(`Download failed: ${res.status} ${res.statusText}`);
+          }
+          buffer = await res.arrayBuffer();
+        } finally {
+          clearTimeout(dlTimeout);
         }
-        buffer = await res.arrayBuffer();
       } catch (err) {
         spinner.stop();
-        const msg = err instanceof Error ? err.message : String(err);
+        const isTimeout = err instanceof DOMException && err.name === "AbortError";
+        const msg = isTimeout ? "Download timed out (120s)" : err instanceof Error ? err.message : String(err);
         printError("DOWNLOAD_FAILED", `Failed to download update: ${msg}`, {
           retryable: true,
           suggestions: ["Check your internet connection", `Download manually from ${release.html_url}`],
@@ -181,11 +198,18 @@ export function registerUpdateCommand(program: Command): void {
       if (checksumAsset) {
         spinner.text = "Verifying checksum...";
         try {
-          const csRes = await fetch(checksumAsset.browser_download_url);
-          if (!csRes.ok) {
-            throw new Error(`Checksum file returned ${csRes.status}`);
+          const csController = new AbortController();
+          const csTimeout = setTimeout(() => csController.abort(), 15_000);
+          let csText: string;
+          try {
+            const csRes = await fetch(checksumAsset.browser_download_url, { signal: csController.signal });
+            if (!csRes.ok) {
+              throw new Error(`Checksum file returned ${csRes.status}`);
+            }
+            csText = (await csRes.text()).trim().split(/\s+/)[0].toLowerCase();
+          } finally {
+            clearTimeout(csTimeout);
           }
-          const csText = (await csRes.text()).trim().split(/\s+/)[0].toLowerCase();
           const actual = createHash("sha256").update(Buffer.from(buffer)).digest("hex");
           if (actual !== csText) {
             spinner.stop();
@@ -228,6 +252,15 @@ export function registerUpdateCommand(program: Command): void {
         // Set executable permission on Unix
         if (process.platform !== "win32") {
           chmodSync(execPath, 0o755);
+        }
+
+        // Remove macOS quarantine attribute so Gatekeeper doesn't block the binary
+        if (process.platform === "darwin") {
+          try {
+            Bun.spawnSync(["xattr", "-d", "com.apple.quarantine", execPath]);
+          } catch {
+            // best-effort — xattr may not exist or attribute may not be set
+          }
         }
 
         // Clean up backup

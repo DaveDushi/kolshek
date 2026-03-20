@@ -190,6 +190,12 @@ fi
 mkdir -p "$INSTALL_DIR"
 mv "$TMPDIR/$BINARY_NAME" "$BINARY_PATH"
 chmod +x "$BINARY_PATH"
+
+# Remove macOS quarantine attribute so Gatekeeper doesn't block the unsigned binary
+if [ "$PLATFORM" = "macos" ]; then
+  xattr -d com.apple.quarantine "$BINARY_PATH" 2>/dev/null || true
+fi
+
 success "Installed to $BINARY_PATH"
 
 # --- PATH management ---
