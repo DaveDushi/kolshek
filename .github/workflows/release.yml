@@ -40,8 +40,11 @@ jobs:
 
       - run: bun install
 
-      - name: Generate embedded plugin files
-        run: bun scripts/generate-plugin-embed.ts
+      - name: Build SPA and generate embedded files
+        run: |
+          bun run build:web
+          bun scripts/generate-web-embed.ts
+          bun scripts/generate-plugin-embed.ts
 
       - run: bun build ./src/cli/index.ts --compile --target=${{ matrix.target }} --outfile dist/${{ matrix.artifact }}
 

@@ -15,7 +15,7 @@
     "dev:css": "bunx @tailwindcss/cli -i src/web/styles.css -o src/web/dist/styles.css --watch",
     "dev:web": "bun --bun vite --config src/web/app/vite.config.ts",
     "build:web": "bun --bun vite build --config src/web/app/vite.config.ts",
-    "prebuild": "bun scripts/generate-plugin-embed.ts",
+    "prebuild": "bun run build:web && bun scripts/generate-web-embed.ts && bun scripts/generate-plugin-embed.ts",
     "build": "bun build ./src/cli/index.ts --compile --outfile dist/kolshek",
     "build:windows-x64": "bun build ./src/cli/index.ts --compile --target=bun-windows-x64 --outfile dist/kolshek-windows-x64.exe",
     "build:linux-x64": "bun build ./src/cli/index.ts --compile --target=bun-linux-x64 --outfile dist/kolshek-linux-x64",

@@ -26,6 +26,7 @@ Thumbs.db
 
 # Auto-generated
 src/cli/plugin-files.ts
+src/web/web-files.ts
 
 # React dashboard build output
 src/web/dist/app/
