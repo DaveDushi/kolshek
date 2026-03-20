@@ -1,5 +1,6 @@
 # KolShek installer for Windows
 # Usage: irm https://kolshek.com/install.ps1 | iex
+# Uninstall: irm https://kolshek.com/uninstall.ps1 | iex
 #
 # Environment variables:
 #   KOLSHEK_INSTALL_DIR  Override install location (default: $env:LOCALAPPDATA\kolshek)

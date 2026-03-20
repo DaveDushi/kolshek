@@ -1,7 +1,7 @@
 #!/bin/sh
 # KolShek installer for macOS and Linux
 # Usage: curl -fsSL https://kolshek.com/install.sh | sh
-# Uninstall: curl -fsSL https://kolshek.com/install.sh | sh -s -- --uninstall
+# Uninstall: curl -fsSL https://kolshek.com/uninstall.sh | sh
 #
 # Environment variables:
 #   KOLSHEK_INSTALL_DIR  Override install location (default: ~/.local/bin)
