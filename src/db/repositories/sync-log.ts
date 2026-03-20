@@ -146,6 +146,26 @@ export function countSyncLogsSince(since: string): number {
   return row.cnt;
 }
 
+// Count consecutive recent failures (from newest sync backward, stopping at first success)
+export function countConsecutiveFailures(providerId: number): number {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT status FROM sync_log
+       WHERE provider_id = $providerId AND status != 'running'
+       ORDER BY started_at DESC
+       LIMIT 10`,
+    )
+    .all({ $providerId: providerId }) as { status: string }[];
+
+  let count = 0;
+  for (const row of rows) {
+    if (row.status === "error") count++;
+    else break;
+  }
+  return count;
+}
+
 export function hasSuccessfulSync(providerId: number): boolean {
   const db = getDatabase();
   const row = db

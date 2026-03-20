@@ -59,8 +59,19 @@ Powered by [israeli-bank-scrapers](https://github.com/eshaham/israeli-bank-scrap
 
 ## Quick Start
 
-1. Download the latest binary for your platform from [Releases](https://github.com/DaveDushi/kolshek/releases)
-2. Run the setup wizard:
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://kolshek.com/install.sh | sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://kolshek.com/install.ps1 | iex
+```
+
+Then run the setup wizard:
 
 ```bash
 kolshek init
@@ -68,13 +79,13 @@ kolshek init
 
 This walks you through adding your first bank or credit card, testing the connection, and fetching your initial transactions.
 
-3. See your accounts:
+See your accounts:
 
 ```bash
 kolshek accounts
 ```
 
-4. (Optional) Install the AI agent plugin for your tool:
+(Optional) Install the AI agent plugin for your tool:
 
 ```bash
 kolshek plugin install claude-code   # Claude Code
@@ -82,6 +93,8 @@ kolshek plugin install opencode      # OpenCode
 kolshek plugin install codex         # Codex (OpenAI)
 kolshek plugin install openclaw      # OpenClaw
 ```
+
+> Or download binaries directly from [Releases](https://github.com/DaveDushi/kolshek/releases).
 
 ### Prerequisites
 

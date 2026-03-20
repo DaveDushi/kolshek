@@ -129,7 +129,7 @@ kolshek query <sql> [--limit] [--json]
 
 ### Dashboard
 ```
-kolshek dashboard [-p, --port <port>] [--no-open]   # open local settings dashboard (default port: 3000)
+kolshek dashboard [-p, --port <port>] [--no-open]   # open local settings dashboard (default port: 45091)
 ```
 
 ### Self-Update

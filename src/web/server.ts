@@ -3,7 +3,9 @@
 // Authentication: single-use token in URL → HttpOnly session cookie.
 
 import { resolve } from "node:path";
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
+import { unlinkSync } from "node:fs";
+import { WEB_FILES } from "./web-files.js";
 import {
   listProviders,
   createProvider,
@@ -32,6 +34,7 @@ import {
   hasSuccessfulSync,
   listRecentSyncLogs,
   countSyncLogsSince,
+  countConsecutiveFailures,
 } from "../db/repositories/sync-log.js";
 import {
   readScheduleConfig,
@@ -107,40 +110,28 @@ import type { TransactionFilters } from "../types/transaction.js";
 // Track active fetch so we don't allow concurrent syncs
 let activeFetch: { promise: Promise<void>; events: string[]; listeners: Set<(event: string) => void> } | null = null;
 
-// Resolve paths to static assets (import.meta.dir is Bun-native, handles Windows)
-const logoPath = resolve(import.meta.dir, "../../assets/logo.png");
-const faviconPath = resolve(import.meta.dir, "../../assets/favicon.png");
-const appDistDir = resolve(import.meta.dir, "dist/app");
-
-// MIME types for serving static SPA assets
-const MIME_TYPES: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "application/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".svg": "image/svg+xml",
-  ".ico": "image/x-icon",
-  ".woff": "font/woff",
-  ".woff2": "font/woff2",
-};
-
-function getMimeType(filePath: string): string {
-  const ext = filePath.slice(filePath.lastIndexOf("."));
-  return MIME_TYPES[ext] || "application/octet-stream";
+// Serve embedded SPA assets from web-files.ts (survives bun build --compile)
+function serveEmbedded(key: string, cacheControl: string, extraHeaders?: Record<string, string>): Response | null {
+  const asset = WEB_FILES[key];
+  if (!asset) return null;
+  const body = asset.binary ? Buffer.from(asset.content, "base64") : asset.content;
+  return new Response(body, {
+    headers: { "Content-Type": asset.mime, "Cache-Control": cacheControl, ...extraHeaders },
+  });
 }
 
 // --- JSON API helpers ---
 
-// Allowed origins for CORS (Vite dev on :5173, server on :3000)
+// Allowed origins for CORS — include Vite dev port only in dev mode
 function getAllowedOrigins(port: number): string[] {
-  return [
+  const origins = [
     `http://localhost:${port}`,
     `http://127.0.0.1:${port}`,
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
   ];
+  if (IS_DEV) {
+    origins.push("http://localhost:5173", "http://127.0.0.1:5173");
+  }
+  return origins;
 }
 
 function corsHeaders(origin: string | null, allowedOrigins: string[]): Record<string, string> {
@@ -168,8 +159,20 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'",
 };
 
+// Dev mode — set KOLSHEK_DEV=1 to enable Vite proxy support and dev CORS origins
+const IS_DEV = process.env.KOLSHEK_DEV === "1";
+
 // MAX_PAGINATION_LIMIT prevents dumping entire DB via ?limit=999999999
 const MAX_PAGINATION_LIMIT = 500;
+
+// Constant-time string comparison to prevent timing attacks on tokens
+function safeEqual(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
 
 // Validate that a user-supplied regex isn't pathologically complex (ReDoS)
 function isSafeRegex(pattern: string): boolean {
@@ -188,12 +191,22 @@ function isSafeRegex(pattern: string): boolean {
   }
 }
 
-// Sanitize error messages — strip file paths and internal details
+// Sanitize error messages — strip file paths, stack traces, and credential-like values
+const CREDENTIAL_KEYWORDS = "password|passwd|secret|token|credential|apiKey|api_key|sessionId|bearer|authorization|access_key|private_key|jwt";
+const CREDENTIAL_RE = new RegExp(
+  // Match key=value, key: value, and JSON "key":"value" patterns
+  `["']?(${CREDENTIAL_KEYWORDS})["']?\\s*[=:]\\s*["']?\\S+["']?`,
+  "gi",
+);
 function sanitizeError(msg: string): string {
-  // Remove Windows/Unix file paths
-  return msg.replace(/[A-Z]:\\[^\s:]+/gi, "[path]")
+  return msg
+    // Remove Windows/Unix file paths
+    .replace(/[A-Z]:\\[^\s:]+/gi, "[path]")
     .replace(/\/[^\s:]*\/[^\s:]*/g, "[path]")
+    // Remove stack trace lines
     .replace(/at\s+.+\(.+\)/g, "")
+    // Strip values that look like credentials
+    .replace(CREDENTIAL_RE, "$1=[redacted]")
     .trim();
 }
 
@@ -254,17 +267,20 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
   const allowedOrigins = getAllowedOrigins(port);
 
   // Generate a one-time session token — only the CLI user sees this in the terminal.
-  // The token is exchanged for an HttpOnly cookie on first visit.
+  // The URL token is single-use: consumed on first browser visit, then invalidated.
   const sessionToken = randomBytes(32).toString("hex");
+  let urlTokenConsumed = false;
   const cookieName = "kolshek_session";
 
   // Write session token to .dev-session so the Vite dev proxy can inject it.
-  // This file is gitignored and only used for local development.
-  try {
-    const devSessionPath = resolve(import.meta.dir, "../../.dev-session");
-    Bun.write(devSessionPath, `${cookieName}=${sessionToken}`);
-  } catch {
-    // Non-fatal — only needed for Vite dev mode
+  // Only written in dev mode (KOLSHEK_DEV=1). Cleaned up on server stop.
+  const devSessionPath = resolve(import.meta.dir, "../../.dev-session");
+  if (IS_DEV) {
+    try {
+      Bun.write(devSessionPath, `${cookieName}=${sessionToken}`);
+    } catch {
+      // Non-fatal — only needed for Vite dev mode
+    }
   }
 
   // Parse the session cookie from a Cookie header
@@ -277,18 +293,15 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
     return null;
   }
 
-  // Check if a request is authenticated (has valid cookie OR valid token query param)
-  function isAuthenticated(req: Request, url: URL): boolean {
-    // Check cookie first (most requests)
-    if (getSessionCookie(req) === sessionToken) return true;
-    // Check query param (initial browser open)
-    if (url.searchParams.get("token") === sessionToken) return true;
-    return false;
+  // Check if a request is authenticated (has valid session cookie)
+  function isAuthenticated(req: Request): boolean {
+    const cookie = getSessionCookie(req);
+    return cookie !== null && safeEqual(cookie, sessionToken);
   }
 
   // Build a Set-Cookie header that persists the session
   function sessionCookieHeader(): string {
-    return `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400`;
+    return `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=86400`;
   }
 
   const server = Bun.serve({
@@ -318,7 +331,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       if (method === "POST" && path === "/api/v2/auth/token") {
         const body = await parseJsonBody(req);
         const token = typeof body.token === "string" ? body.token : "";
-        if (token !== sessionToken) {
+        if (!safeEqual(token, sessionToken)) {
           return jsonError("UNAUTHORIZED", "Invalid token.", 401);
         }
         return new Response(JSON.stringify({ success: true, data: null }), {
@@ -333,13 +346,15 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       }
 
       // If the request has ?token= in the URL, validate it and set a cookie.
-      // This is the initial browser open from the CLI.
+      // The URL token is single-use — once consumed, replay from browser history is rejected.
       if (url.searchParams.has("token")) {
-        if (url.searchParams.get("token") !== sessionToken) {
-          return new Response("Unauthorized: invalid token", { status: 401 });
+        const urlToken = url.searchParams.get("token") ?? "";
+        if (urlTokenConsumed || !safeEqual(urlToken, sessionToken)) {
+          return new Response("Unauthorized: token already used or invalid. Relaunch the dashboard.", { status: 401 });
         }
-        // Valid token — redirect to the same URL without the token param
-        // and set the session cookie so future requests are authenticated.
+        // Mark token as consumed — future URL token attempts will fail
+        urlTokenConsumed = true;
+        // Redirect to clean URL and set session cookie.
         url.searchParams.delete("token");
         const cleanUrl = url.pathname + (url.search || "");
         return new Response(null, {
@@ -347,12 +362,13 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           headers: {
             Location: cleanUrl || "/",
             "Set-Cookie": sessionCookieHeader(),
+            "Cache-Control": "no-store",
           },
         });
       }
 
       // All other requests must have the session cookie
-      if (!isAuthenticated(req, url)) {
+      if (!isAuthenticated(req)) {
         if (path.startsWith("/api/")) {
           return jsonError("UNAUTHORIZED", "Session expired. Relaunch the dashboard.", 401);
         }
@@ -375,42 +391,21 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       }
 
       try {
-        // --- Static assets ---
+        // --- Static assets (served from embedded web-files.ts) ---
         if (method === "GET" && path === "/favicon.png") {
-          const file = Bun.file(faviconPath);
-          if (await file.exists()) {
-            return new Response(file, {
-              headers: {
-                "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=86400",
-              },
-            });
-          }
+          const res = serveEmbedded("/favicon.png", "public, max-age=86400");
+          if (res) return res;
           return new Response("Not found", { status: 404 });
         }
 
         if (method === "GET" && path === "/logo.png") {
-          const file = Bun.file(logoPath);
-          if (await file.exists()) {
-            return new Response(file, {
-              headers: {
-                "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=86400",
-              },
-            });
-          }
+          const res = serveEmbedded("/logo.png", "public, max-age=86400");
+          if (res) return res;
           return new Response("Not found", { status: 404 });
         }
         if (method === "GET" && path === "/favicon.ico") {
-          const file = Bun.file(faviconPath);
-          if (await file.exists()) {
-            return new Response(file, {
-              headers: {
-                "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=86400",
-              },
-            });
-          }
+          const res = serveEmbedded("/favicon.png", "public, max-age=86400");
+          if (res) return res;
           return new Response("Not found", { status: 404 });
         }
 
@@ -431,10 +426,12 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
                 const txCount = countTransactions({ providerId: p.id });
                 const latestSync = getLatestCompletedSyncLog(p.id);
                 const everSucceeded = hasSuccessfulSync(p.id);
+                const failures = countConsecutiveFailures(p.id);
                 const authStatus = computeAuthStatus(
                   hasCreds,
                   (latestSync?.status as "success" | "error") ?? null,
                   everSucceeded,
+                  failures,
                 );
                 return {
                   ...p,
@@ -1197,7 +1194,15 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           }
           const body = await parseJsonBody(req);
           const visible = body.visible === true || body.visible === 1;
-          const providerIds = Array.isArray(body.providers) ? (body.providers as number[]) : undefined;
+          const rawProviders = Array.isArray(body.providers) ? body.providers : undefined;
+          // Validate and coerce providerIds to numbers, reject non-numeric values
+          let providerIds: number[] | undefined;
+          if (rawProviders) {
+            providerIds = rawProviders.map(Number).filter((n) => Number.isFinite(n) && n > 0);
+            if (providerIds.length === 0) {
+              return jsonError("INVALID_PROVIDERS", "Provider IDs must be positive numbers.", 400);
+            }
+          }
           return startFetchSSE(visible, providerIds, jsonError);
         }
 
@@ -1208,33 +1213,16 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
 
         // --- React SPA fallback (never for /api/ routes) ---
         if (method === "GET" && !path.startsWith("/api/")) {
-          // Try serving a static file from the React build output.
-          // SECURITY: resolve the path and verify it stays within appDistDir
-          // to prevent path traversal (e.g. /../../../etc/passwd).
-          const assetPath = resolve(appDistDir, path.slice(1));
-          if (!assetPath.startsWith(appDistDir)) {
-            return new Response("Forbidden", { status: 403 });
-          }
-          const assetFile = Bun.file(assetPath);
-          if (await assetFile.exists()) {
-            return new Response(assetFile, {
-              headers: {
-                "Content-Type": getMimeType(assetPath),
-                "Cache-Control": assetPath.includes("/assets/")
-                  ? "public, max-age=31536000, immutable"
-                  : "public, max-age=3600",
-                ...SECURITY_HEADERS,
-              },
-            });
-          }
+          // Try serving from embedded SPA assets
+          const cachePolicy = path.includes("/assets/")
+            ? "public, max-age=31536000, immutable"
+            : "public, max-age=3600";
+          const res = serveEmbedded(path, cachePolicy, SECURITY_HEADERS);
+          if (res) return res;
 
           // SPA fallback: serve index.html for all unmatched GET routes
-          const indexFile = Bun.file(resolve(appDistDir, "index.html"));
-          if (await indexFile.exists()) {
-            return new Response(indexFile, {
-              headers: { "Content-Type": "text/html; charset=utf-8" },
-            });
-          }
+          const indexRes = serveEmbedded("/index.html", "public, max-age=3600", SECURITY_HEADERS);
+          if (indexRes) return indexRes;
         }
 
         // --- 404 ---
@@ -1249,6 +1237,16 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       }
     },
   });
+
+  // Clean up .dev-session file when process exits
+  if (IS_DEV) {
+    const cleanup = () => {
+      try { unlinkSync(devSessionPath); } catch { /* already gone */ }
+    };
+    process.on("exit", cleanup);
+    process.on("SIGINT", () => { cleanup(); process.exit(0); });
+    process.on("SIGTERM", () => { cleanup(); process.exit(0); });
+  }
 
   return { server, token: sessionToken };
 }

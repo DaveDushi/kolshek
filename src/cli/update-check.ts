@@ -38,8 +38,11 @@ function isCacheStale(cache: UpdateCache | null): boolean {
 }
 
 // Fire-and-forget GitHub API check. Writes cache for next invocation.
+// Aborts after 5 seconds to avoid leaking connections on long-running commands.
 export function refreshUpdateCacheInBackground(): void {
-  fetchLatestRelease()
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  fetchLatestRelease(controller.signal)
     .then((release) => {
       const latestVersion = parseVersion(release.tag_name);
       const cachePath = getCachePath();
@@ -53,7 +56,8 @@ export function refreshUpdateCacheInBackground(): void {
     })
     .catch(() => {
       // Silent — never interrupt the CLI for update checks
-    });
+    })
+    .finally(() => clearTimeout(timeout));
 }
 
 // Main entry point. Sync cache read, optional background refresh.

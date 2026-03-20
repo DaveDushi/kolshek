@@ -55,17 +55,18 @@ export function UpdateAuthDialog({
     (f) => credentials[f] && credentials[f].trim() !== ""
   );
 
+  const resetMutation = updateAuth.reset;
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
       if (!isOpen) {
         setTimeout(() => {
           setCredentials({});
-          updateAuth.reset();
+          resetMutation();
         }, 200);
       }
       onOpenChange(isOpen);
     },
-    [onOpenChange, updateAuth]
+    [onOpenChange, resetMutation]
   );
 
   const handleSubmit = useCallback(() => {

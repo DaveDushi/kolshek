@@ -38,7 +38,7 @@ async function parseResponse<T>(res: Response): Promise<T> {
 
 class ApiClient {
   // credentials: "include" ensures cookies are sent for cross-origin requests
-  // (Vite dev server on :5173 → API on :3000). Harmless for same-origin production.
+  // (Vite dev server on :5173 → API on :45091). Harmless for same-origin production.
   async get<T>(path: string): Promise<T> {
     const res = await fetch(path, { credentials: "include" });
     return parseResponse<T>(res);

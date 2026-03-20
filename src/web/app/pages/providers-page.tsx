@@ -143,7 +143,6 @@ export function ProvidersPage() {
           onSync={handleSync}
           onDelete={handleDelete}
           onAuth={handleAuth}
-          isSyncing={isRunning}
         />
       )}
 
