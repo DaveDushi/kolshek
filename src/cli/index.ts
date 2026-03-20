@@ -31,6 +31,7 @@ import { registerInsightsCommand } from "./commands/insights.js";
 import { registerDashboardCommand } from "./commands/dashboard.js";
 import { registerPageCommand } from "./commands/page.js";
 import { registerUpdateCommand } from "./commands/update.js";
+import { registerUninstallCommand } from "./commands/uninstall.js";
 import { getMostRecentSyncTime, listProviders } from "../db/repositories/providers.js";
 import { loadConfig } from "../config/loader.js";
 import { syncProviders } from "../core/sync-engine.js";
@@ -81,7 +82,7 @@ program
     }
 
     // Ensure data directories and init DB for commands that need it
-    if (commandName !== "init" && commandName !== "update") {
+    if (commandName !== "init" && commandName !== "update" && commandName !== "uninstall") {
       await ensureDirectories();
       const dbPath = getDbPath();
       initDatabase(dbPath);
@@ -162,6 +163,7 @@ registerInsightsCommand(program);
 registerDashboardCommand(program);
 registerPageCommand(program);
 registerUpdateCommand(program);
+registerUninstallCommand(program);
 
 // Parse and run
 program.parseAsync(process.argv).then(() => {

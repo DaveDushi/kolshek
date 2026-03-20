@@ -35,6 +35,7 @@ interface TransactionTableProps {
   transactions: TransactionWithContext[];
   loading: boolean;
   onRowClick?: (transaction: TransactionWithContext) => void;
+  containerRef?: React.Ref<HTMLDivElement>;
 }
 
 // Inline category editor shown in a popover when the badge is clicked
@@ -156,10 +157,14 @@ export function TransactionTable({
   transactions,
   loading,
   onRowClick,
+  containerRef,
 }: TransactionTableProps) {
   return (
-    <Table>
-      <TableHeader>
+    <Table
+      wrapperRef={containerRef}
+      wrapperClassName="max-h-[calc(100vh-320px)] min-h-[300px]"
+    >
+      <TableHeader className="sticky top-0 z-10 bg-background">
         <TableRow>
           <TableHead className="w-[90px]">Date</TableHead>
           <TableHead>Description</TableHead>

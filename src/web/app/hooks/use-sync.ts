@@ -5,6 +5,9 @@ import { useState, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { SyncEvent } from "@/types/api";
 
+// Maximum queued syncs to prevent unbounded growth
+const MAX_QUEUE_DEPTH = 10;
+
 interface SyncOptions {
   visible?: boolean;
   providers?: number[];
@@ -131,7 +134,19 @@ export function useSync() {
   }, [runSync, queryClient]);
 
   const start = useCallback((options?: SyncOptions) => {
+    // Normalize empty provider array to undefined (= sync all)
+    if (options?.providers?.length === 0) options.providers = undefined;
+
     if (runningRef.current) {
+      // Reject if queue is full
+      if (queueRef.current.length >= MAX_QUEUE_DEPTH) return;
+      // Dedup: skip if an identical provider set is already queued
+      const key = options?.providers?.slice().sort().join(",") ?? "all";
+      const isDuplicate = queueRef.current.some((q) => {
+        const qKey = q.providers?.slice().sort().join(",") ?? "all";
+        return qKey === key;
+      });
+      if (isDuplicate) return;
       // Already syncing — queue this request and show queued status
       queueRef.current.push(options ?? {});
       // Add synthetic "queued" events so the panel shows them

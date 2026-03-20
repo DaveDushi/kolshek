@@ -29,3 +29,9 @@ Create a new release for KolShek. Steps:
 9. Show me the release notes and new version and ask for confirmation before pushing
 10. After confirmation: push the commit, create tag `vX.Y.Z`, push the tag
 11. Show the GitHub Actions URL so I can monitor the release workflow
+12. After the release workflow completes and binaries are uploaded, generate SHA256 checksum sidecar files:
+    - For each binary asset (e.g. `kolshek-windows-x64.exe`, `kolshek-linux-x64`, etc.):
+      - Download the asset
+      - Generate SHA256: `sha256sum <binary> > <binary>.sha256`
+      - Upload the `.sha256` file to the release via `gh release upload vX.Y.Z <binary>.sha256`
+    - These checksums are verified by the `kolshek update` command before installing
