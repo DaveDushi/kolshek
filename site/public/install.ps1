@@ -76,7 +76,11 @@ $TmpFile = Join-Path $TmpDir $BinaryName
 
 try {
     Write-Info "Downloading $BinaryName..."
+    # Disable progress bar — it slows Invoke-WebRequest from minutes to seconds
+    $OldProgress = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'
     Invoke-WebRequest -Uri $DownloadUrl -OutFile $TmpFile -UseBasicParsing
+    $ProgressPreference = $OldProgress
 } catch {
     Write-Err "Failed to download $BinaryName"
     Write-Info "URL: $DownloadUrl"
@@ -92,7 +96,10 @@ $ChecksumUrl = "$DownloadUrl.sha256"
 $ChecksumFile = Join-Path $TmpDir "checksum.sha256"
 
 try {
+    $OldProgress = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'
     Invoke-WebRequest -Uri $ChecksumUrl -OutFile $ChecksumFile -UseBasicParsing
+    $ProgressPreference = $OldProgress
     $ExpectedLine = (Get-Content $ChecksumFile -Raw).Trim()
     $Expected = $ExpectedLine.Split(' ')[0].ToLower()
     $Actual = (Get-FileHash -Path $TmpFile -Algorithm SHA256).Hash.ToLower()
