@@ -30,7 +30,7 @@
         />
         <meta
             property="og:description"
-            content="Pull transactions from 17 Israeli banks and credit cards into a local SQLite database. Privacy-first, AI-ready, open source."
+            content="Pull transactions from 18 Israeli banks and credit cards into a local SQLite database. Privacy-first, AI-ready, open source."
         />
         <meta property="og:image" content="logo.png" />
         <meta property="og:type" content="website" />
@@ -217,7 +217,7 @@
                     <p
                         class="text-base md:text-lg text-body mb-8 leading-relaxed max-w-lg"
                     >
-                        Open-source CLI that pulls transactions from 17 Israeli
+                        Open-source CLI that pulls transactions from 18 Israeli
                         banks and credit cards into a local SQLite database. No
                         cloud. No telemetry.
                     </p>
@@ -228,7 +228,7 @@
                             <div
                                 class="text-2xl md:text-3xl font-bold text-heading tabular-nums"
                             >
-                                17
+                                18
                             </div>
                             <div class="text-xs text-faint mt-0.5">
                                 Providers
@@ -1212,8 +1212,8 @@
                             <p class="text-sm text-body">
                                 Monthly summaries, category breakdowns, balance
                                 history, and multi-month trend analysis.
-                                Lifestyle mode filters non-spending categories.
-                                Self-update built in.
+                                Classification filtering to focus on real
+                                spending. Self-update built in.
                             </p>
                         </div>
                     </div>
@@ -1480,26 +1480,35 @@
                 <!-- PATH: With AI Agent (3 steps) -->
                 <div class="gs-path active" id="gs-path-agent">
                     <div class="gs-steps fade-up">
-                        <!-- Step 1: Download -->
+                        <!-- Step 1: Install -->
                         <div class="gs-step">
                             <div class="gs-num">1</div>
                             <div class="gs-content">
-                                <h3 class="gs-title">Download KolShek</h3>
-                                <p class="gs-desc">Click the button for your system.</p>
-                                <a id="dl-auto" href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-windows-x64.exe" class="gs-download-btn">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                    <span>
-                                        <span class="gs-download-label" id="dl-auto-label">Download for Windows</span>
-                                        <span class="gs-download-meta" id="dl-auto-meta"></span>
-                                    </span>
-                                </a>
-                                <div class="gs-other-platforms">
-                                    <span class="text-xs text-faint">Other platforms:</span>
-                                    <a href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-macos-arm64" class="gs-alt-link">macOS (Apple Silicon)</a>
-                                    <a href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-macos-x64" class="gs-alt-link">macOS (Intel)</a>
-                                    <a href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-linux-x64" class="gs-alt-link">Linux x64</a>
-                                    <a href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-linux-arm64" class="gs-alt-link">Linux ARM</a>
+                                <h3 class="gs-title">Install KolShek</h3>
+                                <p class="gs-desc">Paste this into your terminal.</p>
+                                <div class="gs-install-tabs">
+                                    <button class="gs-install-tab active" data-install="mac-linux">macOS / Linux</button>
+                                    <button class="gs-install-tab" data-install="windows">Windows</button>
                                 </div>
+                                <div class="gs-install-cmd active" id="gs-install-mac-linux">
+                                    <div class="gs-cmd-block">
+                                        <code>curl -fsSL https://kolshek.com/install.sh | sh</code>
+                                        <button class="copy-btn" onclick="copyText(this, 'curl -fsSL https://kolshek.com/install.sh | sh')" title="Copy">
+                                            <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                            <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="gs-install-cmd" id="gs-install-windows">
+                                    <div class="gs-cmd-block">
+                                        <code>irm https://kolshek.com/install.ps1 | iex</code>
+                                        <button class="copy-btn" onclick="copyText(this, 'irm https://kolshek.com/install.ps1 | iex')" title="Copy">
+                                            <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                            <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-faint mt-2">Or <a href="https://github.com/DaveDushi/kolshek/releases" class="gs-alt-link">download binaries directly</a></p>
                             </div>
                         </div>
 
@@ -1563,18 +1572,35 @@
                 <!-- PATH: Manual Setup (3 steps) -->
                 <div class="gs-path" id="gs-path-manual">
                     <div class="gs-steps fade-up">
-                        <!-- Step 1: Download -->
+                        <!-- Step 1: Install -->
                         <div class="gs-step">
                             <div class="gs-num">1</div>
                             <div class="gs-content">
-                                <h3 class="gs-title">Download KolShek</h3>
-                                <p class="gs-desc">Click the button for your system.</p>
-                                <a href="https://github.com/DaveDushi/kolshek/releases/latest/download/kolshek-windows-x64.exe" class="gs-download-btn">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                    <span>
-                                        <span class="gs-download-label">Download for Windows</span>
-                                    </span>
-                                </a>
+                                <h3 class="gs-title">Install KolShek</h3>
+                                <p class="gs-desc">Paste this into your terminal.</p>
+                                <div class="gs-install-tabs">
+                                    <button class="gs-install-tab active" data-install="mac-linux-m">macOS / Linux</button>
+                                    <button class="gs-install-tab" data-install="windows-m">Windows</button>
+                                </div>
+                                <div class="gs-install-cmd active" id="gs-install-mac-linux-m">
+                                    <div class="gs-cmd-block">
+                                        <code>curl -fsSL https://kolshek.com/install.sh | sh</code>
+                                        <button class="copy-btn" onclick="copyText(this, 'curl -fsSL https://kolshek.com/install.sh | sh')" title="Copy">
+                                            <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                            <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="gs-install-cmd" id="gs-install-windows-m">
+                                    <div class="gs-cmd-block">
+                                        <code>irm https://kolshek.com/install.ps1 | iex</code>
+                                        <button class="copy-btn" onclick="copyText(this, 'irm https://kolshek.com/install.ps1 | iex')" title="Copy">
+                                            <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                            <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-faint mt-2">Or <a href="https://github.com/DaveDushi/kolshek/releases" class="gs-alt-link">download binaries directly</a></p>
                             </div>
                         </div>
 

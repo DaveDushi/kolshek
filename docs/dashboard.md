@@ -8,7 +8,7 @@ The settings dashboard provides a browser UI for managing providers, categories,
 kolshek dashboard
 ```
 
-This opens a local web server (default: `http://localhost:3000`) with a React SPA dashboard featuring 8 pages:
+This opens a local web server (default: `http://localhost:45091`) with a React SPA dashboard featuring 8 pages:
 
 - **Dashboard** — net worth overview, cashflow chart, spending breakdown, automated insights, and recent transactions
 - **Transactions** — browse, search, and filter all transactions with pagination

@@ -2,6 +2,7 @@
 
 import { basename, dirname, join } from "path";
 import { existsSync, renameSync, unlinkSync, chmodSync } from "fs";
+import { createHash } from "crypto";
 import type { Command } from "commander";
 import chalk from "chalk";
 import {
@@ -44,9 +45,10 @@ function getBinaryName(): string | null {
   return null;
 }
 
-export async function fetchLatestRelease(): Promise<GithubRelease> {
+export async function fetchLatestRelease(signal?: AbortSignal): Promise<GithubRelease> {
   const res = await fetch(API_URL, {
     headers: { Accept: "application/vnd.github+json" },
+    signal,
   });
   if (!res.ok) {
     throw new Error(`GitHub API returned ${res.status}: ${res.statusText}`);
@@ -89,10 +91,17 @@ export function registerUpdateCommand(program: Command): void {
 
       let release: GithubRelease;
       try {
-        release = await fetchLatestRelease();
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30_000);
+        try {
+          release = await fetchLatestRelease(controller.signal);
+        } finally {
+          clearTimeout(timeout);
+        }
       } catch (err) {
         spinner.stop();
-        const msg = err instanceof Error ? err.message : String(err);
+        const isTimeout = err instanceof DOMException && err.name === "AbortError";
+        const msg = isTimeout ? "Request timed out (30s)" : err instanceof Error ? err.message : String(err);
         printError("UPDATE_CHECK_FAILED", `Failed to check for updates: ${msg}`, {
           retryable: true,
           suggestions: ["Check your internet connection", "Try again later"],
@@ -131,6 +140,9 @@ export function registerUpdateCommand(program: Command): void {
         return;
       }
 
+      // Progress: past the check phase
+      spinner.text = "Preparing download...";
+
       // Find the matching asset
       const asset = release.assets.find((a) => a.name === binaryName);
       if (!asset) {
@@ -146,22 +158,79 @@ export function registerUpdateCommand(program: Command): void {
       const sizeMB = (asset.size / 1024 / 1024).toFixed(1);
       spinner.text = `Downloading v${latestVersion} (${sizeMB} MB)...`;
 
+      // Enforce HTTPS for binary download
+      if (!asset.browser_download_url.startsWith("https://")) {
+        spinner.stop();
+        printError("INSECURE_DOWNLOAD", "Refusing to download binary over insecure connection.", {
+          suggestions: [`Download manually from ${release.html_url}`],
+        });
+        process.exit(ExitCode.Error);
+        return;
+      }
+
       let buffer: ArrayBuffer;
       try {
-        const res = await fetch(asset.browser_download_url);
-        if (!res.ok) {
-          throw new Error(`Download failed: ${res.status} ${res.statusText}`);
+        const dlController = new AbortController();
+        const dlTimeout = setTimeout(() => dlController.abort(), 120_000);
+        try {
+          const res = await fetch(asset.browser_download_url, { signal: dlController.signal });
+          if (!res.ok) {
+            throw new Error(`Download failed: ${res.status} ${res.statusText}`);
+          }
+          buffer = await res.arrayBuffer();
+        } finally {
+          clearTimeout(dlTimeout);
         }
-        buffer = await res.arrayBuffer();
       } catch (err) {
         spinner.stop();
-        const msg = err instanceof Error ? err.message : String(err);
+        const isTimeout = err instanceof DOMException && err.name === "AbortError";
+        const msg = isTimeout ? "Download timed out (120s)" : err instanceof Error ? err.message : String(err);
         printError("DOWNLOAD_FAILED", `Failed to download update: ${msg}`, {
           retryable: true,
           suggestions: ["Check your internet connection", `Download manually from ${release.html_url}`],
         });
         process.exit(ExitCode.Error);
         return;
+      }
+
+      // Verify checksum if available (SHA256 sidecar file: binary.sha256)
+      const checksumAsset = release.assets.find((a) => a.name === binaryName + ".sha256");
+      if (checksumAsset) {
+        spinner.text = "Verifying checksum...";
+        try {
+          const csController = new AbortController();
+          const csTimeout = setTimeout(() => csController.abort(), 15_000);
+          let csText: string;
+          try {
+            const csRes = await fetch(checksumAsset.browser_download_url, { signal: csController.signal });
+            if (!csRes.ok) {
+              throw new Error(`Checksum file returned ${csRes.status}`);
+            }
+            csText = (await csRes.text()).trim().split(/\s+/)[0].toLowerCase();
+          } finally {
+            clearTimeout(csTimeout);
+          }
+          const actual = createHash("sha256").update(Buffer.from(buffer)).digest("hex");
+          if (actual !== csText) {
+            spinner.stop();
+            printError("CHECKSUM_MISMATCH", "Downloaded binary does not match expected SHA256 checksum. The file may be corrupted or tampered with.", {
+              suggestions: [`Download manually from ${release.html_url}`, "Try again later"],
+            });
+            process.exit(ExitCode.Error);
+            return;
+          }
+        } catch (err) {
+          spinner.stop();
+          const msg = err instanceof Error ? err.message : String(err);
+          printError("CHECKSUM_FAILED", `Checksum verification failed: ${msg}. Aborting update for safety.`, {
+            retryable: true,
+            suggestions: ["Check your internet connection", `Download manually from ${release.html_url}`],
+          });
+          process.exit(ExitCode.Error);
+          return;
+        }
+      } else {
+        info("Note: No checksum file in this release. Skipping integrity verification.");
       }
 
       // Replace the current binary
@@ -183,6 +252,15 @@ export function registerUpdateCommand(program: Command): void {
         // Set executable permission on Unix
         if (process.platform !== "win32") {
           chmodSync(execPath, 0o755);
+        }
+
+        // Remove macOS quarantine attribute so Gatekeeper doesn't block the binary
+        if (process.platform === "darwin") {
+          try {
+            Bun.spawnSync(["xattr", "-d", "com.apple.quarantine", execPath]);
+          } catch {
+            // best-effort — xattr may not exist or attribute may not be set
+          }
         }
 
         // Clean up backup

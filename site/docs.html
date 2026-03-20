@@ -567,7 +567,7 @@ kolshek plugin install openclaw</code></pre></div>
           <table class="docs-table">
             <thead><tr><th>Option</th><th>Description</th></tr></thead>
             <tbody>
-              <tr><td><code>-p, --port &lt;port&gt;</code></td><td>Port to listen on (default: 3000)</td></tr>
+              <tr><td><code>-p, --port &lt;port&gt;</code></td><td>Port to listen on (default: 45091)</td></tr>
               <tr><td><code>--no-open</code></td><td>Don't auto-open the browser</td></tr>
             </tbody>
           </table>
@@ -776,7 +776,7 @@ kolshek db schema transactions --json</code></pre></div>
 
         <h3 class="docs-h3">Quick Start</h3>
         <div class="docs-code"><pre><code>kolshek dashboard</code></pre></div>
-        <p class="docs-p">Opens a local web server (default: <code>http://localhost:3000</code>) with a React SPA dashboard featuring 8 pages:</p>
+        <p class="docs-p">Opens a local web server (default: <code>http://localhost:45091</code>) with a React SPA dashboard featuring 8 pages:</p>
         <ul class="docs-ul">
           <li><strong>Dashboard</strong> — net worth overview, cashflow chart, spending breakdown, automated insights, recent transactions</li>
           <li><strong>Transactions</strong> — browse, search, and filter all transactions with pagination</li>
@@ -817,6 +817,50 @@ kolshek db schema transactions --json</code></pre></div>
       <!-- ── Changelog ──────────────────────────────────────────── -->
       <section id="changelog" class="docs-section">
         <h1 class="docs-h1">Changelog</h1>
+
+        <h2 class="docs-h2">v0.3.8</h2>
+        <h3 class="docs-h3">Features</h3>
+        <ul class="docs-ul">
+          <li><strong>Transaction pagination</strong> &mdash; Dashboard transaction table now supports server-side pagination with configurable page sizes (25/50/100), page number navigation with ellipsis, and scroll-to-top on page change.</li>
+          <li><strong>Provider credential update</strong> &mdash; New dialog in the dashboard to update login credentials for existing providers without re-adding them.</li>
+          <li><strong>Per-provider sync</strong> &mdash; Sync individual providers from the dashboard provider card menu instead of syncing all at once.</li>
+          <li><strong>Sync queue</strong> &mdash; Multiple sync requests are queued and processed sequentially with deduplication and a max queue depth of 10.</li>
+          <li><strong>4-state auth status</strong> &mdash; Providers now show one of four authentication states (no credentials, pending, connected, expired) based on credential and sync history.</li>
+          <li><strong>CLI update check</strong> &mdash; Non-blocking version check with 24-hour cache notifies users when a new release is available.</li>
+          <li><strong>Getting started flow</strong> &mdash; New setup page with separate tabs for agent-assisted and manual configuration paths.</li>
+          <li><strong>Mobile dashboard navigation</strong> &mdash; Responsive page navigation and labels for mobile screens.</li>
+        </ul>
+
+        <h3 class="docs-h3">Security</h3>
+        <ul class="docs-ul">
+          <li><strong>Timing-safe token comparison</strong> &mdash; Session token validation now uses <code class="docs-code">crypto.timingSafeEqual</code> to prevent timing attacks.</li>
+          <li><strong>Single-use URL token</strong> &mdash; The dashboard launch token in the URL is consumed on first use &mdash; replay from browser history is rejected.</li>
+          <li><strong>Dev-mode isolation</strong> &mdash; <code class="docs-code">.dev-session</code> file and Vite CORS origins are now gated behind <code class="docs-code">KOLSHEK_DEV=1</code> environment variable, with automatic cleanup on exit.</li>
+          <li><strong>Secure cookie flag</strong> &mdash; Session cookie now includes the <code class="docs-code">Secure</code> attribute.</li>
+          <li><strong>Self-update integrity</strong> &mdash; Binary downloads are verified against SHA256 checksum sidecar files. Downloads abort on checksum mismatch or verification failure. HTTPS is enforced.</li>
+          <li><strong>XSS fix</strong> &mdash; Site feedback form now uses DOM API with GitHub URL allowlist instead of <code class="docs-code">innerHTML</code>.</li>
+          <li><strong>Enhanced error sanitization</strong> &mdash; Credential-like values in JSON format (<code class="docs-code">"password":"value"</code>) are now redacted in error responses, with an expanded keyword list.</li>
+          <li><strong>Provider ID validation</strong> &mdash; Sync endpoint validates and coerces provider IDs to positive numbers, rejecting invalid input.</li>
+          <li><strong>SPA fallback hardening</strong> &mdash; Security headers (CSP, X-Frame-Options, etc.) now applied to the SPA index.html fallback response.</li>
+          <li><strong>Update check timeout</strong> &mdash; Background GitHub API check aborts after 5 seconds to prevent connection leaks.</li>
+        </ul>
+
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li><strong>Sync error visibility</strong> &mdash; Error messages are now shown when individual providers fail during sync.</li>
+          <li><strong>Auth status threshold</strong> &mdash; Providers require 2+ consecutive sync failures before showing &ldquo;expired&rdquo; status &mdash; a single transient failure no longer triggers a false alarm.</li>
+          <li><strong>Sync queue dedup</strong> &mdash; Duplicate provider sync requests are deduplicated in the queue, and empty provider arrays are normalized.</li>
+          <li><strong>React performance</strong> &mdash; Fixed <code class="docs-code">useCallback</code> dependency on unstable mutation object in credential update dialog.</li>
+          <li><strong>Dead code cleanup</strong> &mdash; Removed unused <code class="docs-code">isSyncing</code> prop from provider grid components.</li>
+        </ul>
+
+        <h3 class="docs-h3">Other</h3>
+        <ul class="docs-ul">
+          <li>Security and liability disclaimer added to documentation.</li>
+          <li>Documentation synced with codebase.</li>
+        </ul>
+
+        <div class="docs-divider"></div>
 
         <h2 class="docs-h2">v0.3.7</h2>
         <h3 class="docs-h3">Features</h3>

@@ -455,7 +455,7 @@ Open the settings dashboard in your browser.
 
 | Option | Description |
 |--------|-------------|
-| `-p, --port <port>` | Port to listen on (default: 3000) |
+| `-p, --port <port>` | Port to listen on (default: 45091) |
 | `--no-open` | Don't auto-open the browser |
 
 ---
