@@ -5,10 +5,13 @@ import type { ChatMessage, AiProviderConfig, AgentSSEEvent } from "./types.js";
 import { runAgentLoop } from "./agent.js";
 
 // Create an SSE Response that streams agent events to the frontend.
+// Accepts an AbortSignal so the server-side agent loop stops when the client disconnects.
+// Without this, stopping a request leaves the old loop running (hogging the LLM).
 export function createAgentStream(
   config: AiProviderConfig,
   messages: ChatMessage[],
   cors: Record<string, string>,
+  signal?: AbortSignal,
 ): Response {
   const encoder = new TextEncoder();
 
@@ -23,7 +26,7 @@ export function createAgentStream(
       }
 
       try {
-        await runAgentLoop(config, messages, pushEvent);
+        await runAgentLoop(config, messages, pushEvent, signal);
         pushEvent({ type: "done" });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

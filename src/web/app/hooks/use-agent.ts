@@ -96,10 +96,15 @@ export function useAgent() {
       setIsStreaming(true);
 
       try {
-        // Build the full message history for context
-        // (current messages + new user message, excluding the placeholder assistant)
+        // Build the full message history for context.
+        // Filter out assistant messages with empty content — these are from aborted
+        // streams where tool calls completed but the LLM's text response was cut off.
+        // Sending empty assistant messages confuses the LLM into repeating tool calls
+        // without ever producing text.
         const history = [
-          ...messages.map((m) => ({ role: m.role, content: m.content })),
+          ...messages
+            .filter((m) => !(m.role === "assistant" && !m.content))
+            .map((m) => ({ role: m.role, content: m.content })),
           { role: "user" as const, content: text.trim() },
         ];
 

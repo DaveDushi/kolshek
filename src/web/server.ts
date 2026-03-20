@@ -1167,7 +1167,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             })),
           ];
 
-          return createAgentStream(providerConfig, messages, cors);
+          return createAgentStream(providerConfig, messages, cors, req.signal);
         }
 
         // GET /api/v2/agent/config — get current AI configuration
