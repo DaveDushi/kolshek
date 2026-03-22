@@ -1,10 +1,10 @@
-## v0.3.9
+## v0.3.10
 
 ### Bug Fixes
 
-- **Dashboard port collision**: Changed default dashboard port from 3000 to 45091 to avoid cookie collisions with other local dev servers (React, Express, Rails, etc.).
+- **DML validation**: Added SQL statement validation to prevent destructive queries, with improved error diagnostics for database operations.
+- **Currency formatting**: Fixed crash when currency parameter is undefined during amount formatting.
 
 ### Other
 
-- Streamlined installation with one-liner scripts for Windows, macOS, and Linux.
-- Added SHA256 checksum generation to release workflow.
+- Upgraded GitHub Actions to v5 across all CI workflows.
