@@ -40,6 +40,11 @@ jobs:
 
       - run: bun install
 
+      - name: Run tests and type check
+        run: |
+          bun run typecheck
+          bun test
+
       - name: Build SPA and generate embedded files
         run: |
           bun run build:web
