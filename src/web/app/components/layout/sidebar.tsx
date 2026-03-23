@@ -10,6 +10,7 @@ import {
   Tags,
   Languages,
   Building2,
+  Clock,
   Sun,
   Moon,
   Monitor,
@@ -137,6 +138,7 @@ export function Sidebar() {
       title: "Settings",
       items: [
         { label: "Providers", path: "/providers", icon: Building2 },
+        { label: "Schedule", path: "/schedule", icon: Clock },
       ],
     },
   ];

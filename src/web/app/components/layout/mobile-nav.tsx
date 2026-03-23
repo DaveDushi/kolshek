@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Languages,
   Building2,
+  Clock,
   RefreshCw,
   Sun,
   Moon,
@@ -143,6 +144,11 @@ export function MobileNav() {
       label: "Providers",
       path: "/providers",
       icon: Building2,
+    },
+    {
+      label: "Schedule",
+      path: "/schedule",
+      icon: Clock,
     },
   ];
 
