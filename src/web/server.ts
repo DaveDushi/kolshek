@@ -913,7 +913,9 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             }
 
             const rule = addCategoryRule(category, conditions, priority);
-            return json(rule, 201);
+            // Auto-apply all rules so the new rule takes effect immediately
+            const applyResult = applyCategoryRules({ scope: "uncategorized" });
+            return json({ ...rule, applied: applyResult.applied }, 201);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("CATEGORY_RULE_ADD_FAILED", msg, 500);

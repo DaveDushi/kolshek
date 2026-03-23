@@ -21,6 +21,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { FilterPanel } from "@/components/transactions/filter-panel";
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { TransactionDetail } from "@/components/transactions/transaction-detail";
+import { RuleBuilder } from "@/components/categories/rule-builder";
 import { useTransactions } from "@/hooks/use-transactions";
 import type { TransactionFilters, TransactionWithContext } from "@/types/api";
 
@@ -59,6 +60,10 @@ export function TransactionsPage() {
     null
   );
   const [detailOpen, setDetailOpen] = useState(false);
+
+  // Rule builder state
+  const [ruleBuilderOpen, setRuleBuilderOpen] = useState(false);
+  const [rulePrefill, setRulePrefill] = useState<{ description?: string }>({});
 
   // Fetch transactions with current filters
   const { data, isLoading, isError, error } = useTransactions(filters);
@@ -278,6 +283,17 @@ export function TransactionsPage() {
         transaction={selectedTx}
         open={detailOpen}
         onClose={handleDetailClose}
+        onCreateRule={(prefill) => {
+          setRulePrefill(prefill);
+          setRuleBuilderOpen(true);
+        }}
+      />
+
+      {/* Rule builder dialog */}
+      <RuleBuilder
+        open={ruleBuilderOpen}
+        onClose={() => setRuleBuilderOpen(false)}
+        prefill={rulePrefill}
       />
     </div>
   );

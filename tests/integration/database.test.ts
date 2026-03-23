@@ -663,15 +663,14 @@ describe("listCategoriesWithSource", () => {
 
     // Entertainment was added as a rule (match: Netflix) and Netflix has a transaction
     const entertainment = categories.find((c) => c.category === "Entertainment");
-    if (entertainment) {
-      expect(entertainment.ruleCount).toBeGreaterThanOrEqual(1);
-    }
+    expect(entertainment).toBeDefined();
+    expect(entertainment!.ruleCount).toBeGreaterThanOrEqual(1);
 
     // Transport was added as rules only (no transactions categorized as Transport)
     const transport = categories.find((c) => c.category === "Transport");
-    if (transport && transport.transactionCount === 0) {
-      expect(transport.source).toBe("rules");
-    }
+    expect(transport).toBeDefined();
+    expect(transport!.transactionCount).toBe(0);
+    expect(transport!.source).toBe("rules");
   });
 });
 

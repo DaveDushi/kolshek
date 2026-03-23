@@ -112,10 +112,13 @@ describe("encodePayload / decodePayload", () => {
     expect(() => decodePayload(huge)).toThrow("Credential payload too large");
   });
 
-  it("accepts payload just under size limit", () => {
-    const creds = { key: "x".repeat(1000) };
+  it("accepts payload near the size limit", () => {
+    // 65536 is the base64 decode limit; build a payload whose
+    // base64 encoding lands just below it (~48KB raw → ~64KB base64)
+    const creds = { key: "x".repeat(48000) };
     const encoded = encodePayload(creds);
     expect(encoded.length).toBeLessThan(65536);
+    expect(encoded.length).toBeGreaterThan(60000);
     expect(decodePayload(encoded)).toEqual(creds);
   });
 
@@ -362,18 +365,10 @@ describe("getCredentialSource", () => {
   });
 
   it("returns 'keychain' by default (no env vars, no file)", () => {
-    // Assuming no credentials.enc file exists at default path
-    const result = getCredentialSource();
-    expect(["keychain", "file"]).toContain(result);
+    // No KOLSHEK_ env vars and no credentials.enc file → keychain
+    expect(getCredentialSource()).toBe("keychain");
   });
 });
 
-// ---------------------------------------------------------------------------
-// resetKeychainCache
-// ---------------------------------------------------------------------------
-
-describe("resetKeychainCache", () => {
-  it("is callable without error", () => {
-    expect(() => resetKeychainCache()).not.toThrow();
-  });
-});
+// resetKeychainCache is a trivial test-utility (sets one variable to null).
+// No standalone test needed — it exists to support other tests, not to be tested itself.
