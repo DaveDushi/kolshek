@@ -13,6 +13,10 @@
 - **DML validation**: Added SQL statement validation to prevent destructive queries, with improved error diagnostics for database operations.
 - **Currency formatting**: Fixed crash when currency parameter is undefined during amount formatting.
 
+### Security
+
+- **Scheduler path validation**: Added `validateBinaryPath` to reject shell metacharacters (`&`, `|`, `$`, etc.) and control characters in binary paths before passing them to OS schedulers (schtasks, cron, systemd, launchd).
+
 ### Other
 
 - Upgraded GitHub Actions to v5 across all CI workflows.

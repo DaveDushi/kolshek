@@ -9,7 +9,7 @@ import { mkdir, unlink } from "node:fs/promises";
 import type { ScheduleConfig } from "../../types/index.js";
 import type { SchedulerBackend } from "./index.js";
 import { run } from "./index.js";
-import { escapeXml } from "./escape.js";
+import { escapeXml, validateBinaryPath } from "./escape.js";
 
 const LABEL = "com.kolshek.fetch";
 const PLIST_DIR = join(homedir(), "Library", "LaunchAgents");
@@ -44,6 +44,7 @@ function buildPlist(config: ScheduleConfig): string {
 
 const backend: SchedulerBackend = {
   async register(config: ScheduleConfig): Promise<void> {
+    validateBinaryPath(config.binaryPath);
     // Unload existing if present
     try {
       await run(["launchctl", "unload", PLIST_PATH]);

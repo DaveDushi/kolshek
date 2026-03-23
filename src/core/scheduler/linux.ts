@@ -8,7 +8,7 @@ import { mkdir, unlink } from "node:fs/promises";
 import type { ScheduleConfig } from "../../types/index.js";
 import type { SchedulerBackend } from "./index.js";
 import { run } from "./index.js";
-import { shellQuote, systemdEscape } from "./escape.js";
+import { shellQuote, systemdEscape, validateBinaryPath } from "./escape.js";
 
 const UNIT_NAME = "kolshek-fetch";
 const SYSTEMD_DIR = join(homedir(), ".config", "systemd", "user");
@@ -125,6 +125,7 @@ async function cronIsRegistered(): Promise<boolean> {
 
 const backend: SchedulerBackend = {
   async register(config: ScheduleConfig): Promise<void> {
+    validateBinaryPath(config.binaryPath);
     if (await hasSystemd()) {
       await systemdRegister(config);
     } else {

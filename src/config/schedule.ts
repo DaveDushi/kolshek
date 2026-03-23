@@ -59,5 +59,5 @@ export async function resolveBinaryPath(): Promise<string> {
   } catch { /* not found */ }
 
   // Fallback: bun run <script>
-  return `bun run ${scriptPath}`;
+  return `bun run "${scriptPath}"`;
 }

@@ -4,6 +4,7 @@
 import type { ScheduleConfig } from "../../types/index.js";
 import type { SchedulerBackend } from "./index.js";
 import { run } from "./index.js";
+import { validateBinaryPath } from "./escape.js";
 
 const TASK_NAME = "KolShek Fetch";
 
@@ -27,7 +28,8 @@ function nowHHMM(): string {
 
 const backend: SchedulerBackend = {
   async register(config: ScheduleConfig): Promise<void> {
-    const tr = `"${config.binaryPath}" fetch --non-interactive`;
+    const safePath = validateBinaryPath(config.binaryPath);
+    const tr = `"${safePath}" fetch --non-interactive`;
     await run([
       "schtasks", "/Create",
       "/TN", TASK_NAME,
