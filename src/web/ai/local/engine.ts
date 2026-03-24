@@ -392,8 +392,25 @@ export async function runLocalInference(
     });
 
     const elapsed = (Date.now() - genStart) / 1000;
-    const tokSec = elapsed > 0 ? (tokenCount / elapsed).toFixed(1) : "?";
-    console.log(`[engine] Generated ${tokenCount} tokens in ${elapsed.toFixed(1)}s (${tokSec} tok/s)`);
+    const tokPerSec = elapsed > 0 ? parseFloat((tokenCount / elapsed).toFixed(1)) : 0;
+    console.log(`[engine] Generated ${tokenCount} tokens in ${elapsed.toFixed(1)}s (${tokPerSec} tok/s)`);
+
+    // Emit context usage stats — estimate total tokens in context window.
+    // Includes system prompt, tool definitions, conversation history, and generated tokens.
+    const contextMax = contextInstance.contextSize ?? activeProfile.contextSize;
+    const toolDefsText = tools.map((t) =>
+      `${t.function.name}: ${t.function.description} ${JSON.stringify(t.function.parameters)}`
+    ).join("\n");
+    const totalInputChars = systemPrompt.length + toolDefsText.length + fullPrompt.length;
+    const estimatedInputTokens = Math.ceil(totalInputChars / 4);
+    const contextUsed = estimatedInputTokens + tokenCount;
+    onEvent({
+      type: "usage",
+      tokensGenerated: tokenCount,
+      tokPerSec,
+      contextUsed,
+      contextMax,
+    });
 
     onEvent({ type: "turn_end", iteration: 0 });
   } catch (err) {

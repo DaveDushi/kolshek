@@ -3,7 +3,7 @@ import { useRef, useEffect, useCallback, useState } from "react";
 import { Bot } from "lucide-react";
 import type { AgentMessage, AgentStatus } from "@/hooks/use-agent";
 import { ChatMessage } from "./chat-message";
-import { ChatInput, type ChatInputModel } from "./chat-input";
+import { ChatInput, type ChatInputModel, type ChatInputUsage } from "./chat-input";
 
 interface ChatContainerProps {
   messages: AgentMessage[];
@@ -18,6 +18,7 @@ interface ChatContainerProps {
   activeModelId?: string | null;
   onModelChange?: (modelId: string) => void;
   isModelLoading?: boolean;
+  usage?: ChatInputUsage | null;
 }
 
 const SUGGESTIONS = [
@@ -64,6 +65,7 @@ export function ChatContainer({
   activeModelId,
   onModelChange,
   isModelLoading,
+  usage,
 }: ChatContainerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -167,6 +169,7 @@ export function ChatContainer({
         activeModelId={activeModelId}
         onModelChange={onModelChange}
         isModelLoading={isModelLoading}
+        usage={usage}
       />
     </div>
   );

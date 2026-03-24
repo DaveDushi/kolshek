@@ -10,6 +10,12 @@ export interface ChatInputModel {
   loaded: boolean;
 }
 
+export interface ChatInputUsage {
+  contextUsed: number;
+  contextMax: number;
+  tokPerSec: number;
+}
+
 interface ChatInputProps {
   onSend: (text: string) => void;
   onStop: () => void;
@@ -22,6 +28,7 @@ interface ChatInputProps {
   activeModelId?: string | null;
   onModelChange?: (modelId: string) => void;
   isModelLoading?: boolean;
+  usage?: ChatInputUsage | null;
 }
 
 export function ChatInput({
@@ -36,6 +43,7 @@ export function ChatInput({
   activeModelId,
   onModelChange,
   isModelLoading,
+  usage,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
@@ -208,9 +216,37 @@ export function ChatInput({
             )}
           </div>
 
-          <p className="text-[11px] text-muted-foreground/50 select-none">
-            Enter to send, Shift+Enter for new line
-          </p>
+          <div className="flex items-center gap-3">
+            {/* Context usage */}
+            {usage && (
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <div className="w-14 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-300",
+                      usage.contextUsed / usage.contextMax > 0.95
+                        ? "bg-red-500"
+                        : usage.contextUsed / usage.contextMax > 0.8
+                          ? "bg-amber-500"
+                          : "bg-primary/60"
+                    )}
+                    style={{ width: `${Math.min(100, Math.round(usage.contextUsed / usage.contextMax * 100))}%` }}
+                  />
+                </div>
+                <span className="tabular-nums">
+                  {Math.round(usage.contextUsed / usage.contextMax * 100)}%
+                </span>
+                {usage.tokPerSec > 0 && (
+                  <span className="text-muted-foreground/50 tabular-nums">
+                    {usage.tokPerSec} t/s
+                  </span>
+                )}
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground/50 select-none">
+              Enter to send, Shift+Enter for new line
+            </p>
+          </div>
         </div>
       </div>
     </div>
