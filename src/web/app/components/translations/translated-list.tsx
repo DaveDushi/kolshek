@@ -1,8 +1,9 @@
 // Searchable list of already-translated descriptions with edit capability
-import { useState, useMemo } from "react";
+import { useState, useCallback } from "react";
 import { Search, Pencil, Check, X, BookCheck } from "lucide-react";
 import { useTranslated, useTranslate } from "@/hooks/use-translations";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Pagination } from "@/components/shared/pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,25 +17,38 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const DEFAULT_PAGE_SIZE = 50;
+
 export function TranslatedList() {
-  const { data: groups, isLoading } = useTranslated();
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  // Debounced search value sent to API
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  const { data, isLoading } = useTranslated({
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+    search: debouncedSearch || undefined,
+  });
   const translate = useTranslate();
 
-  const [search, setSearch] = useState("");
+  const groups = data?.groups ?? [];
+  const total = data?.total ?? 0;
+
   const [editingDesc, setEditingDesc] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
-  // Filter locally by search term
-  const filtered = useMemo(() => {
-    if (!groups) return [];
-    if (!search.trim()) return groups;
-    const q = search.toLowerCase();
-    return groups.filter(
-      (g) =>
-        g.description.toLowerCase().includes(q) ||
-        g.descriptionEn.toLowerCase().includes(q)
-    );
-  }, [groups, search]);
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    if (debounceTimer) clearTimeout(debounceTimer);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(value);
+      setPage(1);
+    }, 300);
+    setDebounceTimer(timer);
+  }
 
   function startEdit(description: string, currentEnglish: string) {
     setEditingDesc(description);
@@ -57,7 +71,13 @@ export function TranslatedList() {
     );
   }
 
-  if (isLoading) {
+  const handlePageChange = useCallback((p: number) => setPage(p), []);
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    setPage(1);
+  }, []);
+
+  if (isLoading && !data) {
     return (
       <div className="space-y-3">
         <Skeleton className="h-8 w-48" />
@@ -66,7 +86,7 @@ export function TranslatedList() {
     );
   }
 
-  if (!groups || groups.length === 0) {
+  if (!debouncedSearch && total === 0) {
     return (
       <EmptyState
         icon={<BookCheck />}
@@ -80,7 +100,7 @@ export function TranslatedList() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Translated Descriptions</h3>
-        <Badge variant="secondary">{groups.length} total</Badge>
+        <Badge variant="secondary">{total} total</Badge>
       </div>
 
       {/* Search */}
@@ -88,7 +108,7 @@ export function TranslatedList() {
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
           placeholder="Search translations..."
           className="pl-9"
         />
@@ -104,7 +124,7 @@ export function TranslatedList() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filtered.map((group) => (
+          {groups.map((group) => (
             <TableRow key={group.description}>
               <TableCell dir="rtl" className="font-medium text-right">
                 {group.description}
@@ -166,11 +186,19 @@ export function TranslatedList() {
         </TableBody>
       </Table>
 
-      {filtered.length === 0 && search.trim() && (
+      {groups.length === 0 && debouncedSearch && (
         <p className="text-center text-sm text-muted-foreground py-4">
-          No translations match &quot;{search}&quot;
+          No translations match &quot;{debouncedSearch}&quot;
         </p>
       )}
+
+      <Pagination
+        total={total}
+        pageSize={pageSize}
+        currentPage={page}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+      />
     </div>
   );
 }

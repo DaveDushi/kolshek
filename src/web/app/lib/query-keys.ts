@@ -24,8 +24,10 @@ export const queryKeys = {
   },
   translations: {
     all: ["translations"] as const,
-    untranslated: () => [...queryKeys.translations.all, "untranslated"] as const,
-    translated: () => [...queryKeys.translations.all, "translated"] as const,
+    untranslated: (params?: Record<string, unknown>) =>
+      [...queryKeys.translations.all, "untranslated", params ?? null] as const,
+    translated: (params?: Record<string, unknown>) =>
+      [...queryKeys.translations.all, "translated", params ?? null] as const,
     rules: () => [...queryKeys.translations.all, "rules"] as const,
   },
   reports: {

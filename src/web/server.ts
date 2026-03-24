@@ -992,20 +992,27 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
 
         // --- Translations v2 ---
 
-        // GET /api/v2/translations/untranslated — untranslated groups
+        // GET /api/v2/translations/untranslated — untranslated groups (paginated)
         if (method === "GET" && path === "/api/v2/translations/untranslated") {
           try {
-            return json(listUntranslatedGrouped());
+            const sp = url.searchParams;
+            const limit = sp.has("limit") ? Math.min(Number(sp.get("limit")) || 50, MAX_PAGINATION_LIMIT) : undefined;
+            const offset = sp.has("offset") ? Math.max(Number(sp.get("offset")) || 0, 0) : undefined;
+            return json(listUntranslatedGrouped({ limit, offset }));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("UNTRANSLATED_FAILED", msg, 500);
           }
         }
 
-        // GET /api/v2/translations/translated — translated groups
+        // GET /api/v2/translations/translated — translated groups (paginated + search)
         if (method === "GET" && path === "/api/v2/translations/translated") {
           try {
-            return json(listTranslatedGrouped());
+            const sp = url.searchParams;
+            const limit = sp.has("limit") ? Math.min(Number(sp.get("limit")) || 50, MAX_PAGINATION_LIMIT) : undefined;
+            const offset = sp.has("offset") ? Math.max(Number(sp.get("offset")) || 0, 0) : undefined;
+            const search = sp.get("search") || undefined;
+            return json(listTranslatedGrouped({ limit, offset, search }));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("TRANSLATED_FAILED", msg, 500);

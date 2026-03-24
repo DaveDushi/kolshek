@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Trash2, Play, Plus, BookOpen } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { CategoryRule, RuleConditions } from "@/types/api";
 
 // Convert rule conditions to a human-readable string
@@ -109,42 +110,44 @@ export function RulesTable({ onAddRule }: { onAddRule?: () => void }) {
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-16">Priority</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Conditions</TableHead>
-            <TableHead className="w-16">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sorted.map((rule) => (
-            <TableRow key={rule.id}>
-              <TableCell className="tabular-nums font-medium">
-                {rule.priority}
-              </TableCell>
-              <TableCell>
-                <CategoryBadge category={rule.category} />
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {describeConditions(rule.conditions)}
-              </TableCell>
-              <TableCell>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeRule.mutate(rule.id)}
-                  disabled={removeRule.isPending}
-                  aria-label={`Delete rule for ${rule.category}`}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </TableCell>
+      <ScrollArea className="max-h-[400px]">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16">Priority</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Conditions</TableHead>
+              <TableHead className="w-16">Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {sorted.map((rule) => (
+              <TableRow key={rule.id}>
+                <TableCell className="tabular-nums font-medium">
+                  {rule.priority}
+                </TableCell>
+                <TableCell>
+                  <CategoryBadge category={rule.category} />
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {describeConditions(rule.conditions)}
+                </TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeRule.mutate(rule.id)}
+                    disabled={removeRule.isPending}
+                    aria-label={`Delete rule for ${rule.category}`}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </ScrollArea>
     </div>
   );
 }
