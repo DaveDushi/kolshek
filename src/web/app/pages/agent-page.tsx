@@ -14,7 +14,7 @@ import { api } from "@/lib/api";
 interface AgentConfigResponse {
   modelId: string | null;
   modelLoaded: boolean;
-  modelInfo: { id: string; name: string; contextSize: number; gpuBackend: string } | null;
+  modelInfo: { id: string; name: string; contextSize: number; gpuBackend: string; tier: number } | null;
 }
 
 interface ModeInfo {
@@ -55,11 +55,13 @@ export function AgentPage() {
 
   const isReady = !!config?.modelLoaded;
 
+  const modelTier = config?.modelInfo?.tier ?? 1;
+
   const handleSend = useCallback(
     (text: string) => {
-      // Detect slash commands for mode activation
+      // Detect slash commands for mode activation (tier 3+ only)
       const modeMatch = text.match(/^\/(analyze|review|categorize|translate|init)$/);
-      if (modeMatch) {
+      if (modeMatch && modelTier >= 3) {
         const modeName = modeMatch[1];
         setActiveMode(modeName);
         send(
@@ -78,7 +80,7 @@ export function AgentPage() {
 
       send(text, enabledSkills, activeMode || undefined);
     },
-    [send, enabledSkills, activeMode]
+    [send, enabledSkills, activeMode, modelTier]
   );
 
   const handleModeStart = useCallback(
@@ -186,7 +188,7 @@ export function AgentPage() {
         onOpenChange={setConfigOpen}
         enabledSkills={enabledSkills}
         onSkillsChange={setEnabledSkills}
-        modes={modes || []}
+        modes={modelTier >= 3 ? (modes || []) : []}
         onModeStart={handleModeStart}
         onModelChange={refetchConfig}
       />

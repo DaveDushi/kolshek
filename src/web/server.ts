@@ -1143,22 +1143,28 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           const skills = await discoverSkills();
           await discoverModeSkills();
 
-          // Resolve active mode content if set
+          const modelInfo = getLoadedModelInfo();
+          const tier = modelInfo?.tier ?? 1;
+
+          // Resolve active mode content — only for tier 3+ models.
+          // Mode content is too large for small model context windows.
           let modeContent: string | undefined;
-          if (body.activeMode) {
-            const mode = getModeByName(body.activeMode);
+          let activeMode = body.activeMode;
+          if (activeMode && tier >= 3) {
+            const mode = getModeByName(activeMode);
             if (mode) modeContent = mode.content;
+          } else {
+            activeMode = undefined;
           }
 
-          const modelInfo = getLoadedModelInfo();
           const ctx = buildRunnerContext(
             body.messages,
             skills,
             getActiveTools(),
-            body.enabledSkills,
-            body.activeMode,
+            tier >= 3 ? body.enabledSkills : undefined,
+            activeMode,
             modeContent,
-            modelInfo?.tier,
+            tier,
           );
 
           return createAgentStream(ctx, cors, req.signal);

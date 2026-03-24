@@ -57,21 +57,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     description: "Smallest model with reliable tool calling",
     tier: 1,
   },
-  {
-    id: "phi4-mini-q4km",
-    name: "Phi-4 Mini",
-    url: "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/main/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf",
-    sizeBytes: 2_300_000_000,
-    params: "3.8B",
-    quant: "Q4_K_M",
-    minRamGB: 6,
-    contextWindow: 128_000,
-    toolCalling: "good",
-    description: "Microsoft, strong at structured output",
-    tier: 1,
-  },
-
-  // Tier 2: Standard (8-16 GB RAM)
+  // Phi-4 Mini removed — outputs tool calls as text, doesn't use function calling format
   {
     id: "gemma3-4b-q4km",
     name: "Gemma 3 4B",
@@ -79,12 +65,14 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     sizeBytes: 2_500_000_000,
     params: "4B",
     quant: "Q4_K_M",
-    minRamGB: 8,
+    minRamGB: 6,
     contextWindow: 128_000,
     toolCalling: "good",
     description: "Google, 140+ languages",
-    tier: 2,
+    tier: 1,
   },
+
+  // Tier 2: Standard (8-16 GB RAM)
   {
     id: "qwen3-8b-q4km",
     name: "Qwen 3 8B",
@@ -338,71 +326,61 @@ export async function downloadModel(
       headers["Range"] = `bytes=${startByte}-`;
     }
 
+    console.log(`[download] Starting ${model.name} from ${model.url} (resume=${startByte})`);
     const res = await fetch(model.url, {
       headers,
       signal: controller.signal,
       redirect: "follow",
     });
 
+    console.log(`[download] HTTP ${res.status} ${res.statusText}, content-length=${res.headers.get("content-length")}`);
     if (!res.ok && res.status !== 206) {
-      throw new Error(`Download failed: HTTP ${res.status}`);
+      throw new Error(`Download failed: HTTP ${res.status} ${res.statusText}`);
     }
 
     const contentLength = parseInt(res.headers.get("content-length") || "0");
     const totalBytes = res.status === 206 ? startByte + contentLength : contentLength;
+    console.log(`[download] Total size: ${(totalBytes / 1e9).toFixed(2)} GB`);
 
     if (!res.body) throw new Error("No response body");
 
-    // Open file for writing (append if resuming)
-    const file = Bun.file(tmpPath);
-    const writer = (file as any).writer ? (file as any).writer() : null;
-
-    // If Bun.file doesn't have writer, fall back to manual approach
-    const reader = res.body.getReader();
+    // Stream directly to disk — never buffer the whole file in memory
+    const { open: fsOpen } = await import("node:fs/promises");
+    const fh = await fsOpen(tmpPath, startByte > 0 ? "a" : "w");
     let bytesDownloaded = startByte;
-    const chunks: Uint8Array[] = [];
 
-    // Read initial partial file if resuming
-    if (startByte > 0 && !writer) {
-      const existing = await Bun.file(tmpPath).arrayBuffer();
-      chunks.push(new Uint8Array(existing));
-    }
+    try {
+      const reader = res.body.getReader();
+      let lastProgressAt = 0;
 
-    let lastProgressAt = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+        await fh.write(value);
+        bytesDownloaded += value.length;
 
-      chunks.push(value);
-      bytesDownloaded += value.length;
-
-      // Throttle progress callbacks to ~4 per second
-      const now = Date.now();
-      if (now - lastProgressAt > 250 || bytesDownloaded >= totalBytes) {
-        lastProgressAt = now;
-        const percent = totalBytes > 0 ? Math.round((bytesDownloaded / totalBytes) * 100) : 0;
-        onProgress(percent, bytesDownloaded, totalBytes);
+        // Throttle progress callbacks to ~4 per second
+        const now = Date.now();
+        if (now - lastProgressAt > 250 || bytesDownloaded >= totalBytes) {
+          lastProgressAt = now;
+          const percent = totalBytes > 0 ? Math.round((bytesDownloaded / totalBytes) * 100) : 0;
+          onProgress(percent, bytesDownloaded, totalBytes);
+        }
       }
+    } finally {
+      await fh.close();
     }
-
-    // Write all chunks to file
-    const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
-    const combined = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const chunk of chunks) {
-      combined.set(chunk, offset);
-      offset += chunk.length;
-    }
-    await Bun.write(tmpPath, combined);
 
     // Rename tmp to final
     const { rename } = await import("node:fs/promises");
     await rename(tmpPath, destPath);
+    console.log(`[download] Complete: ${model.name} (${(bytesDownloaded / 1e9).toFixed(2)} GB)`);
 
     onProgress(100, bytesDownloaded, totalBytes);
     return destPath;
   } catch (err) {
+    console.error(`[download] Failed: ${model.name}`, err);
     if (err instanceof DOMException && err.name === "AbortError") {
       throw new Error("Download cancelled");
     }

@@ -347,6 +347,9 @@ export async function runLocalInference(
   let iteration = 0;
   let toolCallCounter = 0;
 
+  // Track previous tool calls to detect loops (same tool + same args = loop)
+  let lastToolCallKey = "";
+
   // Context window tracking for efficient KV cache reuse across iterations
   let lastContextShiftMetadata: any;
   let chatHistoryContextWindow: any[] | undefined;
@@ -404,6 +407,26 @@ export async function runLocalInference(
         onEvent({ type: "turn_end", iteration });
         return;
       }
+
+      // Detect duplicate tool calls — if same tool+args as last iteration, force text
+      const currentCallKey = res.functionCalls
+        .map((fc: any) => `${fc.functionName}:${JSON.stringify(fc.params)}`)
+        .join("|");
+      if (currentCallKey === lastToolCallKey) {
+        console.warn("[engine] Duplicate tool call detected, forcing text response");
+        // Re-run without functions to force text output
+        chatHistory.push({ type: "model", response: [] });
+        const forceRes = await llamaChat.generateResponse(chatHistory, {
+          ...(profile.disableThinking ? { budgets: { thoughtTokens: 0 } } : {}),
+          onTextChunk: (text: string) => {
+            if (text) onEvent({ type: "token", content: text });
+          },
+          signal,
+        });
+        onEvent({ type: "turn_end", iteration });
+        return;
+      }
+      lastToolCallKey = currentCallKey;
 
       // Execute each function call
       const toolCallItems: any[] = [];
