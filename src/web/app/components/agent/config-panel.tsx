@@ -21,6 +21,12 @@ interface ModeInfo {
   description: string;
 }
 
+interface ContextBounds {
+  min: number;
+  max: number;
+  current: number;
+}
+
 interface ConfigPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -29,6 +35,9 @@ interface ConfigPanelProps {
   modes?: ModeInfo[];
   onModeStart?: (mode: string) => void;
   onModelChange?: () => void;
+  contextBounds: ContextBounds | null;
+  contextSize: number | null;
+  onContextSizeChange: (size: number | null) => void;
 }
 
 interface HardwareInfo {
@@ -82,6 +91,13 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 ** 3)).toFixed(1)} GB`;
 }
 
+// Context size slider step presets (powers of 2 for clean values)
+const CTX_STEPS = [2048, 4096, 8192, 16384, 32768, 65536];
+
+function formatCtx(n: number): string {
+  return n >= 1024 ? `${Math.round(n / 1024)}K` : String(n);
+}
+
 export function ConfigPanel({
   open,
   onOpenChange,
@@ -90,6 +106,9 @@ export function ConfigPanel({
   modes,
   onModeStart,
   onModelChange,
+  contextBounds,
+  contextSize,
+  onContextSizeChange,
 }: ConfigPanelProps) {
   const queryClient = useQueryClient();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -455,6 +474,61 @@ export function ConfigPanel({
                 })}
               </div>
             </section>
+
+            {/* --- Advanced section --- */}
+            {contextBounds && (
+              <section className="space-y-3">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                  Advanced
+                </p>
+
+                {(() => {
+                  const steps = CTX_STEPS.filter((s) => s >= contextBounds.min && s <= contextBounds.max);
+                  const effective = contextSize ?? contextBounds.current;
+                  // Find closest step index
+                  let closestIdx = 0;
+                  let closestDist = Infinity;
+                  for (let i = 0; i < steps.length; i++) {
+                    const d = Math.abs(steps[i] - effective);
+                    if (d < closestDist) { closestDist = d; closestIdx = i; }
+                  }
+                  return (
+                    <div className="rounded-lg border border-border px-3 py-3 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-foreground">Context window</p>
+                        <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
+                          {formatCtx(steps[closestIdx])}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={steps.length - 1}
+                        value={closestIdx}
+                        onChange={(e) => {
+                          const val = steps[Number(e.target.value)];
+                          onContextSizeChange(val === contextBounds.current ? null : val);
+                        }}
+                        className="w-full h-1.5 accent-primary cursor-pointer"
+                      />
+                      <div className="flex justify-between text-[9px] text-muted-foreground/50">
+                        {steps.map((s) => (
+                          <span key={s}>{formatCtx(s)}</span>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">
+                        Larger context uses more VRAM and slows inference.
+                        {contextSize != null && contextSize !== contextBounds.current && (
+                          <span className="text-amber-600 ml-1">
+                            Changed from default ({formatCtx(contextBounds.current)}) — takes effect on next message.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </section>
+            )}
           </div>
         </ScrollArea>
       </SheetContent>

@@ -83,7 +83,7 @@ export function useAgent() {
   const totalGeneratedRef = useRef(0);
 
   const send = useCallback(
-    async (text: string, enabledSkills?: string[], activeMode?: string, thinking?: boolean) => {
+    async (text: string, enabledSkills?: string[], activeMode?: string, thinking?: boolean, contextSize?: number) => {
       if (!text.trim()) return;
 
       // Abort any in-flight request
@@ -135,6 +135,7 @@ export function useAgent() {
         if (enabledSkills) body.enabledSkills = enabledSkills;
         if (activeMode) body.activeMode = activeMode;
         if (thinking) body.thinking = true;
+        if (contextSize) body.contextSize = contextSize;
 
         const res = await fetch("/api/v2/agent/chat", {
           method: "POST",

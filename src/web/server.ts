@@ -24,6 +24,7 @@ import {
   getLoadedModelId,
   getLoadedModelInfo,
   getActiveTools,
+  getContextBounds,
 } from "./ai/local/engine.js";
 import {
   listProviders,
@@ -1168,7 +1169,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             body.thinking,
           );
 
-          return createAgentStream(ctx, cors, req.signal);
+          return createAgentStream(ctx, cors, req.signal, body.contextSize);
         }
 
         // GET /api/v2/agent/config — current AI configuration + model status
@@ -1179,6 +1180,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             modelId: config?.modelId || null,
             modelLoaded: isModelLoaded(),
             modelInfo,
+            contextBounds: getContextBounds(),
           });
         }
 

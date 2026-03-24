@@ -182,6 +182,46 @@ export function getActiveTools(): ToolDef[] {
   return activeProfile?.tools ?? TOOL_DEFS_LOCAL;
 }
 
+// Get the min/max context size bounds for the loaded model
+export function getContextBounds(): { min: number; max: number; current: number } | null {
+  if (!loadedModelId || !contextInstance) return null;
+  const entry = MODEL_REGISTRY.find((m) => m.id === loadedModelId);
+  if (!entry) return null;
+  // Cap max at 65536 — beyond that, memory/quality degrades sharply on consumer hardware
+  const max = Math.min(entry.contextWindow, 65536);
+  return { min: 2048, max, current: contextInstance.contextSize ?? 0 };
+}
+
+// Resize the context window without reloading the model.
+// Disposes the old context/sequence and creates new ones.
+export async function resizeContext(newSize: number): Promise<void> {
+  if (!modelInstance || !loadedModelId || !activeProfile) {
+    throw new Error("No model loaded");
+  }
+  const entry = MODEL_REGISTRY.find((m) => m.id === loadedModelId);
+  if (!entry) throw new Error("Model entry not found");
+
+  const clamped = Math.max(2048, Math.min(newSize, entry.contextWindow, 65536));
+  const currentSize = contextInstance?.contextSize ?? 0;
+  if (clamped === currentSize) return; // no change
+
+  // Dispose old context + sequence
+  if (sequenceInstance) {
+    try { sequenceInstance.dispose(); } catch { /* already disposed */ }
+    sequenceInstance = null;
+  }
+  if (contextInstance) {
+    try { await contextInstance.dispose(); } catch { /* already disposed */ }
+    contextInstance = null;
+  }
+
+  // Allocate new context
+  contextInstance = await modelInstance.createContext({ contextSize: clamped });
+  sequenceInstance = contextInstance.getSequence();
+  activeProfile = { ...activeProfile, contextSize: clamped };
+  console.log(`[engine] Context resized: ${currentSize} → ${clamped}`);
+}
+
 // --- Inference ---
 
 export type EventCallback = (event: AgentSSEEvent) => void;
@@ -194,9 +234,15 @@ export async function runLocalInference(
   tools: ToolDef[],
   onEvent: EventCallback,
   signal?: AbortSignal,
+  contextSizeOverride?: number,
 ): Promise<void> {
   if (!modelInstance || !contextInstance || !sequenceInstance || !activeProfile) {
     throw new Error("No model loaded — download and load a model first");
+  }
+
+  // If user requested a different context size, resize on-the-fly
+  if (contextSizeOverride && contextSizeOverride !== (contextInstance.contextSize ?? activeProfile.contextSize)) {
+    await resizeContext(contextSizeOverride);
   }
 
   const profile = activeProfile;

@@ -67,4 +67,5 @@ export interface AgentChatRequest {
   enabledSkills?: string[];
   activeMode?: string;
   thinking?: boolean;
+  contextSize?: number; // user override from advanced settings slider
 }

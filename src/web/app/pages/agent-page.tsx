@@ -15,6 +15,7 @@ interface AgentConfigResponse {
   modelId: string | null;
   modelLoaded: boolean;
   modelInfo: { id: string; name: string; contextSize: number; gpuBackend: string; tier: number } | null;
+  contextBounds: { min: number; max: number; current: number } | null;
 }
 
 interface ModeInfo {
@@ -43,6 +44,7 @@ export function AgentPage() {
   ]);
   const [activeMode, setActiveMode] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
+  const [contextSize, setContextSize] = useState<number | null>(null); // null = use default
 
   const { data: config, refetch: refetchConfig } = useQuery<AgentConfigResponse>({
     queryKey: ["agent", "config"],
@@ -70,6 +72,7 @@ export function AgentPage() {
           enabledSkills,
           modeName,
           thinking,
+          contextSize ?? undefined,
         );
         return;
       }
@@ -80,9 +83,9 @@ export function AgentPage() {
         return;
       }
 
-      send(text, enabledSkills, activeMode || undefined, thinking);
+      send(text, enabledSkills, activeMode || undefined, thinking, contextSize ?? undefined);
     },
-    [send, enabledSkills, activeMode, modelTier, thinking]
+    [send, enabledSkills, activeMode, modelTier, thinking, contextSize]
   );
 
   const handleModeStart = useCallback(
@@ -94,9 +97,10 @@ export function AgentPage() {
         enabledSkills,
         modeName,
         thinking,
+        contextSize ?? undefined,
       );
     },
-    [send, enabledSkills, thinking]
+    [send, enabledSkills, thinking, contextSize]
   );
 
   const handleExitMode = useCallback(() => {
@@ -236,6 +240,9 @@ export function AgentPage() {
         modes={modelTier >= 3 ? (modes || []) : []}
         onModeStart={handleModeStart}
         onModelChange={refetchConfig}
+        contextBounds={config?.contextBounds ?? null}
+        contextSize={contextSize}
+        onContextSizeChange={setContextSize}
       />
     </div>
   );

@@ -11,6 +11,7 @@ export function createAgentStream(
   ctx: RunnerContext,
   cors: Record<string, string>,
   signal?: AbortSignal,
+  contextSizeOverride?: number,
 ): Response {
   const encoder = new TextEncoder();
 
@@ -25,7 +26,7 @@ export function createAgentStream(
       }
 
       try {
-        await runAgentLoop(ctx, pushEvent, signal);
+        await runAgentLoop(ctx, pushEvent, signal, contextSizeOverride);
         pushEvent({ type: "done" });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

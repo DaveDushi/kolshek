@@ -35,6 +35,7 @@ export async function runAgentLoop(
   ctx: RunnerContext,
   onEvent: EventCallback,
   signal?: AbortSignal,
+  contextSizeOverride?: number,
 ): Promise<void> {
-  await runLocalInference(ctx.messages, ctx.tools, onEvent, signal);
+  await runLocalInference(ctx.messages, ctx.tools, onEvent, signal, contextSizeOverride);
 }
