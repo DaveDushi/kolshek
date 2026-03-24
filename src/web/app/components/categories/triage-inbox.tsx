@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Inbox } from "lucide-react";
 
 interface TriageInboxProps {
@@ -129,71 +130,73 @@ export function TriageInbox({ category }: TriageInboxProps) {
         </div>
       )}
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-10">
-              <input
-                type="checkbox"
-                checked={
-                  transactions.length > 0 && selected.size === transactions.length
-                }
-                onChange={toggleAll}
-                className="h-4 w-4 rounded border-input"
-                aria-label="Select all"
-              />
-            </TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-            <TableHead>Move to</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {transactions.map((tx) => (
-            <TableRow key={tx.id}>
-              <TableCell>
+      <ScrollArea className="max-h-[400px]">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10">
                 <input
                   type="checkbox"
-                  checked={selected.has(tx.id)}
-                  onChange={() => toggleSelect(tx.id)}
+                  checked={
+                    transactions.length > 0 && selected.size === transactions.length
+                  }
+                  onChange={toggleAll}
                   className="h-4 w-4 rounded border-input"
-                  aria-label={`Select transaction ${tx.id}`}
+                  aria-label="Select all"
                 />
-              </TableCell>
-              <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                {formatDate(tx.date)}
-              </TableCell>
-              <TableCell>
-                <TransactionDescription
-                  description={tx.description}
-                  descriptionEn={tx.descriptionEn}
-                />
-              </TableCell>
-              <TableCell className="text-right">
-                <CurrencyDisplay amount={tx.chargedAmount} />
-              </TableCell>
-              <TableCell>
-                <Select
-                  value=""
-                  onValueChange={(val) => handleMove(tx.id, val)}
-                >
-                  <SelectTrigger className="w-[130px]">
-                    <SelectValue placeholder="Move to..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {otherCategories.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TableCell>
+              </TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
+              <TableHead>Move to</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {transactions.map((tx) => (
+              <TableRow key={tx.id}>
+                <TableCell>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(tx.id)}
+                    onChange={() => toggleSelect(tx.id)}
+                    className="h-4 w-4 rounded border-input"
+                    aria-label={`Select transaction ${tx.id}`}
+                  />
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                  {formatDate(tx.date)}
+                </TableCell>
+                <TableCell>
+                  <TransactionDescription
+                    description={tx.description}
+                    descriptionEn={tx.descriptionEn}
+                  />
+                </TableCell>
+                <TableCell className="text-right">
+                  <CurrencyDisplay amount={tx.chargedAmount} />
+                </TableCell>
+                <TableCell>
+                  <Select
+                    value=""
+                    onValueChange={(val) => handleMove(tx.id, val)}
+                  >
+                    <SelectTrigger className="w-[130px]">
+                      <SelectValue placeholder="Move to..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {otherCategories.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </ScrollArea>
     </div>
   );
 }

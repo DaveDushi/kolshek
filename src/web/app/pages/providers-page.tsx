@@ -24,7 +24,7 @@ export function ProvidersPage() {
   useDocumentTitle("Providers");
   const { data: providers, isLoading, isError, error } = useProviders();
   const deleteProvider = useDeleteProvider();
-  const { events, isRunning, start } = useSync();
+  const { events, isRunning, start, cancel } = useSync();
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [syncPanelOpen, setSyncPanelOpen] = useState(false);
@@ -178,6 +178,7 @@ export function ProvidersPage() {
         events={events}
         isRunning={isRunning}
         onRetry={handleRetrySync}
+        onCancel={cancel}
       />
     </div>
   );

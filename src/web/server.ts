@@ -108,7 +108,7 @@ import type { RuleConditions } from "../types/category-rule.js";
 import type { TransactionFilters } from "../types/transaction.js";
 
 // Track active fetch so we don't allow concurrent syncs
-let activeFetch: { promise: Promise<void>; events: string[]; listeners: Set<(event: string) => void> } | null = null;
+let activeFetch: { promise: Promise<void>; events: string[]; listeners: Set<(event: string) => void>; abort: AbortController } | null = null;
 
 // Serve embedded SPA assets from web-files.ts (survives bun build --compile)
 function serveEmbedded(key: string, cacheControl: string, extraHeaders?: Record<string, string>): Response | null {
@@ -1213,6 +1213,15 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           return fetchEventsSSE();
         }
 
+        // POST /api/v2/fetch/cancel — cancel an in-progress sync
+        if (method === "POST" && path === "/api/v2/fetch/cancel") {
+          if (!activeFetch) {
+            return jsonError("NO_SYNC", "No sync in progress to cancel.", 404);
+          }
+          activeFetch.abort.abort();
+          return json({ cancelled: true });
+        }
+
         // --- React SPA fallback (never for /api/ routes) ---
         if (method === "GET" && !path.startsWith("/api/")) {
           // Try serving from embedded SPA assets
@@ -1283,11 +1292,13 @@ function startFetchSSE(visible: boolean, providerIds: number[] | undefined, json
 
   // Set activeFetch BEFORE starting the sync to prevent race condition
   // where double-click could start two syncs
-  const placeholder = { promise: Promise.resolve(), events, listeners };
+  const abortController = new AbortController();
+  const placeholder = { promise: Promise.resolve(), events, listeners, abort: abortController };
   activeFetch = placeholder;
 
   const fetchPromise = syncProviders(providers, {
     visible,
+    signal: abortController.signal,
     onProgress: (alias, stage) => {
       pushEvent(JSON.stringify({ type: "progress", provider: alias, stage }));
     },

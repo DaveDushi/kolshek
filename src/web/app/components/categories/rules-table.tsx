@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trash2, Play, BookOpen } from "lucide-react";
+import { Trash2, Play, Plus, BookOpen } from "lucide-react";
 import type { CategoryRule, RuleConditions } from "@/types/api";
 
 // Convert rule conditions to a human-readable string
@@ -59,7 +59,7 @@ function describeConditions(conditions: RuleConditions): string {
   return parts.join(" AND ") || "No conditions";
 }
 
-export function RulesTable() {
+export function RulesTable({ onAddRule }: { onAddRule?: () => void }) {
   const { data: rules, isLoading } = useCategoryRules();
   const removeRule = useRemoveCategoryRule();
   const applyRules = useApplyCategoryRules();
@@ -90,15 +90,23 @@ export function RulesTable() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Category Rules</h3>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => applyRules.mutate()}
-          disabled={applyRules.isPending}
-        >
-          <Play className="h-4 w-4" />
-          {applyRules.isPending ? "Applying..." : "Apply Rules"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => applyRules.mutate()}
+            disabled={applyRules.isPending}
+          >
+            <Play className="h-4 w-4" />
+            {applyRules.isPending ? "Applying..." : "Apply Rules"}
+          </Button>
+          {onAddRule && (
+            <Button size="sm" onClick={onAddRule}>
+              <Plus className="h-4 w-4" />
+              Add Rule
+            </Button>
+          )}
+        </div>
       </div>
 
       <Table>

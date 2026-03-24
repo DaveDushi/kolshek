@@ -74,7 +74,7 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
-  const { events, isRunning, start } = useSync();
+  const { events, isRunning, start, cancel } = useSync();
   const { alertCount, uncategorizedCount, untranslatedCount } = useNavBadges();
   const [syncPanelOpen, setSyncPanelOpen] = useState(false);
 
@@ -308,6 +308,7 @@ export function Sidebar() {
         events={events}
         isRunning={isRunning}
         onRetry={() => start()}
+        onCancel={cancel}
       />
     </>
   );

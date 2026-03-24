@@ -61,7 +61,7 @@ export function MobileNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
-  const { events, isRunning, start } = useSync();
+  const { events, isRunning, start, cancel } = useSync();
   const { data: insights } = useInsights();
   const { data: categories } = useCategorySummary();
   const { data: untranslated } = useUntranslated();
@@ -316,6 +316,7 @@ export function MobileNav() {
         events={events}
         isRunning={isRunning}
         onRetry={() => start()}
+        onCancel={cancel}
       />
     </>
   );
