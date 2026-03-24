@@ -1,5 +1,5 @@
 // Tool call — compact inline pill with expandable details (ChatGPT-style)
-import { useState } from "react";
+import { useState, memo } from "react";
 import { ChevronDown, ChevronRight, Check, Loader2 } from "lucide-react";
 import type { AgentToolCall } from "@/hooks/use-agent";
 import { cn } from "@/lib/utils";
@@ -37,7 +37,7 @@ function humanLabel(name: string): string {
   return TOOL_LABELS[name] || name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function ToolCallCard({ toolCall }: ToolCallCardProps) {
+export const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isLoading = toolCall.result === undefined;
   const summary = summarizeResult(toolCall.name, toolCall.result);
@@ -47,6 +47,7 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
       {/* Compact pill */}
       <button
         onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors",
           "hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
@@ -98,7 +99,7 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
       )}
     </div>
   );
-}
+});
 
 function formatJson(str: string): string {
   try {

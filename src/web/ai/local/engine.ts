@@ -11,6 +11,19 @@ import { TOOL_DEFS_LOCAL, TOOL_DEFS_FULL } from "../tools.js";
 import { MODEL_REGISTRY, getModelPath } from "./models.js";
 import type { ModelEntry } from "./models.js";
 
+// Context window limits
+const CTX_MIN = 2048;
+const CTX_MAX_HARDWARE = 65536; // Beyond this, memory/quality degrades on consumer hardware
+const CTX_TIER1 = 8192;
+const CTX_TIER2 = 8192;
+const CTX_TIER3 = 16384;
+const CTX_TIER4 = 32768;
+const CTX_DEFAULT = 4096;
+
+// Tool result truncation limits (chars fed back to model)
+const TOOL_RESULT_SMALL_CTX = 1500;
+const TOOL_RESULT_LARGE_CTX = 4000;
+
 // Inference profile — scales with model capability tier.
 // Small models get fewer tools, less context, tighter limits.
 // Large models get the full experience.
@@ -26,7 +39,7 @@ function getInferenceProfile(entry: ModelEntry): InferenceProfile {
   switch (entry.tier) {
     case 1: // 3-4B models — 2 tools, strict limits
       return {
-        contextSize: 8192,
+        contextSize: CTX_TIER1,
         maxToolIterations: 3,
         maxHistoryMessages: 8,
         tools: TOOL_DEFS_LOCAL,
@@ -34,7 +47,7 @@ function getInferenceProfile(entry: ModelEntry): InferenceProfile {
       };
     case 2: // 8-12B models — moderate context, local tools, reasonable limits
       return {
-        contextSize: 8192,
+        contextSize: CTX_TIER2,
         maxToolIterations: 4,
         maxHistoryMessages: 16,
         tools: TOOL_DEFS_LOCAL,
@@ -42,7 +55,7 @@ function getInferenceProfile(entry: ModelEntry): InferenceProfile {
       };
     case 3: // 24-32B models — large context, full tools, generous limits
       return {
-        contextSize: 16384,
+        contextSize: CTX_TIER3,
         maxToolIterations: 8,
         maxHistoryMessages: 24,
         tools: TOOL_DEFS_FULL,
@@ -50,7 +63,7 @@ function getInferenceProfile(entry: ModelEntry): InferenceProfile {
       };
     case 4: // 70B+ models — maximum capability
       return {
-        contextSize: 32768,
+        contextSize: CTX_TIER4,
         maxToolIterations: 10,
         maxHistoryMessages: 32,
         tools: TOOL_DEFS_FULL,
@@ -58,7 +71,7 @@ function getInferenceProfile(entry: ModelEntry): InferenceProfile {
       };
     default:
       return {
-        contextSize: 4096,
+        contextSize: CTX_DEFAULT,
         maxToolIterations: 3,
         maxHistoryMessages: 8,
         tools: TOOL_DEFS_LOCAL,
@@ -213,9 +226,8 @@ export function getContextBounds(): { min: number; max: number; current: number 
   if (!loadedModelId || !contextInstance) return null;
   const entry = MODEL_REGISTRY.find((m) => m.id === loadedModelId);
   if (!entry) return null;
-  // Cap max at 65536 — beyond that, memory/quality degrades sharply on consumer hardware
-  const max = Math.min(entry.contextWindow, 65536);
-  return { min: 2048, max, current: contextInstance.contextSize ?? 0 };
+  const max = Math.min(entry.contextWindow, CTX_MAX_HARDWARE);
+  return { min: CTX_MIN, max, current: contextInstance.contextSize ?? 0 };
 }
 
 // Resize the context window without reloading the model.
@@ -227,7 +239,7 @@ export async function resizeContext(newSize: number): Promise<void> {
   const entry = MODEL_REGISTRY.find((m) => m.id === loadedModelId);
   if (!entry) throw new Error("Model entry not found");
 
-  const clamped = Math.max(2048, Math.min(newSize, entry.contextWindow, 65536));
+  const clamped = Math.max(CTX_MIN, Math.min(newSize, entry.contextWindow, CTX_MAX_HARDWARE));
   const currentSize = contextInstance?.contextSize ?? 0;
   if (clamped === currentSize) return; // no change
 
@@ -379,7 +391,7 @@ export async function runLocalInference(
 
         // Truncate large results to avoid context overflow.
         // Frontend gets the full result via the event above; the model gets a trimmed version.
-        const maxChars = profile.contextSize <= 8192 ? 1500 : 4000;
+        const maxChars = profile.contextSize <= CTX_TIER1 ? TOOL_RESULT_SMALL_CTX : TOOL_RESULT_LARGE_CTX;
         let trimmed = result;
         if (trimmed.length > maxChars) {
           trimmed = trimmed.slice(0, maxChars) + "...(truncated)";

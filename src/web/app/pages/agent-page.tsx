@@ -79,8 +79,20 @@ export function AgentPage() {
 
   const modelTier = config?.modelInfo?.tier ?? 1;
 
+  // Use refs for values that change frequently but shouldn't recreate callbacks
+  const enabledSkillsRef = useRef(enabledSkills);
+  enabledSkillsRef.current = enabledSkills;
+  const thinkingRef = useRef(thinking);
+  thinkingRef.current = thinking;
+  const contextSizeRef = useRef(contextSize);
+  contextSizeRef.current = contextSize;
+
   const handleSend = useCallback(
     (text: string) => {
+      const skills = enabledSkillsRef.current;
+      const think = thinkingRef.current;
+      const ctx = contextSizeRef.current;
+
       // Detect slash commands for mode activation (tier 3+ only)
       const modeMatch = text.match(/^\/(analyze|review|categorize|translate|init)$/);
       if (modeMatch && modelTier >= 3) {
@@ -88,10 +100,10 @@ export function AgentPage() {
         setActiveMode(modeName);
         send(
           `Starting ${MODE_LABELS[modeName] || modeName} workflow. Follow the skill steps.`,
-          enabledSkills,
+          skills,
           modeName,
-          thinking,
-          contextSize ?? undefined,
+          think,
+          ctx ?? undefined,
         );
         return;
       }
@@ -102,9 +114,9 @@ export function AgentPage() {
         return;
       }
 
-      send(text, enabledSkills, activeMode || undefined, thinking, contextSize ?? undefined);
+      send(text, skills, activeMode || undefined, think, ctx ?? undefined);
     },
-    [send, enabledSkills, activeMode, modelTier, thinking, contextSize]
+    [send, activeMode, modelTier]
   );
 
   const handleModeStart = useCallback(
@@ -113,13 +125,13 @@ export function AgentPage() {
       setConfigOpen(false);
       send(
         `Starting ${MODE_LABELS[modeName] || modeName} workflow. Follow the skill steps.`,
-        enabledSkills,
+        enabledSkillsRef.current,
         modeName,
-        thinking,
-        contextSize ?? undefined,
+        thinkingRef.current,
+        contextSizeRef.current ?? undefined,
       );
     },
-    [send, enabledSkills, thinking, contextSize]
+    [send]
   );
 
   const handleExitMode = useCallback(() => {
@@ -132,17 +144,22 @@ export function AgentPage() {
     setActiveMode(null);
   }, [clear]);
 
+  const [switchError, setSwitchError] = useState<string | null>(null);
+
   // Switch to a different downloaded model
   const handleModelSwitch = useCallback(async (modelId: string) => {
     setIsModelLoading(true);
+    setSwitchError(null);
     try {
       await api.post("/api/v2/agent/model/load", { modelId });
       queryClient.invalidateQueries({ queryKey: ["agent", "models"] });
       refetchConfig();
       // Pre-evaluate system prompt so first message is fast
       api.post("/api/v2/agent/warmup", {}).catch(() => {});
-    } catch {
-      // ignore
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to switch model";
+      setSwitchError(msg);
+      setTimeout(() => setSwitchError(null), 5000);
     } finally {
       setIsModelLoading(false);
     }
@@ -244,6 +261,13 @@ export function AgentPage() {
           </button>
         </div>
       </div>
+
+      {/* Model switch error */}
+      {switchError && (
+        <div role="alert" className="mx-4 md:mx-6 mt-2 rounded-lg border border-red-500/20 bg-red-500/8 p-2 text-xs text-red-700 dark:text-red-400">
+          {switchError}
+        </div>
+      )}
 
       {/* Show loading screen during auto-load, setup wizard if no model, or chat */}
       {isModelLoading && !isReady ? (

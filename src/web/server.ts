@@ -1386,9 +1386,9 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
 
         // DELETE /api/v2/agent/models/:id — delete a downloaded model
         if (method === "DELETE" && path.startsWith("/api/v2/agent/models/")) {
-          const modelId = path.split("/").pop();
-          if (!modelId) {
-            return jsonError("BAD_REQUEST", "Model ID required", 400);
+          const modelId = decodeURIComponent(path.split("/").pop() || "");
+          if (!modelId || !MODEL_REGISTRY.find((m) => m.id === modelId)) {
+            return jsonError("BAD_REQUEST", "Unknown model ID", 400);
           }
           // Unload if this model is currently loaded
           if (getLoadedModelId() === modelId) {
@@ -1445,13 +1445,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           return json({ warmed: true });
         }
 
-        // GET /api/v2/agent/model/status — get loaded model info
-        if (method === "GET" && path === "/api/v2/agent/model/status") {
-          return json({
-            loaded: isModelLoaded(),
-            modelInfo: getLoadedModelInfo(),
-          });
-        }
+        // Note: model status is available via GET /api/v2/agent/config (superset)
 
         // POST /api/v2/fetch/cancel — cancel an in-progress sync
         if (method === "POST" && path === "/api/v2/fetch/cancel") {

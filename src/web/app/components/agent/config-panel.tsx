@@ -1,6 +1,7 @@
 // AI agent config panel — model management + skills + workflows
 import { useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useModelDownload } from "@/hooks/use-model-download";
 import { Check, Loader2, HardDrive, Cpu, Download, Trash2 } from "lucide-react";
 import {
   Sheet,
@@ -111,9 +112,8 @@ export function ConfigPanel({
   onContextSizeChange,
 }: ConfigPanelProps) {
   const queryClient = useQueryClient();
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [downloadProgress, setDownloadProgress] = useState(0);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const { data: hardware } = useQuery<HardwareInfo>({
     queryKey: ["agent", "hardware"],
@@ -132,6 +132,13 @@ export function ConfigPanel({
     queryFn: () => api.get("/api/v2/agent/skills"),
   });
 
+  const { downloadingId, downloadProgress, download: handleDownload } = useModelDownload({
+    onComplete: async () => {
+      await refetchModels();
+    },
+    onError: (msg) => setError(msg),
+  });
+
   const toggleSkill = useCallback(
     (name: string) => {
       if (enabledSkills.includes(name)) {
@@ -143,63 +150,17 @@ export function ConfigPanel({
     [enabledSkills, onSkillsChange]
   );
 
-  // Download a model
-  const handleDownload = useCallback(async (modelId: string) => {
-    setDownloadingId(modelId);
-    setDownloadProgress(0);
-    try {
-      const res = await fetch("/api/v2/agent/models/download", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ modelId }),
-      });
-      if (!res.ok || !res.body) throw new Error("Download failed");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() || "";
-        for (const part of parts) {
-          for (const line of part.split("\n")) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            try {
-              const event = JSON.parse(trimmed.slice(5).trim());
-              if (event.type === "progress") setDownloadProgress(event.percent || 0);
-              else if (event.type === "error") throw new Error(event.message);
-            } catch (e) {
-              if (e instanceof Error && e.message !== "Download failed") continue;
-              throw e;
-            }
-          }
-        }
-      }
-      await refetchModels();
-    } catch {
-      // ignore cancelled downloads
-    } finally {
-      setDownloadingId(null);
-      setDownloadProgress(0);
-    }
-  }, [refetchModels]);
-
   // Load a model
   const handleLoad = useCallback(async (modelId: string) => {
     setLoadingId(modelId);
+    setError(null);
     try {
       await api.post("/api/v2/agent/model/load", { modelId });
       await refetchModels();
       queryClient.invalidateQueries({ queryKey: ["agent", "config"] });
       onModelChange?.();
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load model");
     } finally {
       setLoadingId(null);
     }
@@ -207,6 +168,7 @@ export function ConfigPanel({
 
   // Delete a model
   const handleDelete = useCallback(async (modelId: string) => {
+    setError(null);
     try {
       await fetch(`/api/v2/agent/models/${modelId}`, {
         method: "DELETE",
@@ -215,8 +177,8 @@ export function ConfigPanel({
       await refetchModels();
       queryClient.invalidateQueries({ queryKey: ["agent", "config"] });
       onModelChange?.();
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete model");
     }
   }, [refetchModels, queryClient, onModelChange]);
 
@@ -237,6 +199,14 @@ export function ConfigPanel({
 
         <ScrollArea className="flex-1">
           <div className="px-6 pb-6 space-y-6">
+            {/* Error banner */}
+            {error && (
+              <div className="rounded-lg border border-red-500/20 bg-red-500/8 p-2.5 text-xs text-red-700 dark:text-red-400 flex items-center justify-between">
+                <span>{error}</span>
+                <button onClick={() => setError(null)} className="ml-2 underline text-[11px]">dismiss</button>
+              </div>
+            )}
+
             {/* --- Model section --- */}
             <section className="space-y-3">
               <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">

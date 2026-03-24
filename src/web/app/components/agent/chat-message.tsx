@@ -1,4 +1,5 @@
 // Single chat message — user or assistant (ChatGPT-style layout)
+import { memo } from "react";
 import type { AgentMessage } from "@/hooks/use-agent";
 import { ToolCallCard } from "./tool-call-card";
 import { MarkdownContent } from "./markdown-content";
@@ -8,7 +9,7 @@ interface ChatMessageProps {
   message: AgentMessage;
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
 
   if (isUser) {
@@ -51,4 +52,4 @@ export function ChatMessage({ message }: ChatMessageProps) {
       )}
     </div>
   );
-}
+});

@@ -1,7 +1,8 @@
 // Model setup wizard — shown when no model is loaded.
 // Detects hardware, recommends a model, lets user download and load it.
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useModelDownload } from "@/hooks/use-model-download";
 import { Download, Loader2, Check, HardDrive, Cpu, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -53,8 +54,6 @@ const TIER_LABELS: Record<number, string> = {
 
 export function ModelSetup({ onReady }: ModelSetupProps) {
   const queryClient = useQueryClient();
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [downloadProgress, setDownloadProgress] = useState(0);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
@@ -73,60 +72,10 @@ export function ModelSetup({ onReady }: ModelSetupProps) {
   const recommendedModel = models?.find((m) => m.recommended);
   const hasDownloaded = models?.some((m) => m.downloaded);
 
-  // Download a model via SSE progress stream
-  const handleDownload = useCallback(async (modelId: string) => {
-    setDownloadingId(modelId);
-    setDownloadProgress(0);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/v2/agent/models/download", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ modelId }),
-      });
-
-      if (!res.ok || !res.body) {
-        throw new Error(`Download failed: ${res.status}`);
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() || "";
-
-        for (const part of parts) {
-          for (const line of part.split("\n")) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            try {
-              const event = JSON.parse(trimmed.slice(5).trim());
-              if (event.type === "progress") {
-                setDownloadProgress(event.percent || 0);
-              } else if (event.type === "done") {
-                setDownloadProgress(100);
-              } else if (event.type === "error") {
-                throw new Error(event.message || "Download failed");
-              }
-            } catch (e) {
-              if (e instanceof Error && e.message !== "Download failed") continue;
-              throw e;
-            }
-          }
-        }
-      }
-
-      // Download complete — refresh model list then auto-load
+  const { downloadingId, downloadProgress, download } = useModelDownload({
+    onComplete: async (modelId) => {
       await refetchModels();
-      // Load the model into memory
+      // Auto-load after download
       setLoadingId(modelId);
       try {
         await api.post("/api/v2/agent/model/load", { modelId });
@@ -137,14 +86,14 @@ export function ModelSetup({ onReady }: ModelSetupProps) {
       } finally {
         setLoadingId(null);
       }
-    } catch (err) {
-      if (err instanceof Error && err.message.includes("cancelled")) return;
-      setError(err instanceof Error ? err.message : "Download failed");
-    } finally {
-      setDownloadingId(null);
-      setDownloadProgress(0);
-    }
-  }, [refetchModels, queryClient, onReady]);
+    },
+    onError: (msg) => setError(msg),
+  });
+
+  const handleDownload = useCallback((modelId: string) => {
+    setError(null);
+    download(modelId);
+  }, [download]);
 
   // Load a downloaded model
   const handleLoad = useCallback(async (modelId: string) => {
@@ -163,14 +112,15 @@ export function ModelSetup({ onReady }: ModelSetupProps) {
 
   // Delete a downloaded model
   const handleDelete = useCallback(async (modelId: string) => {
+    setError(null);
     try {
       await fetch(`/api/v2/agent/models/${modelId}`, {
         method: "DELETE",
         credentials: "include",
       });
       refetchModels();
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete model");
     }
   }, [refetchModels]);
 
@@ -232,7 +182,7 @@ export function ModelSetup({ onReady }: ModelSetupProps) {
 
         {/* Error display */}
         {error && (
-          <div className="rounded-lg border border-red-500/20 bg-red-500/8 p-3 text-xs text-red-700 dark:text-red-400">
+          <div role="alert" className="rounded-lg border border-red-500/20 bg-red-500/8 p-3 text-xs text-red-700 dark:text-red-400">
             {error}
           </div>
         )}

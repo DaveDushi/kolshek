@@ -2,7 +2,7 @@
 // Read tools run in-process for speed. Write operations go through
 // the CLI subprocess with --json for full validation and structured output.
 
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { readFile, writeFile } from "node:fs/promises";
 import envPaths from "env-paths";
 import { getDatabase } from "../../db/database.js";
@@ -18,6 +18,11 @@ const READONLY_PREFIXES = /^\s*(SELECT|WITH|EXPLAIN|PRAGMA|VALUES)\b/i;
 
 const SAFE_PRAGMAS = /^\s*PRAGMA\s+(table_info|table_list|index_list|index_info|database_list|compile_options|journal_mode|page_count|page_size|freelist_count|integrity_check|quick_check|foreign_key_list|foreign_key_check|collation_list)\b/i;
 
+// Strip SQL comments before validation to prevent keyword hiding
+function stripSqlComments(sql: string): string {
+  return sql.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g, " ");
+}
+
 // Validate read-only SQL (mirrors src/cli/commands/query.ts logic)
 function validateSql(sql: string): string | null {
   let cleaned = sql.trim();
@@ -25,23 +30,30 @@ function validateSql(sql: string): string | null {
     cleaned = cleaned.slice(0, -1).trim();
   }
 
-  if (cleaned.includes(";")) {
+  // Strip comments so keywords can't be hidden inside /* */ or -- blocks
+  const decommented = stripSqlComments(cleaned);
+
+  if (decommented.includes(";")) {
     return "Multi-statement queries are not allowed";
   }
 
-  if (/\b_migrations\b/i.test(cleaned)) {
+  if (/\b_migrations\b/i.test(decommented)) {
     return "Access to internal tables is not allowed";
   }
 
-  if (!READONLY_PREFIXES.test(cleaned)) {
+  if (/\bATTACH\b/i.test(decommented)) {
+    return "ATTACH is not allowed";
+  }
+
+  if (!READONLY_PREFIXES.test(decommented)) {
     return "Only read-only queries (SELECT, WITH, EXPLAIN) are allowed";
   }
 
-  if (/^\s*PRAGMA\b/i.test(cleaned)) {
-    if (cleaned.includes("=")) {
+  if (/^\s*PRAGMA\b/i.test(decommented)) {
+    if (decommented.includes("=")) {
       return "PRAGMA setters (with =) are not allowed";
     }
-    if (!SAFE_PRAGMAS.test(cleaned)) {
+    if (!SAFE_PRAGMAS.test(decommented)) {
       return "Only read-only PRAGMAs are allowed";
     }
   }
@@ -49,8 +61,11 @@ function validateSql(sql: string): string | null {
   return null;
 }
 
+const MAX_RESULT_BYTES = 8192;
+const DEFAULT_QUERY_LIMIT = 200;
+
 // Cap a JSON result string to a max byte size
-function capResult(data: unknown, maxBytes: number = 8192): string {
+function capResult(data: unknown, maxBytes: number = MAX_RESULT_BYTES): string {
   const json = JSON.stringify(data);
   if (json.length <= maxBytes) return json;
   return json.slice(0, maxBytes) + "\n...(truncated)";
@@ -59,8 +74,11 @@ function capResult(data: unknown, maxBytes: number = 8192): string {
 // CLI entry point path (resolved relative to this file: ai/ → web/ → src/ → cli/index.ts)
 const CLI_ENTRY = join(import.meta.dir, "..", "..", "cli", "index.ts");
 
-// Commands blocked from agent execution (destructive or interactive)
-const BLOCKED_COMMANDS = new Set(["init", "fetch", "dashboard", "update", "schedule", "plugin"]);
+// Commands allowed from agent execution (explicit allowlist — new commands must be opted in)
+const ALLOWED_COMMANDS = new Set([
+  "categorize", "translate", "transactions", "accounts",
+  "reports", "spending", "income", "trends", "insights",
+]);
 
 // Full tool definitions — used by cloud providers with large context
 export const TOOL_DEFS_FULL: ToolDef[] = [
@@ -280,6 +298,11 @@ function validateConfigPath(path: string): string | null {
   if (!ALLOWED_EXTENSIONS.has(ext)) {
     return `File extension ${ext} is not allowed. Allowed: ${[...ALLOWED_EXTENSIONS].join(", ")}`;
   }
+  // Belt-and-suspenders: verify resolved path stays within configDir
+  const resolved = resolve(configDir, path);
+  if (!resolved.startsWith(resolve(configDir))) {
+    return "Path traversal is not allowed. Use a simple filename like 'budget.toml'";
+  }
   return null;
 }
 
@@ -303,6 +326,9 @@ export function executeTool(name: string, args: Record<string, unknown>): string
         return executeRunCommand(args.command as string);
       case "load_skill":
         return executeLoadSkill(args.name as string);
+      case "read_file":
+      case "write_file":
+        return JSON.stringify({ error: `${name} requires async execution` });
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -339,7 +365,7 @@ function executeQuery(sql: string): string {
   // Auto-append LIMIT if not present (skip for PRAGMA/VALUES)
   const isPragmaOrValues = /^\s*(PRAGMA|VALUES)\b/i.test(cleaned);
   if (!isPragmaOrValues && !/\bLIMIT\b/i.test(cleaned)) {
-    cleaned = `${cleaned} LIMIT 200`;
+    cleaned = `${cleaned} LIMIT ${DEFAULT_QUERY_LIMIT}`;
   }
 
   const db = getDatabase();
@@ -425,8 +451,8 @@ async function executeRunCommandAsync(command: string): Promise<string> {
   const argv = parseCommandArgs(command.trim());
   const rootCmd = argv[0];
 
-  if (BLOCKED_COMMANDS.has(rootCmd)) {
-    return JSON.stringify({ error: `Command "${rootCmd}" is not available from the agent. Blocked commands: ${[...BLOCKED_COMMANDS].join(", ")}` });
+  if (!ALLOWED_COMMANDS.has(rootCmd)) {
+    return JSON.stringify({ error: `Command "${rootCmd}" is not available from the agent. Allowed: ${[...ALLOWED_COMMANDS].join(", ")}` });
   }
 
   try {

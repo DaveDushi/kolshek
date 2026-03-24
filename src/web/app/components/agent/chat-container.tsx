@@ -71,12 +71,24 @@ export function ChatContainer({
   const bottomRef = useRef<HTMLDivElement>(null);
   const userScrolledRef = useRef(false);
 
-  // Smart auto-scroll: only scroll if user hasn't scrolled up
+  // Smart auto-scroll: batch to one scroll per frame to avoid flooding during streaming
+  const scrollRafRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!userScrolledRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
+      scrollRafRef.current = requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        scrollRafRef.current = null;
+      });
     }
   }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
+    };
+  }, []);
 
   const handleSend = useCallback(
     (text: string) => {

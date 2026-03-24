@@ -106,17 +106,20 @@ const components: Components = {
     </blockquote>
   ),
 
-  // Links
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-primary underline underline-offset-2 hover:text-primary/80"
-    >
-      {children}
-    </a>
-  ),
+  // Links — block dangerous URI schemes (javascript:, data:, vbscript:)
+  a: ({ href, children }) => {
+    const isSafe = !href || !/^(javascript|data|vbscript):/i.test(href.replace(/\s/g, ""));
+    return (
+      <a
+        href={isSafe ? href : undefined}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary underline underline-offset-2 hover:text-primary/80"
+      >
+        {children}
+      </a>
+    );
+  },
 };
 
 export function MarkdownContent({ content }: MarkdownContentProps) {
