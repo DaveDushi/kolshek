@@ -1,9 +1,6 @@
-/**
- * kolshek schedule — Manage automatic fetch scheduling via OS task scheduler.
- */
+// kolshek schedule — Manage automatic fetch scheduling via OS task scheduler.
 
 import type { Command } from "commander";
-import { join } from "node:path";
 import {
   registerSchedule,
   unregisterSchedule,
@@ -11,7 +8,13 @@ import {
   currentPlatform,
 } from "../../core/scheduler/index.js";
 import type { ScheduleConfig, ScheduleStatus } from "../../types/index.js";
-import { getAppPaths } from "../../config/loader.js";
+import {
+  readScheduleConfig,
+  writeScheduleConfig,
+  deleteScheduleConfig,
+  parseInterval,
+  resolveBinaryPath,
+} from "../../config/schedule.js";
 import {
   isJsonMode,
   printJson,
@@ -22,72 +25,6 @@ import {
   createTable,
   ExitCode,
 } from "../output.js";
-import { run } from "../../core/scheduler/index.js";
-
-// ---------------------------------------------------------------------------
-// Schedule metadata — stored in {dataDir}/schedule.json
-// ---------------------------------------------------------------------------
-
-function scheduleJsonPath(): string {
-  const paths = getAppPaths();
-  return join(paths.data, "schedule.json");
-}
-
-async function readScheduleConfig(): Promise<ScheduleConfig | null> {
-  const file = Bun.file(scheduleJsonPath());
-  if (!(await file.exists())) return null;
-  try {
-    return (await file.json()) as ScheduleConfig;
-  } catch {
-    return null;
-  }
-}
-
-async function writeScheduleConfig(config: ScheduleConfig): Promise<void> {
-  await Bun.write(scheduleJsonPath(), JSON.stringify(config, null, 2));
-}
-
-async function deleteScheduleConfig(): Promise<void> {
-  const { unlink } = await import("node:fs/promises");
-  try {
-    await unlink(scheduleJsonPath());
-  } catch { /* ignore if not exists */ }
-}
-
-// ---------------------------------------------------------------------------
-// Binary resolution
-// ---------------------------------------------------------------------------
-
-async function resolveBinaryPath(): Promise<string> {
-  // If running compiled (not .ts source), use the executable
-  const scriptPath = process.argv[1];
-  if (scriptPath && !scriptPath.endsWith(".ts")) {
-    return process.argv[0];
-  }
-
-  // Try which/where to find installed binary
-  const whichCmd = process.platform === "win32" ? "where" : "which";
-  try {
-    const out = await run([whichCmd, "kolshek"]);
-    const firstLine = out.trim().split("\n")[0].trim();
-    if (firstLine) return firstLine;
-  } catch { /* not found */ }
-
-  // Fallback: bun run <script>
-  return `bun run ${scriptPath}`;
-}
-
-// ---------------------------------------------------------------------------
-// Interval parsing
-// ---------------------------------------------------------------------------
-
-function parseInterval(value: string): number | null {
-  const match = value.match(/^(\d+)h$/i);
-  if (!match) return null;
-  const hours = parseInt(match[1], 10);
-  if (hours < 1 || hours > 168) return null;
-  return hours;
-}
 
 // ---------------------------------------------------------------------------
 // Commands

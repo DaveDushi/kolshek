@@ -15,6 +15,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -25,12 +26,14 @@ import { useUpdateCategory } from "@/hooks/use-transactions";
 import { useCategoryList } from "@/hooks/use-categories";
 import { formatFullDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Wand2 } from "lucide-react";
 import type { TransactionWithContext } from "@/types/api";
 
 interface TransactionDetailProps {
   transaction: TransactionWithContext | null;
   open: boolean;
   onClose: () => void;
+  onCreateRule?: (prefill: { description: string }) => void;
 }
 
 // Simple heuristic: if the string contains Hebrew Unicode range characters
@@ -60,6 +63,7 @@ export function TransactionDetail({
   transaction,
   open,
   onClose,
+  onCreateRule,
 }: TransactionDetailProps) {
   const { data: categories } = useCategoryList();
   const updateCategory = useUpdateCategory();
@@ -235,6 +239,19 @@ export function TransactionDetail({
                     </SelectContent>
                   </Select>
                 </div>
+                {onCreateRule && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() =>
+                      onCreateRule({ description: transaction.description })
+                    }
+                  >
+                    <Wand2 className="h-4 w-4" />
+                    Create Rule from this transaction
+                  </Button>
+                )}
               </div>
 
               <Separator />

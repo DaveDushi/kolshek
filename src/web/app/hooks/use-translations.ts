@@ -8,21 +8,48 @@ import type {
   TranslationRule,
 } from "@/types/api";
 
+// -- Paginated response types --
+
+interface PaginatedUntranslated {
+  groups: UntranslatedGroup[];
+  total: number;
+}
+
+interface PaginatedTranslated {
+  groups: TranslatedGroup[];
+  total: number;
+}
+
 // -- Queries --
 
-export function useUntranslated() {
+export function useUntranslated(params?: { limit?: number; offset?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  const suffix = qs.toString() ? `?${qs}` : "";
+
   return useQuery({
-    queryKey: queryKeys.translations.untranslated(),
+    queryKey: queryKeys.translations.untranslated(params),
     queryFn: () =>
-      api.get<UntranslatedGroup[]>("/api/v2/translations/untranslated"),
+      api.get<PaginatedUntranslated>(`/api/v2/translations/untranslated${suffix}`),
   });
 }
 
-export function useTranslated() {
+export function useTranslated(params?: {
+  limit?: number;
+  offset?: number;
+  search?: string;
+}) {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  if (params?.search) qs.set("search", params.search);
+  const suffix = qs.toString() ? `?${qs}` : "";
+
   return useQuery({
-    queryKey: queryKeys.translations.translated(),
+    queryKey: queryKeys.translations.translated(params),
     queryFn: () =>
-      api.get<TranslatedGroup[]>("/api/v2/translations/translated"),
+      api.get<PaginatedTranslated>(`/api/v2/translations/translated${suffix}`),
   });
 }
 

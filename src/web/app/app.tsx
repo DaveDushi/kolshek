@@ -13,6 +13,7 @@ import { CategoriesPage } from "./pages/categories-page";
 import { TranslationsPage } from "./pages/translations-page";
 import { ProvidersPage } from "./pages/providers-page";
 import { CustomPage } from "./pages/custom-page";
+import { SchedulePage } from "./pages/schedule-page";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,6 +45,7 @@ export function App() {
                 <Route path="/translations" element={<TranslationsPage />} />
                 <Route path="/providers" element={<ProvidersPage />} />
                 <Route path="/pages/:pageId" element={<CustomPage />} />
+                <Route path="/schedule" element={<SchedulePage />} />
               </Routes>
             </ErrorBoundary>
           </AppShell>

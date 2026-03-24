@@ -10,6 +10,7 @@ import {
   Tags,
   Languages,
   Building2,
+  Clock,
   Sun,
   Moon,
   Monitor,
@@ -75,7 +76,7 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
-  const { events, isRunning, start } = useSync();
+  const { events, isRunning, start, cancel } = useSync();
   const { alertCount, uncategorizedCount, untranslatedCount } = useNavBadges();
   const [syncPanelOpen, setSyncPanelOpen] = useState(false);
   const { data: customPages } = useCustomPages();
@@ -141,6 +142,7 @@ export function Sidebar() {
       title: "Settings",
       items: [
         { label: "Providers", path: "/providers", icon: Building2 },
+        { label: "Schedule", path: "/schedule", icon: Clock },
       ],
     },
     // Dynamic custom pages section
@@ -323,6 +325,7 @@ export function Sidebar() {
         events={events}
         isRunning={isRunning}
         onRetry={() => start()}
+        onCancel={cancel}
       />
     </>
   );

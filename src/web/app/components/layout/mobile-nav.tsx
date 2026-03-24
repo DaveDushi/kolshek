@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Languages,
   Building2,
+  Clock,
   RefreshCw,
   Sun,
   Moon,
@@ -62,7 +63,7 @@ export function MobileNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
-  const { events, isRunning, start } = useSync();
+  const { events, isRunning, start, cancel } = useSync();
   const { data: insights } = useInsights();
   const { data: categories } = useCategorySummary();
   const { data: untranslated } = useUntranslated();
@@ -148,6 +149,11 @@ export function MobileNav() {
       label: "Providers",
       path: "/providers",
       icon: Building2,
+    },
+    {
+      label: "Schedule",
+      path: "/schedule",
+      icon: Clock,
     },
     // Dynamic custom pages
     ...(customPages ?? []).map((page) => ({
@@ -321,6 +327,7 @@ export function MobileNav() {
         events={events}
         isRunning={isRunning}
         onRetry={() => start()}
+        onCancel={cancel}
       />
     </>
   );

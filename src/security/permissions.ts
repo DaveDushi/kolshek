@@ -4,7 +4,9 @@
 import { chmodSync, statSync } from "fs";
 
 // Restrict a file or directory so only the current user can access it.
+// Skips virtual paths like SQLite's :memory: that don't exist on disk.
 export function restrictPathToOwner(targetPath: string): void {
+  if (targetPath === ":memory:") return;
   if (process.platform === "win32") {
     restrictWindows(targetPath);
   } else {

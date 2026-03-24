@@ -32,8 +32,22 @@ import { getAccountsByProvider } from "../db/repositories/accounts.js";
 import {
   getLatestCompletedSyncLog,
   hasSuccessfulSync,
+  listRecentSyncLogs,
+  countSyncLogsSince,
   countConsecutiveFailures,
 } from "../db/repositories/sync-log.js";
+import {
+  readScheduleConfig,
+  writeScheduleConfig,
+  deleteScheduleConfig,
+  resolveBinaryPath,
+} from "../config/schedule.js";
+import {
+  registerSchedule,
+  unregisterSchedule,
+  checkScheduleRegistered,
+  currentPlatform,
+} from "../core/scheduler/index.js";
 import { computeAuthStatus } from "../core/auth-status.js";
 import {
   listCategoryRules,
@@ -120,7 +134,7 @@ function notifyPageChange(type: "page_changed" | "page_deleted", id: string): vo
 }
 
 // Track active fetch so we don't allow concurrent syncs
-let activeFetch: { promise: Promise<void>; events: string[]; listeners: Set<(event: string) => void> } | null = null;
+let activeFetch: { promise: Promise<void>; events: string[]; listeners: Set<(event: string) => void>; abort: AbortController } | null = null;
 
 // Serve embedded SPA assets from web-files.ts (survives bun build --compile)
 function serveEmbedded(key: string, cacheControl: string, extraHeaders?: Record<string, string>): Response | null {
@@ -925,7 +939,9 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             }
 
             const rule = addCategoryRule(category, conditions, priority);
-            return json(rule, 201);
+            // Auto-apply all rules so the new rule takes effect immediately
+            const applyResult = applyCategoryRules({ scope: "uncategorized" });
+            return json({ ...rule, applied: applyResult.applied }, 201);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("CATEGORY_RULE_ADD_FAILED", msg, 500);
@@ -1002,20 +1018,27 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
 
         // --- Translations v2 ---
 
-        // GET /api/v2/translations/untranslated — untranslated groups
+        // GET /api/v2/translations/untranslated — untranslated groups (paginated)
         if (method === "GET" && path === "/api/v2/translations/untranslated") {
           try {
-            return json(listUntranslatedGrouped());
+            const sp = url.searchParams;
+            const limit = sp.has("limit") ? Math.min(Number(sp.get("limit")) || 50, MAX_PAGINATION_LIMIT) : undefined;
+            const offset = sp.has("offset") ? Math.max(Number(sp.get("offset")) || 0, 0) : undefined;
+            return json(listUntranslatedGrouped({ limit, offset }));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("UNTRANSLATED_FAILED", msg, 500);
           }
         }
 
-        // GET /api/v2/translations/translated — translated groups
+        // GET /api/v2/translations/translated — translated groups (paginated + search)
         if (method === "GET" && path === "/api/v2/translations/translated") {
           try {
-            return json(listTranslatedGrouped());
+            const sp = url.searchParams;
+            const limit = sp.has("limit") ? Math.min(Number(sp.get("limit")) || 50, MAX_PAGINATION_LIMIT) : undefined;
+            const offset = sp.has("offset") ? Math.max(Number(sp.get("offset")) || 0, 0) : undefined;
+            const search = sp.get("search") || undefined;
+            return json(listTranslatedGrouped({ limit, offset, search }));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("TRANSLATED_FAILED", msg, 500);
@@ -1367,6 +1390,97 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         }
 
         // =================================================================
+        // --- Schedule API ---
+
+        // GET /api/v2/schedule — current schedule status + sync history
+        if (method === "GET" && path === "/api/v2/schedule") {
+          try {
+            const config = await readScheduleConfig();
+            const osRegistered = await checkScheduleRegistered();
+
+            const schedule: Record<string, unknown> = { registered: osRegistered };
+            let missedRuns = 0;
+
+            if (config) {
+              schedule.intervalHours = config.intervalHours;
+              schedule.registeredAt = config.registeredAt;
+              schedule.platform = config.platform;
+
+              // Estimate next run
+              if (osRegistered) {
+                const registeredDate = new Date(config.registeredAt);
+                const intervalMs = config.intervalHours * 60 * 60 * 1000;
+                const now = Date.now();
+                const elapsed = now - registeredDate.getTime();
+                const periods = Math.ceil(elapsed / intervalMs);
+                const nextRun = new Date(registeredDate.getTime() + periods * intervalMs);
+                schedule.nextRunAt = nextRun.toISOString();
+
+                // Compute missed runs
+                const expectedRuns = Math.floor(elapsed / intervalMs);
+                const actualRuns = countSyncLogsSince(config.registeredAt);
+                missedRuns = Math.max(0, Math.min(expectedRuns - actualRuns, 10));
+              }
+            }
+
+            const syncHistory = listRecentSyncLogs(30);
+
+            return json({ schedule, syncHistory, missedRuns });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("SCHEDULE_STATUS_FAILED", msg, 500);
+          }
+        }
+
+        // POST /api/v2/schedule — enable or update schedule
+        if (method === "POST" && path === "/api/v2/schedule") {
+          try {
+            const body = await parseJsonBody(req);
+            // Accept fractional hours (e.g. 0.5 = 30min). Minimum 5 minutes (5/60).
+            const raw = Number(body.intervalHours);
+            const MIN_HOURS = 5 / 60; // 5 minutes
+            if (!raw || isNaN(raw) || raw < MIN_HOURS || raw > 168) {
+              return jsonError("BAD_INTERVAL", "intervalHours must be between 0.084 (5 min) and 168 (1 week).");
+            }
+            // Round to nearest minute to avoid floating point weirdness
+            const intervalHours = Math.round(raw * 60) / 60;
+
+            const binaryPath = await resolveBinaryPath();
+            const config = {
+              intervalHours,
+              registeredAt: new Date().toISOString(),
+              platform: currentPlatform(),
+              binaryPath,
+            };
+
+            await registerSchedule(config);
+            await writeScheduleConfig(config);
+
+            return json({
+              registered: true,
+              intervalHours: config.intervalHours,
+              registeredAt: config.registeredAt,
+              platform: config.platform,
+            });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("SCHEDULE_SET_FAILED", msg, 500);
+          }
+        }
+
+        // DELETE /api/v2/schedule — disable schedule
+        if (method === "DELETE" && path === "/api/v2/schedule") {
+          try {
+            await unregisterSchedule();
+            await deleteScheduleConfig();
+            return json({ removed: true });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("SCHEDULE_REMOVE_FAILED", msg, 500);
+          }
+        }
+
+        // =================================================================
         // --- Fetch / Sync API ---
 
         // POST /api/v2/fetch — start a fetch (JSON body). Returns SSE stream.
@@ -1391,6 +1505,15 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         // GET /api/v2/fetch/events — SSE stream for fetch progress
         if (method === "GET" && path === "/api/v2/fetch/events") {
           return fetchEventsSSE();
+        }
+
+        // POST /api/v2/fetch/cancel — cancel an in-progress sync
+        if (method === "POST" && path === "/api/v2/fetch/cancel") {
+          if (!activeFetch) {
+            return jsonError("NO_SYNC", "No sync in progress to cancel.", 404);
+          }
+          activeFetch.abort.abort();
+          return json({ cancelled: true });
         }
 
         // --- React SPA fallback (never for /api/ routes) ---
@@ -1463,11 +1586,13 @@ function startFetchSSE(visible: boolean, providerIds: number[] | undefined, json
 
   // Set activeFetch BEFORE starting the sync to prevent race condition
   // where double-click could start two syncs
-  const placeholder = { promise: Promise.resolve(), events, listeners };
+  const abortController = new AbortController();
+  const placeholder = { promise: Promise.resolve(), events, listeners, abort: abortController };
   activeFetch = placeholder;
 
   const fetchPromise = syncProviders(providers, {
     visible,
+    signal: abortController.signal,
     onProgress: (alias, stage) => {
       pushEvent(JSON.stringify({ type: "progress", provider: alias, stage }));
     },

@@ -89,7 +89,9 @@ export function useAddCategoryRule() {
     mutationFn: (body: { category: string; conditions: Record<string, unknown>; priority?: number }) =>
       api.post("/api/v2/categories/rules", body),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.categories.rules() });
+      // Rules are auto-applied on the backend, so refresh everything
+      qc.invalidateQueries({ queryKey: queryKeys.categories.all });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions.all });
     },
   });
 }
