@@ -58,34 +58,10 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     tier: 1,
   },
   // Phi-4 Mini removed — outputs tool calls as text, doesn't use function calling format
-  {
-    id: "gemma3-4b-q4km",
-    name: "Gemma 3 4B",
-    url: "https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/resolve/main/google_gemma-3-4b-it-Q4_K_M.gguf",
-    sizeBytes: 2_500_000_000,
-    params: "4B",
-    quant: "Q4_K_M",
-    minRamGB: 6,
-    contextWindow: 128_000,
-    toolCalling: "good",
-    description: "Google, 140+ languages",
-    tier: 1,
-  },
+  // Gemma 3 4B removed — poor tool calling, ignores results, hallucinates data
 
   // Tier 2: Standard (8-16 GB RAM)
-  {
-    id: "qwen3-8b-q4km",
-    name: "Qwen 3 8B",
-    url: "https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/main/qwen3-8b-q4_k_m.gguf",
-    sizeBytes: 5_000_000_000,
-    params: "8B",
-    quant: "Q4_K_M",
-    minRamGB: 12,
-    contextWindow: 32_000,
-    toolCalling: "excellent",
-    description: "Strong all-rounder",
-    tier: 2,
-  },
+  // Qwen 3 8B removed — download failures (HuggingFace URL issues)
   {
     id: "qwen3.5-9b-q4km",
     name: "Qwen 3.5 9B",
@@ -99,19 +75,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     description: "Best value for 16GB RAM",
     tier: 2,
   },
-  {
-    id: "gemma3-12b-q4km",
-    name: "Gemma 3 12B",
-    url: "https://huggingface.co/bartowski/google_gemma-3-12b-it-GGUF/resolve/main/google_gemma-3-12b-it-Q4_K_M.gguf",
-    sizeBytes: 6_900_000_000,
-    params: "12B",
-    quant: "Q4_K_M",
-    minRamGB: 14,
-    contextWindow: 128_000,
-    toolCalling: "good",
-    description: "Google, strong multilingual",
-    tier: 2,
-  },
+  // Gemma 3 12B removed — poor tool calling, ignores results, hallucinates data
 
   // Tier 3: Performance (24-32 GB RAM)
   {
@@ -127,19 +91,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     description: "Best for tool calling, 2x fewer bad gens",
     tier: 3,
   },
-  {
-    id: "gemma3-27b-q4km",
-    name: "Gemma 3 27B",
-    url: "https://huggingface.co/bartowski/google_gemma-3-27b-it-GGUF/resolve/main/google_gemma-3-27b-it-Q4_K_M.gguf",
-    sizeBytes: 15_900_000_000,
-    params: "27B",
-    quant: "Q4_K_M",
-    minRamGB: 28,
-    contextWindow: 128_000,
-    toolCalling: "good",
-    description: "Google, massive multilingual",
-    tier: 3,
-  },
+  // Gemma 3 27B removed — poor tool calling, ignores results, hallucinates data
   {
     id: "qwen3-32b-q4km",
     name: "Qwen 3 32B",
