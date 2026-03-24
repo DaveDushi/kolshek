@@ -43,6 +43,7 @@ export type AgentSSEEvent =
   | { type: "tool_executing"; id: string; name: string }
   | { type: "tool_result"; id: string; name: string; result: string }
   | { type: "turn_end"; iteration: number }
+  | { type: "usage"; tokensGenerated: number; tokPerSec: number; contextUsed: number; contextMax: number }
   | { type: "error"; message: string }
   | { type: "done" };
 

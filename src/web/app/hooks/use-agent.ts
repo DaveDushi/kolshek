@@ -30,9 +30,17 @@ export interface AgentStatus {
   toolName?: string;
 }
 
+// Context usage stats — updated per generation pass
+export interface AgentUsage {
+  contextUsed: number;
+  contextMax: number;
+  tokPerSec: number;
+  totalGenerated: number; // cumulative tokens generated in this conversation
+}
+
 // SSE event from the server (matches AgentSSEEvent on backend)
 interface AgentSSEEvent {
-  type: "turn_start" | "llm_start" | "token" | "tool_call" | "tool_executing" | "tool_result" | "turn_end" | "error" | "done";
+  type: "turn_start" | "llm_start" | "token" | "tool_call" | "tool_executing" | "tool_result" | "turn_end" | "usage" | "error" | "done";
   content?: string;
   id?: string;
   name?: string;
@@ -41,6 +49,10 @@ interface AgentSSEEvent {
   message?: string;
   iteration?: number;
   model?: string;
+  tokensGenerated?: number;
+  tokPerSec?: number;
+  contextUsed?: number;
+  contextMax?: number;
 }
 
 function parseSseEvent(line: string): AgentSSEEvent | null {
@@ -65,8 +77,10 @@ export function useAgent() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<AgentStatus | null>(null);
+  const [usage, setUsage] = useState<AgentUsage | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const iterationRef = useRef(0);
+  const totalGeneratedRef = useRef(0);
 
   const send = useCallback(
     async (text: string, enabledSkills?: string[], activeMode?: string) => {
@@ -248,6 +262,18 @@ export function useAgent() {
                   // Turn ended — if more turns follow, turn_start will set status again
                   break;
 
+                case "usage":
+                  if (event.contextUsed != null && event.contextMax != null) {
+                    totalGeneratedRef.current += event.tokensGenerated ?? 0;
+                    setUsage({
+                      contextUsed: event.contextUsed,
+                      contextMax: event.contextMax,
+                      tokPerSec: event.tokPerSec ?? 0,
+                      totalGenerated: totalGeneratedRef.current,
+                    });
+                  }
+                  break;
+
                 case "error":
                   setError(event.message || "Unknown error");
                   setStatus(null);
@@ -327,7 +353,9 @@ export function useAgent() {
     setMessages([]);
     setError(null);
     setStatus(null);
+    setUsage(null);
+    totalGeneratedRef.current = 0;
   }, []);
 
-  return { messages, isStreaming, error, status, send, stop, clear };
+  return { messages, isStreaming, error, status, usage, send, stop, clear };
 }

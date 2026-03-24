@@ -33,7 +33,7 @@ const MODE_LABELS: Record<string, string> = {
 
 export function AgentPage() {
   useDocumentTitle("Agent");
-  const { messages, isStreaming, status, send, stop, clear } = useAgent();
+  const { messages, isStreaming, status, usage, send, stop, clear } = useAgent();
   const [configOpen, setConfigOpen] = useState(false);
   const [enabledSkills, setEnabledSkills] = useState<string[]>([
     "analysis",
@@ -149,7 +149,35 @@ export function AgentPage() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-2">
+          {/* Context usage meter */}
+          {usage && (
+            <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      usage.contextUsed / usage.contextMax > 0.8
+                        ? "bg-amber-500"
+                        : usage.contextUsed / usage.contextMax > 0.95
+                          ? "bg-red-500"
+                          : "bg-primary/60"
+                    }`}
+                    style={{ width: `${Math.min(100, Math.round(usage.contextUsed / usage.contextMax * 100))}%` }}
+                  />
+                </div>
+                <span className="tabular-nums">
+                  {Math.round(usage.contextUsed / usage.contextMax * 100)}%
+                </span>
+              </div>
+              {usage.tokPerSec > 0 && (
+                <span className="text-muted-foreground/50 tabular-nums">
+                  {usage.tokPerSec} t/s
+                </span>
+              )}
+            </div>
+          )}
+
           {messages.length > 0 && (
             <button
               onClick={handleClear}
