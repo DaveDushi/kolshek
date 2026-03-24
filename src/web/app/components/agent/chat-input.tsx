@@ -1,7 +1,14 @@
 // Chat input — floating composer with unified container (ChatGPT-style)
+// Includes Think toggle and model switcher below the composer.
 import { useState, useRef, useCallback } from "react";
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp, Square, Brain, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+export interface ChatInputModel {
+  id: string;
+  name: string;
+  loaded: boolean;
+}
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -9,6 +16,12 @@ interface ChatInputProps {
   isStreaming: boolean;
   disabled?: boolean;
   placeholder?: string;
+  thinking?: boolean;
+  onThinkingChange?: (v: boolean) => void;
+  models?: ChatInputModel[];
+  activeModelId?: string | null;
+  onModelChange?: (modelId: string) => void;
+  isModelLoading?: boolean;
 }
 
 export function ChatInput({
@@ -17,9 +30,17 @@ export function ChatInput({
   isStreaming,
   disabled,
   placeholder = "Ask about your finances...",
+  thinking,
+  onThinkingChange,
+  models,
+  activeModelId,
+  onModelChange,
+  isModelLoading,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = useCallback(() => {
     if (isStreaming) {
@@ -52,6 +73,8 @@ export function ChatInput({
   }, []);
 
   const hasContent = value.trim().length > 0;
+  const activeModel = models?.find((m) => m.id === activeModelId);
+  const hasMultipleModels = models && models.length > 1;
 
   return (
     <div className="shrink-0 px-4 md:px-6 pb-4 pt-2 bg-background">
@@ -102,9 +125,93 @@ export function ChatInput({
             )}
           </button>
         </div>
-        <p className="text-center text-[11px] text-muted-foreground/50 mt-1.5 select-none">
-          Enter to send, Shift+Enter for new line
-        </p>
+
+        {/* Bottom bar: Think toggle + Model switcher + hint */}
+        <div className="flex items-center justify-between mt-1.5 px-1">
+          <div className="flex items-center gap-2">
+            {/* Think toggle */}
+            {onThinkingChange && (
+              <button
+                onClick={() => onThinkingChange(!thinking)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+                  thinking
+                    ? "bg-violet-500/15 text-violet-700 dark:text-violet-400"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                )}
+                title={thinking
+                  ? "Thinking ON — slower but may improve reasoning. Click to disable."
+                  : "Thinking OFF (recommended for small models). Click to enable."}
+              >
+                <Brain className="h-3 w-3" />
+                {thinking ? "Think" : "No Think"}
+              </button>
+            )}
+
+            {/* Model switcher */}
+            {hasMultipleModels && (
+              <div className="relative">
+                <button
+                  onClick={() => setModelMenuOpen((v) => !v)}
+                  disabled={isModelLoading}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+                    "bg-muted text-muted-foreground hover:bg-muted/80",
+                    isModelLoading && "opacity-60 cursor-wait"
+                  )}
+                >
+                  <span className="max-w-[120px] truncate">
+                    {isModelLoading ? "Loading..." : (activeModel?.name || "Select model")}
+                  </span>
+                  <ChevronDown className={cn("h-3 w-3 transition-transform", modelMenuOpen && "rotate-180")} />
+                </button>
+
+                {modelMenuOpen && (
+                  <>
+                    {/* Backdrop */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setModelMenuOpen(false)}
+                    />
+                    {/* Dropdown */}
+                    <div
+                      ref={menuRef}
+                      className="absolute bottom-full left-0 mb-1 z-50 min-w-[200px] rounded-lg border border-border bg-card shadow-md py-1 animate-fade-in"
+                    >
+                      {models.map((model) => (
+                        <button
+                          key={model.id}
+                          onClick={() => {
+                            if (model.id !== activeModelId) {
+                              onModelChange?.(model.id);
+                            }
+                            setModelMenuOpen(false);
+                          }}
+                          disabled={isModelLoading}
+                          className={cn(
+                            "flex items-center gap-2 w-full px-3 py-1.5 text-xs text-left transition-colors",
+                            "hover:bg-accent/50",
+                            model.id === activeModelId && "text-foreground font-medium",
+                            model.id !== activeModelId && "text-muted-foreground"
+                          )}
+                        >
+                          <span className="flex-1 truncate">{model.name}</span>
+                          {model.id === activeModelId && (
+                            <Check className="h-3 w-3 text-primary shrink-0" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <p className="text-[11px] text-muted-foreground/50 select-none">
+            Enter to send, Shift+Enter for new line
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -134,6 +134,7 @@ export async function loadModel(
 
 // Unload the current model and free all resources.
 export async function unloadModel(): Promise<void> {
+  const wasLoaded = loadedModelId;
   if (sequenceInstance) {
     try { sequenceInstance.dispose(); } catch { /* already disposed */ }
     sequenceInstance = null;
@@ -148,6 +149,9 @@ export async function unloadModel(): Promise<void> {
   }
   llamaInstance = null;
   loadedModelId = null;
+  if (wasLoaded) {
+    console.log(`[engine] Model unloaded: ${wasLoaded}`);
+  }
 }
 
 export function isModelLoaded(): boolean {

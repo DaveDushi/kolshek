@@ -3,7 +3,7 @@ import { useRef, useEffect, useCallback, useState } from "react";
 import { Bot } from "lucide-react";
 import type { AgentMessage, AgentStatus } from "@/hooks/use-agent";
 import { ChatMessage } from "./chat-message";
-import { ChatInput } from "./chat-input";
+import { ChatInput, type ChatInputModel } from "./chat-input";
 
 interface ChatContainerProps {
   messages: AgentMessage[];
@@ -12,6 +12,12 @@ interface ChatContainerProps {
   disabled?: boolean;
   onSend: (text: string) => void;
   onStop: () => void;
+  thinking?: boolean;
+  onThinkingChange?: (v: boolean) => void;
+  models?: ChatInputModel[];
+  activeModelId?: string | null;
+  onModelChange?: (modelId: string) => void;
+  isModelLoading?: boolean;
 }
 
 const SUGGESTIONS = [
@@ -52,6 +58,12 @@ export function ChatContainer({
   disabled,
   onSend,
   onStop,
+  thinking,
+  onThinkingChange,
+  models,
+  activeModelId,
+  onModelChange,
+  isModelLoading,
 }: ChatContainerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -149,6 +161,12 @@ export function ChatContainer({
         onStop={onStop}
         isStreaming={isStreaming}
         disabled={disabled}
+        thinking={thinking}
+        onThinkingChange={onThinkingChange}
+        models={models}
+        activeModelId={activeModelId}
+        onModelChange={onModelChange}
+        isModelLoading={isModelLoading}
       />
     </div>
   );

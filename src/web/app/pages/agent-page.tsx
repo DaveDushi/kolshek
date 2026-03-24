@@ -1,9 +1,9 @@
 // Agent page — full-bleed chat interface that breaks out of AppShell padding.
 // Supports workflow modes (analyze, review, categorize, translate, init) via
 // slash commands or the config panel.
-import { useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Settings, RotateCcw, X, Brain } from "lucide-react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Settings, RotateCcw, X, Loader2 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useAgent } from "@/hooks/use-agent";
 import { ChatContainer } from "@/components/agent/chat-container";
@@ -23,6 +23,15 @@ interface ModeInfo {
   description: string;
 }
 
+interface ModelStatus {
+  id: string;
+  name: string;
+  downloaded: boolean;
+  loaded: boolean;
+}
+
+const LAST_MODEL_KEY = "kolshek-last-model-id";
+
 // Mode display names
 const MODE_LABELS: Record<string, string> = {
   analyze: "Financial Analysis",
@@ -34,6 +43,7 @@ const MODE_LABELS: Record<string, string> = {
 
 export function AgentPage() {
   useDocumentTitle("Agent");
+  const queryClient = useQueryClient();
   const { messages, isStreaming, status, usage, send, stop, clear } = useAgent();
   const [configOpen, setConfigOpen] = useState(false);
   const [enabledSkills, setEnabledSkills] = useState<string[]>([
@@ -45,6 +55,7 @@ export function AgentPage() {
   const [activeMode, setActiveMode] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
   const [contextSize, setContextSize] = useState<number | null>(null); // null = use default
+  const [isModelLoading, setIsModelLoading] = useState(false);
 
   const { data: config, refetch: refetchConfig } = useQuery<AgentConfigResponse>({
     queryKey: ["agent", "config"],
@@ -55,6 +66,14 @@ export function AgentPage() {
     queryKey: ["agent", "modes"],
     queryFn: () => api.get("/api/v2/agent/modes"),
   });
+
+  const { data: models } = useQuery<ModelStatus[]>({
+    queryKey: ["agent", "models"],
+    queryFn: () => api.get("/api/v2/agent/models"),
+  });
+
+  // Downloaded models available for switching
+  const downloadedModels = (models || []).filter((m) => m.downloaded);
 
   const isReady = !!config?.modelLoaded;
 
@@ -113,10 +132,56 @@ export function AgentPage() {
     setActiveMode(null);
   }, [clear]);
 
+  // Switch to a different downloaded model
+  const handleModelSwitch = useCallback(async (modelId: string) => {
+    setIsModelLoading(true);
+    try {
+      await api.post("/api/v2/agent/model/load", { modelId });
+      queryClient.invalidateQueries({ queryKey: ["agent", "models"] });
+      refetchConfig();
+    } catch {
+      // ignore
+    } finally {
+      setIsModelLoading(false);
+    }
+  }, [queryClient, refetchConfig]);
+
   // Called when model setup completes (model downloaded + loaded)
   const handleModelReady = useCallback(() => {
     refetchConfig();
   }, [refetchConfig]);
+
+  // Track last used model in localStorage
+  const isStreamingRef = useRef(isStreaming);
+  isStreamingRef.current = isStreaming;
+
+  // Persist last model ID whenever config shows a loaded model
+  useEffect(() => {
+    if (config?.modelId && config.modelLoaded) {
+      localStorage.setItem(LAST_MODEL_KEY, config.modelId);
+    }
+  }, [config?.modelId, config?.modelLoaded]);
+
+  // Auto-load last used model on mount (navigate to /agent)
+  useEffect(() => {
+    if (config === undefined) return; // query hasn't resolved yet
+    if (config?.modelLoaded) return; // already loaded
+    const lastId = localStorage.getItem(LAST_MODEL_KEY);
+    if (!lastId) return;
+    // Check the model is still downloaded
+    const available = (models || []).find((m) => m.id === lastId && m.downloaded);
+    if (!available) return;
+    handleModelSwitch(lastId);
+  }, [config, models]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-unload on unmount (navigate away from /agent) unless streaming
+  useEffect(() => {
+    return () => {
+      if (!isStreamingRef.current) {
+        api.post("/api/v2/agent/model/unload", {}).catch(() => {});
+      }
+    };
+  }, []);
 
   // Break out of AppShell's padded container for full-bleed chat layout.
   return (
@@ -141,20 +206,6 @@ export function AgentPage() {
                   ? config.modelInfo.gpuBackend.toUpperCase()
                   : "CPU"}
               </span>
-              <button
-                onClick={() => setThinking((v) => !v)}
-                className={`hidden sm:inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded transition-colors ${
-                  thinking
-                    ? "text-violet-700 bg-violet-500/15"
-                    : "text-muted-foreground bg-muted hover:bg-muted/80"
-                }`}
-                title={thinking
-                  ? "Thinking ON — slower but may improve reasoning. Click to disable."
-                  : "Thinking OFF (recommended for small models). Click to enable."}
-              >
-                <Brain className="h-3 w-3" />
-                {thinking ? "Think" : "No Think"}
-              </button>
             </>
           )}
           {activeMode && (
@@ -218,8 +269,13 @@ export function AgentPage() {
         </div>
       </div>
 
-      {/* Show model setup wizard if no model is loaded, otherwise show chat */}
-      {!isReady ? (
+      {/* Show loading screen during auto-load, setup wizard if no model, or chat */}
+      {isModelLoading && !isReady ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 animate-fade-in">
+          <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading model...</p>
+        </div>
+      ) : !isReady ? (
         <ModelSetup onReady={handleModelReady} />
       ) : (
         <ChatContainer
@@ -229,6 +285,12 @@ export function AgentPage() {
           disabled={false}
           onSend={handleSend}
           onStop={stop}
+          thinking={thinking}
+          onThinkingChange={setThinking}
+          models={downloadedModels.map((m) => ({ id: m.id, name: m.name, loaded: m.loaded }))}
+          activeModelId={config?.modelId ?? null}
+          onModelChange={handleModelSwitch}
+          isModelLoading={isModelLoading}
         />
       )}
 
