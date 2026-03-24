@@ -467,3 +467,13 @@ Self-update KolShek to the latest release. Downloads the correct binary for your
 | Option | Description |
 |--------|-------------|
 | `--check` | Only check for updates without installing |
+
+---
+
+### `uninstall`
+
+Remove KolShek from this machine.
+
+| Option | Description |
+|--------|-------------|
+| `--purge` | Also remove all config, data, and cache |

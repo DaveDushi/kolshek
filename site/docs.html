@@ -90,6 +90,7 @@
           <a href="#trends" class="docs-sidebar-link">trends</a>
           <a href="#insights" class="docs-sidebar-link">insights</a>
           <a href="#update" class="docs-sidebar-link">update</a>
+          <a href="#uninstall" class="docs-sidebar-link">uninstall</a>
         </div>
         <div class="docs-sidebar-group">
           <h3 class="docs-sidebar-heading">Release Notes</h3>
@@ -664,6 +665,20 @@ kolshek spending -m 3         # 3 months ago</code></pre></div>
         </div>
       </section>
 
+      <!-- ── uninstall ─────────────────────────────────────────── -->
+      <section id="uninstall" class="docs-section">
+        <h2 class="docs-h2">uninstall</h2>
+        <p class="docs-p">Remove KolShek from this machine.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--purge</code></td><td>Also remove all config, data, and cache</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- ══════════════════════════════════════════════════════════
            GUIDES
            ══════════════════════════════════════════════════════════ -->
@@ -817,6 +832,46 @@ kolshek db schema transactions --json</code></pre></div>
       <!-- ── Changelog ──────────────────────────────────────────── -->
       <section id="changelog" class="docs-section">
         <h1 class="docs-h1">Changelog</h1>
+
+        <h2 class="docs-h2">v0.3.10</h2>
+        <h3 class="docs-h3">Features</h3>
+        <ul class="docs-ul">
+          <li><strong>Dashboard sync scheduling</strong> &mdash; Manage automatic sync schedules directly from the dashboard &mdash; enable/disable OS task scheduler, pick preset or custom intervals (including minute-level granularity), and view sync history with success/failure status.</li>
+          <li><strong>Missed sync detection</strong> &mdash; Dashboard warns when syncs were missed because the computer was off during scheduled times.</li>
+        </ul>
+
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li><strong>Windows Task Scheduler</strong> &mdash; Fixed scheduling to work without admin elevation by using inline <code class="docs-code">schtasks</code> params instead of XML import.</li>
+          <li><strong>DML validation</strong> &mdash; Added SQL statement validation to prevent destructive queries, with improved error diagnostics for database operations.</li>
+          <li><strong>Currency formatting</strong> &mdash; Fixed crash when currency parameter is undefined during amount formatting.</li>
+        </ul>
+
+        <h3 class="docs-h3">Security</h3>
+        <ul class="docs-ul">
+          <li><strong>Scheduler path validation</strong> &mdash; Added <code class="docs-code">validateBinaryPath</code> to reject shell metacharacters (<code class="docs-code">&amp;</code>, <code class="docs-code">|</code>, <code class="docs-code">$</code>, etc.) and control characters in binary paths before passing them to OS schedulers (schtasks, cron, systemd, launchd).</li>
+        </ul>
+
+        <h3 class="docs-h3">Other</h3>
+        <ul class="docs-ul">
+          <li>Upgraded GitHub Actions to v5 across all CI workflows.</li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
+        <h2 class="docs-h2">v0.3.9</h2>
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li><strong>Dashboard port collision</strong> &mdash; Changed default dashboard port from 3000 to 45091 to avoid cookie collisions with other local dev servers (React, Express, Rails, etc.).</li>
+        </ul>
+
+        <h3 class="docs-h3">Other</h3>
+        <ul class="docs-ul">
+          <li>Streamlined installation with one-liner scripts for Windows, macOS, and Linux.</li>
+          <li>Added SHA256 checksum generation to release workflow.</li>
+        </ul>
+
+        <div class="docs-divider"></div>
 
         <h2 class="docs-h2">v0.3.8</h2>
         <h3 class="docs-h3">Features</h3>
