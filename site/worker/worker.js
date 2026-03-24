@@ -34,11 +34,11 @@ export default {
     }
 
     try {
-      const { type, title, details } = await request.json();
+      const { type, title, details, email, github, os } = await request.json();
 
-      if (!title || !details) {
+      if (!title || !details || !email) {
         return Response.json(
-          { error: "Title and details are required" },
+          { error: "Title, details, and email are required" },
           { status: 400, headers },
         );
       }
@@ -48,8 +48,14 @@ export default {
       if (type === "bug") labels.push("bug");
       if (type === "feature") labels.push("enhancement");
 
+      const ghClean = github ? github.replace(/^@/, "") : "";
+      const isGitHubUser = ghClean && /^[a-zA-Z0-9][-a-zA-Z0-9]{0,38}$/.test(ghClean);
+      const ghLine = isGitHubUser ? ` · GitHub: @${ghClean}` : "";
+      const osLine = os ? `\n\n## Environment\n${os}` : "";
       const body =
         `## Type\n${type}\n\n## Details\n${details}` +
+        `\n\n## Author\n${email}${ghLine}` +
+        osLine +
         `\n\n---\n*Submitted via kolshek.dev feedback form*`;
 
       const res = await fetch(`https://api.github.com/repos/${REPO}/issues`, {
