@@ -216,6 +216,7 @@ export function buildSystemPrompt(
   activeMode?: string,
   modeContent?: string,
   modelTier: number = 1,
+  thinking: boolean = false,
 ): string {
   const today = new Date().toISOString().slice(0, 10);
 
@@ -258,16 +259,11 @@ Uncategorized: category IS NULL OR category = '' OR category = 'uncategorized' �
       }
     }
   } else {
-    // Small models (4-12B) — compact prompt, /no_think to prevent reasoning loops
-    systemPrompt = `/no_think
-You are a concise finance assistant (KolShek). Today: ${today}. Currency: ILS (₪). Negative=expense, positive=income.
-Always respond in English unless the user writes in Hebrew. Be brief.
-
-CRITICAL: You have tools that access the user's LOCAL SQLite database. When a tool returns results, that IS the user's real data. ALWAYS use tool results to answer. NEVER say you cannot access their data.
-
-Tables: transactions(id,account_id,date,charged_amount,description,description_en,category,status), accounts(id,provider_id,account_number,display_name,balance), providers(id,company_id,display_name,type), categories(name,classification).
-Joins: transactions.account_id→accounts.id→accounts.provider_id→providers.id
-Uncategorized: category IS NULL OR category='' OR category='uncategorized'.`;
+    // Small models (4-12B) — compact prompt, /no_think unless user enables thinking.
+    // Schema and commands are in the tool descriptions — not here — so context
+    // is co-located with where the model looks when calling tools.
+    systemPrompt = `${thinking ? "" : "/no_think\n"}You are a finance assistant. Today: ${today}. Currency: ILS (₪). Respond in English unless user writes Hebrew. Be brief.
+Your tools access the user's LOCAL database with real data. ALWAYS use tool results to answer. NEVER say you cannot access their data. Format currency as ₪X,XXX.`;
   }
 
   // Inject active mode content

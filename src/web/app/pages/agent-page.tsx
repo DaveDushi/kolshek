@@ -3,7 +3,7 @@
 // slash commands or the config panel.
 import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Settings, RotateCcw, X } from "lucide-react";
+import { Settings, RotateCcw, X, Brain } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useAgent } from "@/hooks/use-agent";
 import { ChatContainer } from "@/components/agent/chat-container";
@@ -42,6 +42,7 @@ export function AgentPage() {
     "hebrew",
   ]);
   const [activeMode, setActiveMode] = useState<string | null>(null);
+  const [thinking, setThinking] = useState(false);
 
   const { data: config, refetch: refetchConfig } = useQuery<AgentConfigResponse>({
     queryKey: ["agent", "config"],
@@ -68,6 +69,7 @@ export function AgentPage() {
           `Starting ${MODE_LABELS[modeName] || modeName} workflow. Follow the skill steps.`,
           enabledSkills,
           modeName,
+          thinking,
         );
         return;
       }
@@ -78,9 +80,9 @@ export function AgentPage() {
         return;
       }
 
-      send(text, enabledSkills, activeMode || undefined);
+      send(text, enabledSkills, activeMode || undefined, thinking);
     },
-    [send, enabledSkills, activeMode, modelTier]
+    [send, enabledSkills, activeMode, modelTier, thinking]
   );
 
   const handleModeStart = useCallback(
@@ -91,9 +93,10 @@ export function AgentPage() {
         `Starting ${MODE_LABELS[modeName] || modeName} workflow. Follow the skill steps.`,
         enabledSkills,
         modeName,
+        thinking,
       );
     },
-    [send, enabledSkills]
+    [send, enabledSkills, thinking]
   );
 
   const handleExitMode = useCallback(() => {
@@ -134,6 +137,20 @@ export function AgentPage() {
                   ? config.modelInfo.gpuBackend.toUpperCase()
                   : "CPU"}
               </span>
+              <button
+                onClick={() => setThinking((v) => !v)}
+                className={`hidden sm:inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded transition-colors ${
+                  thinking
+                    ? "text-violet-700 bg-violet-500/15"
+                    : "text-muted-foreground bg-muted hover:bg-muted/80"
+                }`}
+                title={thinking
+                  ? "Thinking ON — slower but may improve reasoning. Click to disable."
+                  : "Thinking OFF (recommended for small models). Click to enable."}
+              >
+                <Brain className="h-3 w-3" />
+                {thinking ? "Think" : "No Think"}
+              </button>
             </>
           )}
           {activeMode && (

@@ -66,4 +66,5 @@ export interface AgentChatRequest {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   enabledSkills?: string[];
   activeMode?: string;
+  thinking?: boolean;
 }

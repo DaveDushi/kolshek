@@ -1165,6 +1165,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             activeMode,
             modeContent,
             tier,
+            body.thinking,
           );
 
           return createAgentStream(ctx, cors, req.signal);

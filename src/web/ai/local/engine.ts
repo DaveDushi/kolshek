@@ -24,9 +24,9 @@ interface InferenceProfile {
 
 function getInferenceProfile(entry: ModelEntry): InferenceProfile {
   switch (entry.tier) {
-    case 1: // 3-4B models — minimal context, 2 tools, strict limits
+    case 1: // 3-4B models — 2 tools, strict limits
       return {
-        contextSize: 4096,
+        contextSize: 8192,
         maxToolIterations: 3,
         maxHistoryMessages: 8,
         tools: TOOL_DEFS_LOCAL,
@@ -248,6 +248,8 @@ export async function runLocalInference(
 
   // Create a fresh session per request.
   // LlamaChatSession manages the function calling loop and history internally.
+  const hasThinking = !systemPrompt.startsWith("/no_think");
+  console.log(`[engine] Prompt: ${fullPrompt.length} chars, thinking=${hasThinking}`);
   const session = new LlamaChatSession({
     contextSequence: sequenceInstance,
     systemPrompt: systemPrompt || undefined,
@@ -303,8 +305,17 @@ export async function runLocalInference(
 
         onEvent({ type: "tool_result", id: callId, name: toolName, result });
 
+        // Truncate large results to avoid context overflow.
+        // Frontend gets the full result via the event above; the model gets a trimmed version.
+        const maxChars = profile.contextSize <= 8192 ? 1500 : 4000;
+        let trimmed = result;
+        if (trimmed.length > maxChars) {
+          trimmed = trimmed.slice(0, maxChars) + "...(truncated)";
+          console.log(`[engine] Tool result truncated: ${result.length} → ${maxChars} chars`);
+        }
+
         // Return parsed result — node-llama-cpp stringifies it for the model
-        try { return JSON.parse(result); } catch { return result; }
+        try { return JSON.parse(trimmed); } catch { return trimmed; }
       },
     });
   }

@@ -239,7 +239,7 @@ export const TOOL_DEFS_LOCAL: ToolDef[] = [
     type: "function",
     function: {
       name: "query",
-      description: "Read-only SQL on the finance DB. Returns JSON rows.",
+      description: "SQL SELECT on finance DB, returns JSON. Tables: transactions(id,account_id,date,charged_amount,description,description_en,category,status,memo,type), accounts(id,provider_id,account_number,display_name,balance), providers(id,company_id,display_name,type), categories(name,classification). Joins: transactions.account_id→accounts.id→providers.id. Negative=expense.",
       parameters: {
         type: "object",
         properties: {
@@ -253,11 +253,11 @@ export const TOOL_DEFS_LOCAL: ToolDef[] = [
     type: "function",
     function: {
       name: "run_command",
-      description: "Run a CLI command for writes/reports. Examples: 'spending 2025-03', 'insights', 'categorize rule add Food --description \"שופרסל\"'.",
+      description: "Run CLI command (no 'kolshek' prefix). Commands: spending [YYYY-MM], income [YYYY-MM], insights, trends [months], reports monthly|categories|merchants|balance, accounts, fetch, transactions list|search <query>, categorize apply|list|rule add <cat> --description <pattern>.",
       parameters: {
         type: "object",
         properties: {
-          command: { type: "string", description: "Command without 'kolshek' prefix" },
+          command: { type: "string", description: "Command string" },
         },
         required: ["command"],
       },
