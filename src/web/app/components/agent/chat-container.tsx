@@ -1,13 +1,14 @@
 // Chat container — message list with smart scroll, centered empty state, and input
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import { Bot } from "lucide-react";
-import type { AgentMessage } from "@/hooks/use-agent";
+import type { AgentMessage, AgentStatus } from "@/hooks/use-agent";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
 
 interface ChatContainerProps {
   messages: AgentMessage[];
   isStreaming: boolean;
+  status?: AgentStatus | null;
   disabled?: boolean;
   onSend: (text: string) => void;
   onStop: () => void;
@@ -20,9 +21,34 @@ const SUGGESTIONS = [
   { title: "Savings rate", prompt: "What's my savings rate?" },
 ];
 
+// Format elapsed seconds into a readable string
+function formatElapsed(startedAt: number): string {
+  const seconds = Math.floor((Date.now() - startedAt) / 1000);
+  if (seconds < 5) return "";
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}m ${secs}s`;
+}
+
+// Elapsed timer that re-renders every second
+function ElapsedTimer({ startedAt }: { startedAt: number }) {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+
+  const elapsed = formatElapsed(startedAt);
+  if (!elapsed) return null;
+  return <span className="tabular-nums text-muted-foreground/50">{elapsed}</span>;
+}
+
 export function ChatContainer({
   messages,
   isStreaming,
+  status,
   disabled,
   onSend,
   onStop,
@@ -101,6 +127,18 @@ export function ChatContainer({
                 <ChatMessage key={msg.id} message={msg} />
               ))}
             </div>
+            {status && isStreaming && (
+              <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
+                <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" />
+                <span className="animate-pulse">{status.label}</span>
+                {status.iteration > 0 && (
+                  <span className="text-muted-foreground/40">
+                    turn {status.iteration + 1}
+                  </span>
+                )}
+                <ElapsedTimer startedAt={status.startedAt} />
+              </div>
+            )}
             <div ref={bottomRef} />
           </div>
         </div>

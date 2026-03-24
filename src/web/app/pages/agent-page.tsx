@@ -1,23 +1,39 @@
-// Agent page — full-bleed chat interface that breaks out of AppShell padding
+// Agent page — full-bleed chat interface that breaks out of AppShell padding.
+// Supports workflow modes (analyze, review, categorize, translate, init) via
+// slash commands or the config panel.
 import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Settings, RotateCcw } from "lucide-react";
+import { Settings, RotateCcw, X } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useAgent } from "@/hooks/use-agent";
 import { ChatContainer } from "@/components/agent/chat-container";
 import { ConfigPanel } from "@/components/agent/config-panel";
+import { ModelSetup } from "@/components/agent/model-setup";
 import { api } from "@/lib/api";
 
-interface AiConfigResponse {
-  provider: string;
-  model: string;
-  baseUrl: string;
-  savedKeys: Record<string, boolean>;
+interface AgentConfigResponse {
+  modelId: string | null;
+  modelLoaded: boolean;
+  modelInfo: { id: string; name: string; contextSize: number; gpuBackend: string } | null;
 }
+
+interface ModeInfo {
+  name: string;
+  description: string;
+}
+
+// Mode display names
+const MODE_LABELS: Record<string, string> = {
+  analyze: "Financial Analysis",
+  review: "Monthly Review",
+  categorize: "Categorize",
+  translate: "Translate",
+  init: "Setup",
+};
 
 export function AgentPage() {
   useDocumentTitle("Agent");
-  const { messages, isStreaming, send, stop, clear } = useAgent();
+  const { messages, isStreaming, status, send, stop, clear } = useAgent();
   const [configOpen, setConfigOpen] = useState(false);
   const [enabledSkills, setEnabledSkills] = useState<string[]>([
     "analysis",
@@ -25,25 +41,75 @@ export function AgentPage() {
     "budgeting",
     "hebrew",
   ]);
+  const [activeMode, setActiveMode] = useState<string | null>(null);
 
-  const { data: config } = useQuery<AiConfigResponse>({
+  const { data: config, refetch: refetchConfig } = useQuery<AgentConfigResponse>({
     queryKey: ["agent", "config"],
     queryFn: () => api.get("/api/v2/agent/config"),
   });
 
-  const isConfigured = !!(config?.model);
+  const { data: modes } = useQuery<ModeInfo[]>({
+    queryKey: ["agent", "modes"],
+    queryFn: () => api.get("/api/v2/agent/modes"),
+  });
+
+  const isReady = !!config?.modelLoaded;
 
   const handleSend = useCallback(
     (text: string) => {
-      send(text, undefined, enabledSkills);
+      // Detect slash commands for mode activation
+      const modeMatch = text.match(/^\/(analyze|review|categorize|translate|init)$/);
+      if (modeMatch) {
+        const modeName = modeMatch[1];
+        setActiveMode(modeName);
+        send(
+          `Starting ${MODE_LABELS[modeName] || modeName} workflow. Follow the skill steps.`,
+          enabledSkills,
+          modeName,
+        );
+        return;
+      }
+
+      // Exit mode command
+      if (text.trim() === "/exit" && activeMode) {
+        setActiveMode(null);
+        return;
+      }
+
+      send(text, enabledSkills, activeMode || undefined);
+    },
+    [send, enabledSkills, activeMode]
+  );
+
+  const handleModeStart = useCallback(
+    (modeName: string) => {
+      setActiveMode(modeName);
+      setConfigOpen(false);
+      send(
+        `Starting ${MODE_LABELS[modeName] || modeName} workflow. Follow the skill steps.`,
+        enabledSkills,
+        modeName,
+      );
     },
     [send, enabledSkills]
   );
 
+  const handleExitMode = useCallback(() => {
+    setActiveMode(null);
+  }, []);
+
+  // Clear mode when chat is cleared
+  const handleClear = useCallback(() => {
+    clear();
+    setActiveMode(null);
+  }, [clear]);
+
+  // Called when model setup completes (model downloaded + loaded)
+  const handleModelReady = useCallback(() => {
+    refetchConfig();
+  }, [refetchConfig]);
+
   // Break out of AppShell's padded container for full-bleed chat layout.
-  // AppShell inner div: px-4 py-5 md:px-6 md:py-6 lg:px-8
-  // AppShell main: pb-16 md:pb-0 (mobile nav)
-  // Height: subtract mobile nav (4rem) on mobile, full viewport on desktop
   return (
     <div className="-mx-4 -mt-5 -mb-5 md:-mx-6 md:-mt-6 md:-mb-6 lg:-mx-8 flex flex-col h-[calc(100vh-4rem)] md:h-screen">
       {/* Slim header */}
@@ -52,16 +118,39 @@ export function AgentPage() {
           <span className="text-sm font-medium text-foreground">
             Financial Assistant
           </span>
-          {config?.model && (
-            <span className="hidden sm:inline text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-              {config.model}
+          {config?.modelInfo && (
+            <>
+              <span className="hidden sm:inline text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                {config.modelInfo.name}
+              </span>
+              <span className={`hidden sm:inline text-[11px] px-1.5 py-0.5 rounded ${
+                config.modelInfo.gpuBackend !== "cpu"
+                  ? "text-emerald-700 bg-emerald-500/10"
+                  : "text-amber-700 bg-amber-500/10"
+              }`}>
+                {config.modelInfo.gpuBackend !== "cpu"
+                  ? config.modelInfo.gpuBackend.toUpperCase()
+                  : "CPU"}
+              </span>
+            </>
+          )}
+          {activeMode && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-primary bg-primary/10 px-1.5 py-0.5 rounded font-medium">
+              {MODE_LABELS[activeMode] || activeMode}
+              <button
+                onClick={handleExitMode}
+                className="hover:text-primary/70 transition-colors"
+                title="Exit mode"
+              >
+                <X className="h-3 w-3" />
+              </button>
             </span>
           )}
         </div>
         <div className="flex items-center gap-0.5">
           {messages.length > 0 && (
             <button
-              onClick={clear}
+              onClick={handleClear}
               className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               title="New chat"
             >
@@ -78,19 +167,28 @@ export function AgentPage() {
         </div>
       </div>
 
-      <ChatContainer
-        messages={messages}
-        isStreaming={isStreaming}
-        disabled={!isConfigured}
-        onSend={handleSend}
-        onStop={stop}
-      />
+      {/* Show model setup wizard if no model is loaded, otherwise show chat */}
+      {!isReady ? (
+        <ModelSetup onReady={handleModelReady} />
+      ) : (
+        <ChatContainer
+          messages={messages}
+          isStreaming={isStreaming}
+          status={status}
+          disabled={false}
+          onSend={handleSend}
+          onStop={stop}
+        />
+      )}
 
       <ConfigPanel
         open={configOpen}
         onOpenChange={setConfigOpen}
         enabledSkills={enabledSkills}
         onSkillsChange={setEnabledSkills}
+        modes={modes || []}
+        onModeStart={handleModeStart}
+        onModelChange={refetchConfig}
       />
     </div>
   );

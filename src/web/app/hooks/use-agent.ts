@@ -1,7 +1,9 @@
 // Agent hook — manages conversation state and SSE streaming for the AI chat.
 // Mirrors the use-sync.ts pattern: POST to endpoint, parse SSE stream, update state.
+// Supports lifecycle events (turn_start, llm_start, tool_executing) for status display,
+// and activeMode for workflow skill activation.
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 // Agent message displayed in the chat UI
 export interface AgentMessage {
@@ -19,23 +21,26 @@ export interface AgentToolCall {
   result?: string;
 }
 
-// SSE event from the server
+// Rich status for the UI — includes phase, elapsed time, and iteration
+export interface AgentStatus {
+  label: string;
+  phase: "thinking" | "tool" | "idle";
+  iteration: number;
+  startedAt: number; // Date.now() when this phase started
+  toolName?: string;
+}
+
+// SSE event from the server (matches AgentSSEEvent on backend)
 interface AgentSSEEvent {
-  type: "token" | "tool_call" | "tool_result" | "error" | "done";
+  type: "turn_start" | "llm_start" | "token" | "tool_call" | "tool_executing" | "tool_result" | "turn_end" | "error" | "done";
   content?: string;
   id?: string;
   name?: string;
   arguments?: string;
   result?: string;
   message?: string;
-}
-
-// Config override for a single request
-export interface AgentRequestConfig {
-  provider?: string;
+  iteration?: number;
   model?: string;
-  baseUrl?: string;
-  apiKey?: string;
 }
 
 function parseSseEvent(line: string): AgentSSEEvent | null {
@@ -59,10 +64,12 @@ export function useAgent() {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<AgentStatus | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const iterationRef = useRef(0);
 
   const send = useCallback(
-    async (text: string, config?: AgentRequestConfig, enabledSkills?: string[]) => {
+    async (text: string, enabledSkills?: string[], activeMode?: string) => {
       if (!text.trim()) return;
 
       // Abort any in-flight request
@@ -74,6 +81,8 @@ export function useAgent() {
       abortRef.current = controller;
 
       setError(null);
+      iterationRef.current = 0;
+      setStatus({ label: "Thinking...", phase: "thinking", iteration: 0, startedAt: Date.now() });
 
       // Add user message to state
       const userMsg: AgentMessage = {
@@ -109,8 +118,8 @@ export function useAgent() {
         ];
 
         const body: Record<string, unknown> = { messages: history };
-        if (config) body.config = config;
         if (enabledSkills) body.enabledSkills = enabledSkills;
+        if (activeMode) body.activeMode = activeMode;
 
         const res = await fetch("/api/v2/agent/chat", {
           method: "POST",
@@ -129,6 +138,7 @@ export function useAgent() {
             // use default
           }
           setError(errMsg);
+          setStatus(null);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId ? { ...m, content: errMsg, isStreaming: false } : m
@@ -157,8 +167,25 @@ export function useAgent() {
               if (!event) continue;
 
               switch (event.type) {
+                case "turn_start": {
+                  const iter = event.iteration ?? iterationRef.current;
+                  iterationRef.current = iter;
+                  setStatus({ label: "Thinking...", phase: "thinking", iteration: iter, startedAt: Date.now() });
+                  break;
+                }
+
+                case "llm_start":
+                  setStatus((prev) => ({
+                    label: "Thinking...",
+                    phase: "thinking" as const,
+                    iteration: prev?.iteration ?? iterationRef.current,
+                    startedAt: prev?.startedAt ?? Date.now(),
+                  }));
+                  break;
+
                 case "token":
                   if (event.content) {
+                    setStatus(null);
                     setMessages((prev) =>
                       prev.map((m) =>
                         m.id === assistantId
@@ -186,6 +213,18 @@ export function useAgent() {
                   }
                   break;
 
+                case "tool_executing":
+                  if (event.name) {
+                    setStatus({
+                      label: `Running ${event.name}...`,
+                      phase: "tool",
+                      iteration: iterationRef.current,
+                      startedAt: Date.now(),
+                      toolName: event.name,
+                    });
+                  }
+                  break;
+
                 case "tool_result":
                   if (event.id) {
                     setMessages((prev) =>
@@ -205,8 +244,13 @@ export function useAgent() {
                   }
                   break;
 
+                case "turn_end":
+                  // Turn ended — if more turns follow, turn_start will set status again
+                  break;
+
                 case "error":
                   setError(event.message || "Unknown error");
+                  setStatus(null);
                   setMessages((prev) =>
                     prev.map((m) =>
                       m.id === assistantId
@@ -221,6 +265,7 @@ export function useAgent() {
                   break;
 
                 case "done":
+                  setStatus(null);
                   setMessages((prev) =>
                     prev.map((m) =>
                       m.id === assistantId ? { ...m, isStreaming: false } : m
@@ -260,6 +305,7 @@ export function useAgent() {
         );
       } finally {
         setIsStreaming(false);
+        setStatus(null);
         abortRef.current = null;
         // Mark streaming done in case it wasn't already
         setMessages((prev) =>
@@ -280,7 +326,8 @@ export function useAgent() {
     abortRef.current?.abort();
     setMessages([]);
     setError(null);
+    setStatus(null);
   }, []);
 
-  return { messages, isStreaming, error, send, stop, clear };
+  return { messages, isStreaming, error, status, send, stop, clear };
 }

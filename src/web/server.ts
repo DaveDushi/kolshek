@@ -5,17 +5,26 @@
 import { resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 import { createAgentStream } from "./ai/stream.js";
-import { discoverSkills, buildSystemPrompt } from "./ai/skills.js";
+import { buildRunnerContext } from "./ai/agent.js";
+import { TOOL_DEFS } from "./ai/tools.js";
+import { discoverSkills, discoverModeSkills, getModeByName, getModeIndex } from "./ai/skills.js";
+import { loadAiConfig, saveAiConfig } from "./ai/config.js";
+import type { AgentChatRequest } from "./ai/types.js";
+import { detectHardware } from "./ai/local/hardware.js";
 import {
-  loadAiConfig,
-  saveAiConfig,
-  saveAiApiKey,
-  getAiApiKey,
-  hasAiApiKey,
-  checkOllamaStatus,
-} from "./ai/config.js";
-import { PROVIDER_REGISTRY } from "./ai/types.js";
-import type { AiProviderConfig, AiProviderType, AgentChatRequest } from "./ai/types.js";
+  getModelStatuses,
+  downloadModel,
+  cancelDownload,
+  deleteModel,
+  MODEL_REGISTRY,
+} from "./ai/local/models.js";
+import {
+  loadModel,
+  unloadModel,
+  isModelLoaded,
+  getLoadedModelId,
+  getLoadedModelInfo,
+} from "./ai/local/engine.js";
 import {
   listProviders,
   createProvider,
@@ -1123,100 +1132,171 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             return jsonError("BAD_REQUEST", "messages array is required", 400);
           }
 
-          // Resolve provider config: request overrides > stored config > defaults
-          const storedConfig = await loadAiConfig();
-          const reqConfig = body.config || {};
-          const providerType = (reqConfig.provider || storedConfig?.provider || "ollama") as AiProviderType;
-          const registry = PROVIDER_REGISTRY[providerType];
-          if (!registry) {
-            return jsonError("BAD_REQUEST", `Unknown provider: ${providerType}`, 400);
+          if (!isModelLoaded()) {
+            return jsonError("BAD_REQUEST", "No model loaded. Download and load a model first.", 400);
           }
 
-          const model = reqConfig.model || storedConfig?.model || "";
-          if (!model) {
-            return jsonError("BAD_REQUEST", "No model specified. Configure a model in the agent settings.", 400);
-          }
-
-          // Resolve API key: request body > keychain
-          let apiKey = reqConfig.apiKey || undefined;
-          if (!apiKey && registry.requiresKey) {
-            const stored = await getAiApiKey(providerType);
-            if (stored) apiKey = stored;
-          }
-          if (!apiKey && registry.requiresKey) {
-            return jsonError("BAD_REQUEST", `API key required for ${registry.label}. Add one in agent settings.`, 400);
-          }
-
-          const providerConfig: AiProviderConfig = {
-            type: providerType,
-            baseUrl: reqConfig.baseUrl || storedConfig?.baseUrl || registry.baseUrl,
-            model,
-            apiKey,
-          };
-
-          // Build system prompt with skills
+          // Discover skills + modes, build runner context
           const skills = await discoverSkills();
-          const systemPrompt = buildSystemPrompt(skills, body.enabledSkills);
+          await discoverModeSkills();
 
-          // Convert frontend messages to ChatMessage format
-          const messages = [
-            { role: "system" as const, content: systemPrompt },
-            ...body.messages.map((m) => ({
-              role: m.role as "user" | "assistant",
-              content: m.content,
-            })),
-          ];
+          // Resolve active mode content if set
+          let modeContent: string | undefined;
+          if (body.activeMode) {
+            const mode = getModeByName(body.activeMode);
+            if (mode) modeContent = mode.content;
+          }
 
-          return createAgentStream(providerConfig, messages, cors, req.signal);
+          const ctx = buildRunnerContext(
+            body.messages,
+            skills,
+            TOOL_DEFS,
+            body.enabledSkills,
+            body.activeMode,
+            modeContent,
+          );
+
+          return createAgentStream(ctx, cors, req.signal);
         }
 
-        // GET /api/v2/agent/config — get current AI configuration
+        // GET /api/v2/agent/config — current AI configuration + model status
         if (method === "GET" && path === "/api/v2/agent/config") {
           const config = await loadAiConfig();
-          const provider = config?.provider || "ollama";
-          // Check saved keys for all providers that need them
-          const [hasOpenai, hasGroq, hasOpenrouter] = await Promise.all([
-            hasAiApiKey("openai"),
-            hasAiApiKey("groq"),
-            hasAiApiKey("openrouter"),
-          ]);
+          const modelInfo = getLoadedModelInfo();
           return json({
-            provider,
-            model: config?.model || "",
-            baseUrl: config?.baseUrl || PROVIDER_REGISTRY[provider as AiProviderType]?.baseUrl || "",
-            savedKeys: { openai: hasOpenai, groq: hasGroq, openrouter: hasOpenrouter },
+            modelId: config?.modelId || null,
+            modelLoaded: isModelLoaded(),
+            modelInfo,
           });
         }
 
-        // PUT /api/v2/agent/config — save AI configuration
+        // PUT /api/v2/agent/config — save selected model ID + load it
         if (method === "PUT" && path === "/api/v2/agent/config") {
           const body = await parseJsonBody(req);
-          const provider = body.provider as string;
-          if (!provider || !PROVIDER_REGISTRY[provider as AiProviderType]) {
-            return jsonError("BAD_REQUEST", "Invalid provider", 400);
+          const modelId = body.modelId as string;
+          if (!modelId) {
+            return jsonError("BAD_REQUEST", "modelId is required", 400);
           }
-          await saveAiConfig({
-            provider: provider as AiProviderType,
-            model: (body.model as string) || "",
-            baseUrl: body.baseUrl as string | undefined,
-          });
-          if (body.apiKey && typeof body.apiKey === "string") {
-            await saveAiApiKey(provider, body.apiKey);
+          if (!MODEL_REGISTRY.find((m) => m.id === modelId)) {
+            return jsonError("BAD_REQUEST", `Unknown model: ${modelId}`, 400);
           }
+          await saveAiConfig({ modelId });
           return json({ saved: true });
         }
 
         // GET /api/v2/agent/skills — list available skills
         if (method === "GET" && path === "/api/v2/agent/skills") {
           const skills = await discoverSkills();
-          return json(skills.map((s) => ({ name: s.name, filename: s.filename })));
+          return json(skills.map((s) => ({ name: s.name, filename: s.filename, description: s.description, tier: s.tier })));
         }
 
-        // GET /api/v2/agent/status — check Ollama connectivity
-        if (method === "GET" && path === "/api/v2/agent/status") {
-          const config = await loadAiConfig();
-          const status = await checkOllamaStatus(config?.baseUrl);
-          return json(status);
+        // GET /api/v2/agent/modes — list available workflow modes
+        if (method === "GET" && path === "/api/v2/agent/modes") {
+          await discoverModeSkills();
+          return json(getModeIndex());
+        }
+
+        // GET /api/v2/agent/hardware — detect system hardware capabilities
+        if (method === "GET" && path === "/api/v2/agent/hardware") {
+          const hw = await detectHardware();
+          return json(hw);
+        }
+
+        // GET /api/v2/agent/models — model registry with download/load status
+        if (method === "GET" && path === "/api/v2/agent/models") {
+          const hw = await detectHardware();
+          const statuses = await getModelStatuses(hw, getLoadedModelId());
+          return json(statuses);
+        }
+
+        // POST /api/v2/agent/models/download — download a model (SSE progress stream)
+        if (method === "POST" && path === "/api/v2/agent/models/download") {
+          const body = await parseJsonBody(req);
+          const modelId = body.modelId as string;
+          if (!modelId) {
+            return jsonError("BAD_REQUEST", "modelId is required", 400);
+          }
+
+          const encoder = new TextEncoder();
+          const stream = new ReadableStream({
+            async start(controller) {
+              function push(data: Record<string, unknown>) {
+                try {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+                } catch { /* closed */ }
+              }
+              try {
+                await downloadModel(modelId, (percent, downloaded, total) => {
+                  push({ type: "progress", percent, downloaded, total });
+                }, req.signal);
+                push({ type: "done" });
+              } catch (err) {
+                push({ type: "error", message: err instanceof Error ? err.message : String(err) });
+              } finally {
+                try { controller.close(); } catch { /* already closed */ }
+              }
+            },
+          });
+
+          return new Response(stream, {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+              ...cors,
+            },
+          });
+        }
+
+        // POST /api/v2/agent/models/cancel-download — cancel in-flight download
+        if (method === "POST" && path === "/api/v2/agent/models/cancel-download") {
+          cancelDownload();
+          return json({ cancelled: true });
+        }
+
+        // DELETE /api/v2/agent/models/:id — delete a downloaded model
+        if (method === "DELETE" && path.startsWith("/api/v2/agent/models/")) {
+          const modelId = path.split("/").pop();
+          if (!modelId) {
+            return jsonError("BAD_REQUEST", "Model ID required", 400);
+          }
+          // Unload if this model is currently loaded
+          if (getLoadedModelId() === modelId) {
+            await unloadModel();
+          }
+          await deleteModel(modelId);
+          return json({ deleted: true });
+        }
+
+        // POST /api/v2/agent/model/load — load a downloaded model into memory
+        if (method === "POST" && path === "/api/v2/agent/model/load") {
+          const body = await parseJsonBody(req);
+          const modelId = body.modelId as string;
+          if (!modelId) {
+            return jsonError("BAD_REQUEST", "modelId is required", 400);
+          }
+          try {
+            await loadModel(modelId);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("BAD_REQUEST", msg, 400);
+          }
+          await saveAiConfig({ modelId });
+          return json({ loaded: true, modelInfo: getLoadedModelInfo() });
+        }
+
+        // POST /api/v2/agent/model/unload — unload the current model from memory
+        if (method === "POST" && path === "/api/v2/agent/model/unload") {
+          await unloadModel();
+          return json({ unloaded: true });
+        }
+
+        // GET /api/v2/agent/model/status — get loaded model info
+        if (method === "GET" && path === "/api/v2/agent/model/status") {
+          return json({
+            loaded: isModelLoaded(),
+            modelInfo: getLoadedModelInfo(),
+          });
         }
 
         // --- React SPA fallback (never for /api/ routes) ---

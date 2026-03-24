@@ -3,10 +3,15 @@
 // the CLI subprocess with --json for full validation and structured output.
 
 import { join } from "node:path";
+import { readFile, writeFile } from "node:fs/promises";
+import envPaths from "env-paths";
 import { getDatabase } from "../../db/database.js";
 import { getMonthlyReport, getCategoryReport, getBalanceReport } from "../../db/repositories/reports.js";
 import { searchTransactions } from "../../db/repositories/transactions.js";
+import { getSkillByName } from "./skills.js";
 import type { ToolDef } from "./types.js";
+
+const configDir = envPaths("kolshek").config;
 
 // Read-only SQL keywords that may start a query
 const READONLY_PREFIXES = /^\s*(SELECT|WITH|EXPLAIN|PRAGMA|VALUES)\b/i;
@@ -57,8 +62,8 @@ const CLI_ENTRY = join(import.meta.dir, "..", "..", "cli", "index.ts");
 // Commands blocked from agent execution (destructive or interactive)
 const BLOCKED_COMMANDS = new Set(["init", "fetch", "dashboard", "update", "schedule", "plugin"]);
 
-// Tool definitions sent to the LLM
-export const TOOL_DEFS: ToolDef[] = [
+// Full tool definitions — used by cloud providers with large context
+export const TOOL_DEFS_FULL: ToolDef[] = [
   {
     type: "function",
     function: {
@@ -80,7 +85,7 @@ export const TOOL_DEFS: ToolDef[] = [
     type: "function",
     function: {
       name: "get_schema",
-      description: "Get the database schema (CREATE TABLE statements). Call this first to understand table structure before writing queries.",
+      description: "Get full CREATE TABLE statements. The compact schema is already in your system prompt — only call this if you need exact constraints, indexes, or column defaults.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -181,7 +186,116 @@ Examples:
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "load_skill",
+      description: "Load detailed domain knowledge for a topic. Call this when you need reference material about financial analysis patterns, categorization, budgeting, Hebrew descriptions, or CLI commands.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Skill name from the available skills list (e.g. 'analysis', 'categories', 'cli-reference')" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_file",
+      description: "Read a file from the KolShek config directory (budget.toml, rules, etc.). Only files in the config directory are accessible.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Filename relative to config dir (e.g. 'budget.toml')" },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_file",
+      description: "Write a file to the KolShek config directory (budget.toml, etc.). Only files in the config directory are accessible.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Filename relative to config dir (e.g. 'budget.toml')" },
+          content: { type: "string", description: "File content to write" },
+        },
+        required: ["path", "content"],
+      },
+    },
+  },
 ];
+
+// Compact tool set for local models — 3 core tools instead of 10.
+// Fewer tools = faster prompt evaluation + more reliable tool selection.
+// The model can do everything via query + run_command + load_skill.
+export const TOOL_DEFS_LOCAL: ToolDef[] = [
+  {
+    type: "function",
+    function: {
+      name: "query",
+      description: "Read-only SQL on the finance DB. Tables: transactions, accounts, providers, categories, category_rules. Use load_skill('schema') for full schema.",
+      parameters: {
+        type: "object",
+        properties: {
+          sql: { type: "string", description: "SELECT statement" },
+        },
+        required: ["sql"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "run_command",
+      description: "Run a CLI command for writes. Examples: 'categorize rule add Food --description \"שופרסל\"', 'spending 2025-03', 'insights', 'transactions set-category 42 Food'.",
+      parameters: {
+        type: "object",
+        properties: {
+          command: { type: "string", description: "Command without 'kolshek' prefix" },
+        },
+        required: ["command"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "load_skill",
+      description: "Load reference material: schema, analysis, categories, budgeting, hebrew, cli-reference.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Skill name" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+];
+
+// Default export — local models use compact set, cloud uses full
+export const TOOL_DEFS = TOOL_DEFS_LOCAL;
+
+// Allowed extensions for config file access
+const ALLOWED_EXTENSIONS = new Set([".toml", ".json", ".md"]);
+
+// Validate a config file path — must be a flat filename with allowed extension, no traversal
+function validateConfigPath(path: string): string | null {
+  if (!path || path.includes("..") || path.includes("/") || path.includes("\\")) {
+    return "Path traversal is not allowed. Use a simple filename like 'budget.toml'";
+  }
+  const ext = "." + path.split(".").pop();
+  if (!ALLOWED_EXTENSIONS.has(ext)) {
+    return `File extension ${ext} is not allowed. Allowed: ${[...ALLOWED_EXTENSIONS].join(", ")}`;
+  }
+  return null;
+}
 
 // Tool executor — runs a named tool with parsed arguments, returns result string
 export function executeTool(name: string, args: Record<string, unknown>): string {
@@ -201,6 +315,8 @@ export function executeTool(name: string, args: Record<string, unknown>): string
         return executeListAccounts();
       case "run_command":
         return executeRunCommand(args.command as string);
+      case "load_skill":
+        return executeLoadSkill(args.name as string);
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -210,10 +326,16 @@ export function executeTool(name: string, args: Record<string, unknown>): string
   }
 }
 
-// Async version for tools that need subprocess execution
+// Async version for tools that need subprocess or file I/O
 export async function executeToolAsync(name: string, args: Record<string, unknown>): Promise<string> {
   if (name === "run_command") {
     return await executeRunCommandAsync(args.command as string);
+  }
+  if (name === "read_file") {
+    return await executeReadFile(args.path as string);
+  }
+  if (name === "write_file") {
+    return await executeWriteFile(args.path as string, args.content as string);
   }
   // All other tools are synchronous
   return executeTool(name, args);
@@ -359,5 +481,47 @@ async function executeRunCommandAsync(command: string): Promise<string> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return JSON.stringify({ error: `Failed to run command: ${msg}` });
+  }
+}
+
+function executeLoadSkill(name: string): string {
+  if (!name) return JSON.stringify({ error: "skill name is required" });
+  const skill = getSkillByName(name);
+  if (!skill) return JSON.stringify({ error: `Unknown skill: "${name}". Use a name from the available skills list.` });
+  return JSON.stringify({ name: skill.name, content: skill.content });
+}
+
+async function executeReadFile(path: string): Promise<string> {
+  const error = validateConfigPath(path);
+  if (error) return JSON.stringify({ error });
+
+  const fullPath = join(configDir, path);
+  try {
+    const content = await readFile(fullPath, "utf-8");
+    return JSON.stringify({ path, content });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return JSON.stringify({ error: `File not found: ${path}` });
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    return JSON.stringify({ error: msg });
+  }
+}
+
+async function executeWriteFile(path: string, content: string): Promise<string> {
+  const error = validateConfigPath(path);
+  if (error) return JSON.stringify({ error });
+
+  if (content === undefined || content === null) {
+    return JSON.stringify({ error: "content is required" });
+  }
+
+  const fullPath = join(configDir, path);
+  try {
+    await writeFile(fullPath, content, "utf-8");
+    return JSON.stringify({ success: true, path, bytes: content.length });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return JSON.stringify({ error: `Failed to write file: ${msg}` });
   }
 }

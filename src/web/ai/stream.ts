@@ -1,15 +1,14 @@
 // SSE stream builder — wraps the agent loop into a ReadableStream Response.
 // Follows the same pattern as startFetchSSE in server.ts.
 
-import type { ChatMessage, AiProviderConfig, AgentSSEEvent } from "./types.js";
+import type { RunnerContext, AgentSSEEvent } from "./types.js";
 import { runAgentLoop } from "./agent.js";
 
 // Create an SSE Response that streams agent events to the frontend.
 // Accepts an AbortSignal so the server-side agent loop stops when the client disconnects.
 // Without this, stopping a request leaves the old loop running (hogging the LLM).
 export function createAgentStream(
-  config: AiProviderConfig,
-  messages: ChatMessage[],
+  ctx: RunnerContext,
   cors: Record<string, string>,
   signal?: AbortSignal,
 ): Response {
@@ -26,7 +25,7 @@ export function createAgentStream(
       }
 
       try {
-        await runAgentLoop(config, messages, pushEvent, signal);
+        await runAgentLoop(ctx, pushEvent, signal);
         pushEvent({ type: "done" });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

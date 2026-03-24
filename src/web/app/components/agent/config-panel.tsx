@@ -1,7 +1,7 @@
-// AI agent config panel — clean, card-based settings layout
-import { useState, useEffect, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, X, Loader2, Shield } from "lucide-react";
+// AI agent config panel — model management + skills + workflows
+import { useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, Loader2, HardDrive, Cpu, Download, Trash2 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -10,152 +10,108 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+
+interface ModeInfo {
+  name: string;
+  description: string;
+}
 
 interface ConfigPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   enabledSkills: string[];
   onSkillsChange: (skills: string[]) => void;
+  modes?: ModeInfo[];
+  onModeStart?: (mode: string) => void;
+  onModelChange?: () => void;
 }
 
-interface AiConfigResponse {
-  provider: string;
-  model: string;
-  baseUrl: string;
-  savedKeys: Record<string, boolean>;
+interface HardwareInfo {
+  totalRamGB: number;
+  availableRamGB: number;
+  cpu: { name: string; cores: number; arch: string };
+  gpu: { name: string; vramGB?: number } | null;
 }
 
-interface OllamaStatus {
-  connected: boolean;
-  models: string[];
+interface ModelStatus {
+  id: string;
+  name: string;
+  sizeBytes: number;
+  params: string;
+  quant: string;
+  minRamGB: number;
+  description: string;
+  tier: number;
+  downloaded: boolean;
+  loaded: boolean;
+  recommended: boolean;
+  compatible: boolean;
+  incompatibleReason?: string;
 }
 
 interface SkillInfo {
   name: string;
   filename: string;
+  description?: string;
+  tier?: string;
 }
 
-const PROVIDERS = [
-  { value: "ollama", label: "Ollama (Local)", requiresKey: false },
-  { value: "openai", label: "OpenAI", requiresKey: true },
-  { value: "groq", label: "Groq", requiresKey: true },
-  { value: "openrouter", label: "OpenRouter", requiresKey: true },
-] as const;
-
-const DEFAULT_URLS: Record<string, string> = {
-  ollama: "http://localhost:11434/v1",
-  openai: "https://api.openai.com/v1",
-  groq: "https://api.groq.com/openai/v1",
-  openrouter: "https://openrouter.ai/api/v1",
+// Mode display names
+const MODE_LABELS: Record<string, string> = {
+  analyze: "Financial Analysis",
+  review: "Monthly Review",
+  categorize: "Categorize Transactions",
+  translate: "Translate Descriptions",
+  init: "Initial Setup",
 };
 
-// Suggested models per provider
-const PROVIDER_MODELS: Record<string, string[]> = {
-  ollama: [
-    "qwen3:8b", "qwen3:32b", "qwen3-coder:30b", "qwen3.5:9b",
-    "llama4:scout", "llama3.3:70b", "mistral-small:24b", "phi4-mini:3.8b",
-  ],
-  openai: [
-    "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano",
-    "o3", "o3-mini", "o4-mini", "gpt-4.1",
-  ],
-  groq: [
-    "qwen/qwen3-32b", "meta-llama/llama-4-maverick-17b-128e-instruct",
-    "meta-llama/llama-4-scout-17b-16e-instruct", "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-  ],
-  openrouter: [
-    "openai/gpt-5.4", "anthropic/claude-sonnet-4.6",
-    "deepseek/deepseek-v3.2", "google/gemini-2.5-pro",
-    "google/gemini-3-flash-preview", "openai/gpt-5.4-mini",
-  ],
+const TIER_LABELS: Record<number, string> = {
+  1: "Lightweight",
+  2: "Standard",
+  3: "Performance",
+  4: "Powerhouse",
 };
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024 ** 3) return `${(bytes / (1024 ** 2)).toFixed(0)} MB`;
+  return `${(bytes / (1024 ** 3)).toFixed(1)} GB`;
+}
 
 export function ConfigPanel({
   open,
   onOpenChange,
   enabledSkills,
   onSkillsChange,
+  modes,
+  onModeStart,
+  onModelChange,
 }: ConfigPanelProps) {
   const queryClient = useQueryClient();
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  const [provider, setProvider] = useState("ollama");
-  const [model, setModel] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [saved, setSaved] = useState(false);
-  const [editingKey, setEditingKey] = useState(false);
-
-  const { data: config } = useQuery<AiConfigResponse>({
-    queryKey: ["agent", "config"],
-    queryFn: () => api.get("/api/v2/agent/config"),
+  const { data: hardware } = useQuery<HardwareInfo>({
+    queryKey: ["agent", "hardware"],
+    queryFn: () => api.get("/api/v2/agent/hardware"),
+    enabled: open,
   });
 
-  const { data: ollamaStatus } = useQuery<OllamaStatus>({
-    queryKey: ["agent", "status"],
-    queryFn: () => api.get("/api/v2/agent/status"),
-    refetchInterval: open ? 10000 : false,
+  const { data: models, refetch: refetchModels } = useQuery<ModelStatus[]>({
+    queryKey: ["agent", "models"],
+    queryFn: () => api.get("/api/v2/agent/models"),
+    enabled: open,
   });
 
   const { data: skills } = useQuery<SkillInfo[]>({
     queryKey: ["agent", "skills"],
     queryFn: () => api.get("/api/v2/agent/skills"),
   });
-
-  useEffect(() => {
-    if (config) {
-      setProvider(config.provider);
-      setModel(config.model);
-      setBaseUrl(config.baseUrl);
-    }
-  }, [config]);
-
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      const body: Record<string, string> = { provider, model };
-      if (baseUrl && baseUrl !== DEFAULT_URLS[provider]) {
-        body.baseUrl = baseUrl;
-      }
-      if (apiKey) {
-        body.apiKey = apiKey;
-      }
-      return api.put("/api/v2/agent/config", body);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["agent", "config"] });
-      setApiKey("");
-      setEditingKey(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    },
-  });
-
-  const handleProviderChange = useCallback((value: string) => {
-    setProvider(value);
-    setBaseUrl(DEFAULT_URLS[value] || "");
-    setApiKey("");
-    setEditingKey(false);
-    // For Ollama, prefer first installed model; fall back to suggested list
-    if (value === "ollama" && ollamaStatus?.models?.length) {
-      setModel(ollamaStatus.models[0]);
-    } else {
-      const models = PROVIDER_MODELS[value];
-      setModel(models?.length ? models[0] : "");
-    }
-  }, [ollamaStatus]);
 
   const toggleSkill = useCallback(
     (name: string) => {
@@ -168,15 +124,87 @@ export function ConfigPanel({
     [enabledSkills, onSkillsChange]
   );
 
-  const requiresKey = PROVIDERS.find((p) => p.value === provider)?.requiresKey ?? false;
-  const isCloud = provider !== "ollama";
+  // Download a model
+  const handleDownload = useCallback(async (modelId: string) => {
+    setDownloadingId(modelId);
+    setDownloadProgress(0);
+    try {
+      const res = await fetch("/api/v2/agent/models/download", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelId }),
+      });
+      if (!res.ok || !res.body) throw new Error("Download failed");
 
-  // Only show Save when something has actually changed
-  const hasChanges =
-    provider !== (config?.provider || "ollama") ||
-    model !== (config?.model || "") ||
-    (provider === "ollama" && baseUrl !== (config?.baseUrl || DEFAULT_URLS.ollama)) ||
-    apiKey.length > 0;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+        for (const part of parts) {
+          for (const line of part.split("\n")) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            try {
+              const event = JSON.parse(trimmed.slice(5).trim());
+              if (event.type === "progress") setDownloadProgress(event.percent || 0);
+              else if (event.type === "error") throw new Error(event.message);
+            } catch (e) {
+              if (e instanceof Error && e.message !== "Download failed") continue;
+              throw e;
+            }
+          }
+        }
+      }
+      await refetchModels();
+    } catch {
+      // ignore cancelled downloads
+    } finally {
+      setDownloadingId(null);
+      setDownloadProgress(0);
+    }
+  }, [refetchModels]);
+
+  // Load a model
+  const handleLoad = useCallback(async (modelId: string) => {
+    setLoadingId(modelId);
+    try {
+      await api.post("/api/v2/agent/model/load", { modelId });
+      await refetchModels();
+      queryClient.invalidateQueries({ queryKey: ["agent", "config"] });
+      onModelChange?.();
+    } catch {
+      // ignore
+    } finally {
+      setLoadingId(null);
+    }
+  }, [refetchModels, queryClient, onModelChange]);
+
+  // Delete a model
+  const handleDelete = useCallback(async (modelId: string) => {
+    try {
+      await fetch(`/api/v2/agent/models/${modelId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      await refetchModels();
+      queryClient.invalidateQueries({ queryKey: ["agent", "config"] });
+      onModelChange?.();
+    } catch {
+      // ignore
+    }
+  }, [refetchModels, queryClient, onModelChange]);
+
+  // Group downloaded/loaded models at top
+  const loadedModel = models?.find((m) => m.loaded);
+  const downloadedModels = models?.filter((m) => m.downloaded && !m.loaded) || [];
+  const availableModels = models?.filter((m) => !m.downloaded) || [];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -184,161 +212,203 @@ export function ConfigPanel({
         <SheetHeader className="px-6 pt-6 pb-4">
           <SheetTitle className="text-base">Settings</SheetTitle>
           <SheetDescription className="text-xs">
-            Configure your AI provider and model
+            Local model management and agent configuration
           </SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="flex-1">
           <div className="px-6 pb-6 space-y-6">
-            {/* --- Provider section --- */}
+            {/* --- Model section --- */}
             <section className="space-y-3">
               <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
-                Provider
+                Model
               </p>
 
-              {/* Ollama status indicator */}
-              {provider === "ollama" && (
-                <div className="flex items-center gap-2 text-xs">
-                  <span
-                    className={cn(
-                      "h-1.5 w-1.5 rounded-full",
-                      ollamaStatus?.connected ? "bg-green-500" : "bg-red-500"
-                    )}
-                  />
-                  <span className="text-muted-foreground">
-                    {ollamaStatus?.connected
-                      ? `Connected (${ollamaStatus.models.length} model${ollamaStatus.models.length === 1 ? "" : "s"})`
-                      : "Not detected"}
+              {/* Hardware summary */}
+              {hardware && (
+                <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <HardDrive className="h-3 w-3" />
+                    {hardware.totalRamGB} GB RAM
                   </span>
+                  <span className="flex items-center gap-1">
+                    <Cpu className="h-3 w-3" />
+                    {hardware.cpu.cores} cores
+                  </span>
+                  {hardware.gpu && (
+                    <span>
+                      {hardware.gpu.name}
+                      {hardware.gpu.vramGB ? ` ${hardware.gpu.vramGB} GB` : ""}
+                    </span>
+                  )}
                 </div>
               )}
 
-              {/* Cloud privacy note */}
-              {isCloud && (
-                <div className="flex items-start gap-2 rounded-lg bg-amber-500/8 border border-amber-500/20 p-2.5 text-xs text-amber-700 dark:text-amber-400">
-                  <Shield className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                  <span>
-                    Messages will be sent to {PROVIDERS.find((p) => p.value === provider)?.label}.
-                    Use Ollama to keep data local.
-                  </span>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Service</Label>
-                  <Select value={provider} onValueChange={handleProviderChange}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PROVIDERS.map((p) => (
-                        <SelectItem key={p.value} value={p.value}>
-                          {p.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Model</Label>
-                  {(() => {
-                    const suggestions = PROVIDER_MODELS[provider] || [];
-                    const liveModels = provider === "ollama" && ollamaStatus?.models?.length
-                      ? ollamaStatus.models
-                      : [];
-
-                    return (
-                      <Select value={model} onValueChange={setModel}>
-                        <SelectTrigger className="h-9">
-                          <SelectValue placeholder="Select a model" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {liveModels.length > 0 && suggestions.length > 0 && (
-                            <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-                              Installed
-                            </p>
-                          )}
-                          {liveModels.map((m) => (
-                            <SelectItem key={m} value={m}>{m}</SelectItem>
-                          ))}
-                          {liveModels.length > 0 && suggestions.length > 0 && (
-                            <p className="px-2 py-1 mt-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-                              Suggested
-                            </p>
-                          )}
-                          {suggestions
-                            .filter((m) => !liveModels.includes(m))
-                            .map((m) => (
-                              <SelectItem key={m} value={m}>{m}</SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    );
-                  })()}
-                </div>
-
-                {provider === "ollama" && (
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Base URL</Label>
-                    <Input
-                      value={baseUrl}
-                      onChange={(e) => setBaseUrl(e.target.value)}
-                      placeholder={DEFAULT_URLS[provider]}
-                      className="h-9 text-xs font-mono"
-                    />
+              {/* Active model */}
+              {loadedModel && (
+                <div className="flex items-center justify-between rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2">
+                  <div>
+                    <p className="text-xs font-medium">{loadedModel.name}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {loadedModel.params} {loadedModel.quant} — Active
+                    </p>
                   </div>
-                )}
+                  <Badge variant="default" className="text-[9px] h-4 bg-green-600">
+                    Loaded
+                  </Badge>
+                </div>
+              )}
 
-                {requiresKey && (
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">API Key</Label>
-                    {config?.savedKeys?.[provider] && !editingKey ? (
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 flex items-center gap-2 h-9 px-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
-                          <Check className="h-3 w-3 text-green-600 dark:text-green-400 shrink-0" />
-                          <span>Saved in keychain</span>
-                        </div>
+              {/* Downloaded but not loaded */}
+              {downloadedModels.length > 0 && (
+                <div className="rounded-lg border border-border overflow-hidden divide-y divide-border">
+                  {downloadedModels.map((model) => (
+                    <div key={model.id} className="flex items-center justify-between px-3 py-2">
+                      <div>
+                        <p className="text-xs font-medium">{model.name}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {model.params} — Downloaded
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-9 text-xs shrink-0"
-                          onClick={() => setEditingKey(true)}
+                          className="h-6 text-[10px]"
+                          disabled={loadingId === model.id}
+                          onClick={() => handleLoad(model.id)}
                         >
-                          Change
+                          {loadingId === model.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : "Load"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-red-600"
+                          onClick={() => handleDelete(model.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
-                    ) : (
-                      <Input
-                        type="password"
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        placeholder="Enter API key"
-                        className="h-9"
-                        autoFocus={editingKey}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-              {(hasChanges || saved) && (
-                <Button
-                  onClick={() => saveMutation.mutate()}
-                  disabled={saveMutation.isPending || !model || (!hasChanges && !saved)}
-                  className="w-full h-9"
-                  size="sm"
-                >
-                  {saveMutation.isPending ? (
-                    <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                  ) : saved ? (
-                    <Check className="h-3.5 w-3.5 mr-2" />
-                  ) : null}
-                  {saved ? "Saved" : "Save"}
-                </Button>
+              {/* Available models (grouped by tier) */}
+              {availableModels.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] text-muted-foreground">
+                    Available models — download to use
+                  </p>
+                  {Object.entries(
+                    availableModels.reduce((acc, m) => {
+                      if (!acc[m.tier]) acc[m.tier] = [];
+                      acc[m.tier].push(m);
+                      return acc;
+                    }, {} as Record<number, ModelStatus[]>)
+                  )
+                    .sort(([a], [b]) => Number(a) - Number(b))
+                    .map(([tier, tierModels]) => (
+                      <div key={tier}>
+                        <p className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/40 mb-1">
+                          {TIER_LABELS[Number(tier)] || `Tier ${tier}`}
+                        </p>
+                        <div className="rounded-lg border border-border overflow-hidden divide-y divide-border">
+                          {tierModels.map((model) => {
+                            const isActive = downloadingId === model.id;
+                            return (
+                              <div
+                                key={model.id}
+                                className={cn(
+                                  "px-3 py-2 space-y-1.5",
+                                  !model.compatible && "opacity-40",
+                                )}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-medium">{model.name}</span>
+                                    <span className="text-[9px] text-muted-foreground font-mono">
+                                      {model.params}
+                                    </span>
+                                    {model.recommended && (
+                                      <Badge variant="secondary" className="text-[8px] h-3.5 px-1">
+                                        Best fit
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {model.compatible ? (
+                                    <Button
+                                      variant={model.recommended ? "default" : "outline"}
+                                      size="sm"
+                                      className="h-6 text-[10px]"
+                                      disabled={!!downloadingId}
+                                      onClick={() => handleDownload(model.id)}
+                                    >
+                                      {isActive ? (
+                                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                      ) : (
+                                        <Download className="h-3 w-3 mr-1" />
+                                      )}
+                                      {isActive ? `${downloadProgress}%` : formatSize(model.sizeBytes)}
+                                    </Button>
+                                  ) : (
+                                    <span className="text-[9px] text-muted-foreground">
+                                      {model.incompatibleReason}
+                                    </span>
+                                  )}
+                                </div>
+                                {isActive && <Progress value={downloadProgress} className="h-1" />}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                </div>
               )}
             </section>
+
+            {/* --- Workflows section --- */}
+            {modes && modes.length > 0 && onModeStart && (
+              <section className="space-y-3">
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                    Workflows
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Guided multi-step financial workflows. Also available via slash commands (e.g. /analyze).
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-border overflow-hidden divide-y divide-border">
+                  {modes.map((mode) => (
+                    <div
+                      key={mode.name}
+                      className="flex items-center justify-between px-3 py-2.5"
+                    >
+                      <div className="flex-1 min-w-0 mr-2">
+                        <p className="text-xs font-medium text-foreground">
+                          {MODE_LABELS[mode.name] || mode.name}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          /{mode.name}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[11px] shrink-0"
+                        onClick={() => onModeStart(mode.name)}
+                      >
+                        Start
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* --- Skills section --- */}
             <section className="space-y-3">
@@ -347,7 +417,7 @@ export function ConfigPanel({
                   Skills
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Domain knowledge injected into context. Disable unused skills to save tokens.
+                  Domain knowledge loaded on-demand by the assistant.
                 </p>
               </div>
 
@@ -374,7 +444,12 @@ export function ConfigPanel({
                       >
                         {isActive && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
                       </div>
-                      <span className="flex-1 text-left capitalize">{skill.name}</span>
+                      <div className="flex-1 text-left">
+                        <span className="capitalize">{skill.name}</span>
+                        {skill.description && (
+                          <span className="block text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{skill.description}</span>
+                        )}
+                      </div>
                     </button>
                   );
                 })}

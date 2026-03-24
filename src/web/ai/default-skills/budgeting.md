@@ -1,3 +1,8 @@
+---
+name: budgeting
+description: Budget tracking, monthly review patterns, savings rate analysis, and spending optimization.
+tier: knowledge
+---
 Budget tracking and monthly review patterns.
 
 ## Monthly Review Process

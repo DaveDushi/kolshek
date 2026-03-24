@@ -1,3 +1,8 @@
+---
+name: categories
+description: Transaction categorization system, classification types, and category analysis SQL patterns.
+tier: knowledge
+---
 Transaction categorization knowledge.
 
 ## Classification System

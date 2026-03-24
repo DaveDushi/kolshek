@@ -1,3 +1,8 @@
+---
+name: hebrew
+description: Hebrew transaction description handling, common merchant patterns, and bilingual query tips.
+tier: knowledge
+---
 Hebrew transaction description handling.
 
 ## Description Fields

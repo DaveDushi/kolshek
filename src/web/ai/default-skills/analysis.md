@@ -1,3 +1,8 @@
+---
+name: analysis
+description: Patterns for analyzing Israeli bank/credit card income, expenses, installments, and financial trends.
+tier: knowledge
+---
 Financial analysis patterns for Israeli bank/credit card data.
 
 ## Income Analysis
