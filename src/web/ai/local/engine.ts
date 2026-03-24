@@ -10,9 +10,68 @@
 
 import type { AgentSSEEvent, ChatMessage, ToolDef } from "../types.js";
 import { executeToolAsync } from "../tools.js";
+import { TOOL_DEFS_LOCAL, TOOL_DEFS_FULL } from "../tools.js";
 import { MODEL_REGISTRY, getModelPath } from "./models.js";
+import type { ModelEntry } from "./models.js";
 
-const MAX_TOOL_ITERATIONS = 10;
+// Inference profile — scales with model capability tier.
+// Small models get fewer tools, less context, tighter limits.
+// Large models get the full experience.
+interface InferenceProfile {
+  contextSize: number;
+  maxToolIterations: number;
+  maxHistoryMessages: number;
+  tools: ToolDef[];
+  disableThinking: boolean;
+}
+
+function getInferenceProfile(entry: ModelEntry): InferenceProfile {
+  switch (entry.tier) {
+    case 1: // 3-4B models — minimal context, 2 tools, strict limits
+      return {
+        contextSize: 4096,
+        maxToolIterations: 3,
+        maxHistoryMessages: 8,
+        tools: TOOL_DEFS_LOCAL,
+        disableThinking: true,
+      };
+    case 2: // 8-12B models — moderate context, full tools, reasonable limits
+      return {
+        contextSize: 8192,
+        maxToolIterations: 6,
+        maxHistoryMessages: 16,
+        tools: TOOL_DEFS_FULL,
+        disableThinking: true,
+      };
+    case 3: // 24-32B models — large context, full tools, generous limits
+      return {
+        contextSize: 16384,
+        maxToolIterations: 8,
+        maxHistoryMessages: 24,
+        tools: TOOL_DEFS_FULL,
+        disableThinking: false,
+      };
+    case 4: // 70B+ models — maximum capability
+      return {
+        contextSize: 32768,
+        maxToolIterations: 10,
+        maxHistoryMessages: 32,
+        tools: TOOL_DEFS_FULL,
+        disableThinking: false,
+      };
+    default:
+      return {
+        contextSize: 4096,
+        maxToolIterations: 3,
+        maxHistoryMessages: 8,
+        tools: TOOL_DEFS_LOCAL,
+        disableThinking: true,
+      };
+  }
+}
+
+// Active profile — set when model is loaded, used during inference
+let activeProfile: InferenceProfile | null = null;
 
 // Module-level singleton state — one model loaded at a time
 let llamaInstance: any = null;
@@ -65,11 +124,11 @@ export async function loadModel(
       ? (percent: number) => onProgress(Math.round(percent * 100))
       : undefined,
   });
-  console.log(`[engine] Model loaded: ${modelId}, GPU layers: auto`);
+  // Set inference profile based on model tier — scales context, tools, limits
+  activeProfile = getInferenceProfile(entry);
+  console.log(`[engine] Model loaded: ${modelId}, tier ${entry.tier}, ctx ${activeProfile.contextSize}, tools ${activeProfile.tools.length}, thinking ${!activeProfile.disableThinking}`);
 
-  // Small context = faster allocation + less memory. 4096 is enough for
-  // system prompt (~50 tokens) + tools (~100 tokens) + conversation.
-  const ctxSize = Math.min(entry.contextWindow, 4096);
+  const ctxSize = Math.min(entry.contextWindow, activeProfile.contextSize);
   contextInstance = await modelInstance.createContext({ contextSize: ctxSize });
   sequenceInstance = contextInstance.getSequence();
 
@@ -107,6 +166,7 @@ export function getLoadedModelInfo(): {
   name: string;
   contextSize: number;
   gpuBackend: string;
+  tier: number;
 } | null {
   if (!loadedModelId) return null;
   const entry = MODEL_REGISTRY.find((m) => m.id === loadedModelId);
@@ -116,7 +176,13 @@ export function getLoadedModelInfo(): {
     name: entry.name,
     contextSize: contextInstance?.contextSize ?? 0,
     gpuBackend: llamaInstance?.gpu ? String(llamaInstance.gpu) : "cpu",
+    tier: entry.tier,
   };
+}
+
+// Get the active tools for the currently loaded model's tier
+export function getActiveTools(): ToolDef[] {
+  return activeProfile?.tools ?? TOOL_DEFS_LOCAL;
 }
 
 // --- History conversion ---
@@ -227,24 +293,22 @@ export type EventCallback = (event: AgentSSEEvent) => void;
 //   2. Call generateResponse with onTextChunk for streaming
 //   3. If function calls: execute tools, add results, loop back to 2
 //   4. If no function calls: done
-// Max conversation turns to keep in context. Older messages are dropped
-// to prevent context overflow on small local models.
-const MAX_HISTORY_MESSAGES = 10;
-
 export async function runLocalInference(
   messages: ChatMessage[],
   tools: ToolDef[],
   onEvent: EventCallback,
   signal?: AbortSignal,
 ): Promise<void> {
-  if (!modelInstance || !contextInstance) {
+  if (!modelInstance || !contextInstance || !activeProfile) {
     throw new Error("No model loaded — download and load a model first");
   }
 
-  // Trim history to keep context small. Always keep system prompt + last N messages.
-  if (messages.length > MAX_HISTORY_MESSAGES + 1) {
+  const profile = activeProfile;
+
+  // Trim history based on model tier. Always keep system prompt + last N messages.
+  if (messages.length > profile.maxHistoryMessages + 1) {
     const system = messages[0]?.role === "system" ? [messages[0]] : [];
-    const recent = messages.slice(-(MAX_HISTORY_MESSAGES));
+    const recent = messages.slice(-(profile.maxHistoryMessages));
     messages = [...system, ...recent];
   }
 
@@ -292,19 +356,24 @@ export async function runLocalInference(
   onEvent({ type: "llm_start", model: loadedModelId || "local" });
 
   try {
-    while (iteration < MAX_TOOL_ITERATIONS) {
+    while (iteration < profile.maxToolIterations) {
       if (signal?.aborted) {
         onEvent({ type: "error", message: "Request cancelled" });
         return;
       }
 
+      // On the last allowed iteration, remove tools so the model MUST generate
+      // text instead of looping with more tool calls.
+      const isLastIteration = iteration >= profile.maxToolIterations - 1;
+      const offerFunctions = hasFunctions && !isLastIteration;
+
       // Generate one response from the model
       const genStart = Date.now();
       let tokenCount = 0;
       const res = await llamaChat.generateResponse(chatHistory, {
-        functions: hasFunctions ? functionDefinitions : undefined,
-        // Disable thinking/reasoning mode — wastes thousands of tokens on local models
-        budgets: { thoughtTokens: 0 },
+        functions: offerFunctions ? functionDefinitions : undefined,
+        // Disable thinking for small models (wastes tokens), allow for large ones
+        ...(profile.disableThinking ? { budgets: { thoughtTokens: 0 } } : {}),
         onTextChunk: (text: string) => {
           if (text) {
             tokenCount++;
@@ -404,7 +473,7 @@ export async function runLocalInference(
     // Hit max iterations safety limit
     onEvent({
       type: "error",
-      message: `Agent reached maximum tool call iterations (${MAX_TOOL_ITERATIONS}). Stopping.`,
+      message: `Agent reached maximum tool call iterations (${profile.maxToolIterations}). Stopping.`,
     });
   } catch (err) {
     if (

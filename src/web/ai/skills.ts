@@ -207,37 +207,72 @@ export function getModeIndex(): Array<{ name: string; description: string }> {
   return [...modeCache.values()].map((s) => ({ name: s.name, description: s.description }));
 }
 
-// Build the full system prompt from base prompt + skill index + optional active mode.
-// Kept deliberately compact — every token costs inference time on local models.
+// Build the system prompt, scaled by model tier.
+// Tier 1-2 (small): compact prompt, inline schema, no skills index.
+// Tier 3-4 (large): full prompt with schema, guidelines, skills index.
 export function buildSystemPrompt(
   skills: Skill[],
   enabledSkillNames?: string[],
   activeMode?: string,
   modeContent?: string,
+  modelTier: number = 1,
 ): string {
   const today = new Date().toISOString().slice(0, 10);
 
-  // Compact system prompt — DB schema is available via load_skill, not inlined.
-  // /no_think disables Qwen 3.5's internal reasoning mode which wastes thousands of tokens.
-  let systemPrompt = `/no_think
-You are a concise Israeli finance assistant (KolShek). Today: ${today}. Currency: ILS (₪). Negative=expense, positive=income.
-Use query tool for SQL, run_command for writes. Respond in the user's language. Be brief.`;
+  let systemPrompt: string;
 
-  // Build skill index (progressive disclosure — descriptions only, not full content)
-  const activeSkills = enabledSkillNames
-    ? skills.filter((s) => enabledSkillNames.includes(s.name))
-    : skills;
+  if (modelTier >= 3) {
+    // Large models (24B+) — full system prompt with guidelines
+    systemPrompt = `You are a personal finance assistant for KolShek (כל שקל), an Israeli finance tracking tool.
+You have access to the user's local SQLite database containing bank and credit card transactions from Israeli financial institutions.
+Today: ${today}. Currency: ILS (₪). Negative amounts = expenses, positive = income.
+Always respond in English unless the user writes in Hebrew.
 
-  if (activeSkills.length > 0) {
-    systemPrompt += "\nSkills (load with load_skill tool):";
-    for (const skill of activeSkills) {
-      systemPrompt += ` ${skill.name},`;
+## Database Schema
+providers(id PK, company_id, alias UNIQUE, display_name, type bank|credit_card, last_synced_at, created_at)
+accounts(id PK, provider_id→providers, account_number, display_name, balance, currency='ILS', created_at)
+transactions(id PK, account_id→accounts, type normal|installments, identifier, date, processed_date, original_amount, original_currency, charged_amount, charged_currency, description, description_en, memo, status completed|pending, installment_number, installment_total, category, hash, unique_id, created_at, updated_at)
+categories(name PK, classification='expense', created_at)
+category_rules(id PK, category, conditions JSON, priority=0, created_at)
+translation_rules(id PK, english_name, match_pattern, created_at)
+sync_log(id PK, provider_id→providers, started_at, completed_at, status, transactions_added, transactions_updated, error_message)
+spending_excludes(category PK, created_at)
+
+Key joins: transactions.account_id → accounts.id → accounts.provider_id → providers.id
+Uncategorized: category IS NULL OR category = '' OR category = 'uncategorized' — always check all three.
+
+## Guidelines
+- Format currency as ₪X,XXX
+- Use tables for comparative data
+- Be concise but thorough — show data, not just conclusions
+- When creating rules or modifying data, show the user what you're doing and confirm the result`;
+
+    // Skills index for large models
+    const activeSkills = enabledSkillNames
+      ? skills.filter((s) => enabledSkillNames.includes(s.name))
+      : skills;
+    if (activeSkills.length > 0) {
+      systemPrompt += "\n\n## Available Skills\nUse the `load_skill` tool to load detailed domain knowledge when needed.\n";
+      for (const skill of activeSkills) {
+        systemPrompt += `- **${skill.name}**: ${skill.description}\n`;
+      }
     }
+  } else {
+    // Small models (4-12B) — compact prompt, /no_think to prevent reasoning loops
+    systemPrompt = `/no_think
+You are a concise finance assistant (KolShek). Today: ${today}. Currency: ILS (₪). Negative=expense, positive=income.
+Always respond in English unless the user writes in Hebrew. Be brief.
+
+Tables: transactions(id,account_id,date,charged_amount,description,description_en,category,status), accounts(id,provider_id,account_number,display_name,balance), providers(id,company_id,display_name,type), categories(name,classification).
+Joins: transactions.account_id→accounts.id→accounts.provider_id→providers.id
+Uncategorized: category IS NULL OR category='' OR category='uncategorized'.`;
   }
 
-  // Inject active mode content into system prompt
+  // Inject active mode content
   if (activeMode && modeContent) {
-    systemPrompt += `\n\nMode: ${activeMode}\n${modeContent}`;
+    systemPrompt += modelTier >= 3
+      ? `\n\n## Active Mode: ${activeMode}\nFollow the steps below carefully, using the available tools.\n\n${modeContent}`
+      : `\n\nMode: ${activeMode}\n${modeContent}`;
   }
 
   return systemPrompt;

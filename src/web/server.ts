@@ -6,7 +6,6 @@ import { resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 import { createAgentStream } from "./ai/stream.js";
 import { buildRunnerContext } from "./ai/agent.js";
-import { TOOL_DEFS } from "./ai/tools.js";
 import { discoverSkills, discoverModeSkills, getModeByName, getModeIndex } from "./ai/skills.js";
 import { loadAiConfig, saveAiConfig } from "./ai/config.js";
 import type { AgentChatRequest } from "./ai/types.js";
@@ -24,6 +23,7 @@ import {
   isModelLoaded,
   getLoadedModelId,
   getLoadedModelInfo,
+  getActiveTools,
 } from "./ai/local/engine.js";
 import {
   listProviders,
@@ -301,6 +301,9 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
   const server = Bun.serve({
     port,
     hostname: "127.0.0.1",
+    // SSE streams for chat + model downloads need long-lived connections.
+    // Default 10s kills them mid-response.
+    idleTimeout: 255, // max allowed by Bun (seconds)
     async fetch(req) {
       const url = new URL(req.url);
       const path = url.pathname;
@@ -1147,13 +1150,15 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             if (mode) modeContent = mode.content;
           }
 
+          const modelInfo = getLoadedModelInfo();
           const ctx = buildRunnerContext(
             body.messages,
             skills,
-            TOOL_DEFS,
+            getActiveTools(),
             body.enabledSkills,
             body.activeMode,
             modeContent,
+            modelInfo?.tier,
           );
 
           return createAgentStream(ctx, cors, req.signal);

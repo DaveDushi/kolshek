@@ -231,15 +231,15 @@ Examples:
   },
 ];
 
-// Compact tool set for local models — 3 core tools instead of 10.
-// Fewer tools = faster prompt evaluation + more reliable tool selection.
-// The model can do everything via query + run_command + load_skill.
+// Compact tool set for local models — 2 core tools only.
+// Small models can't handle meta-tools like load_skill (they loop).
+// Schema is in the system prompt. Everything goes through query + run_command.
 export const TOOL_DEFS_LOCAL: ToolDef[] = [
   {
     type: "function",
     function: {
       name: "query",
-      description: "Read-only SQL on the finance DB. Tables: transactions, accounts, providers, categories, category_rules. Use load_skill('schema') for full schema.",
+      description: "Read-only SQL on the finance DB. Returns JSON rows.",
       parameters: {
         type: "object",
         properties: {
@@ -253,27 +253,13 @@ export const TOOL_DEFS_LOCAL: ToolDef[] = [
     type: "function",
     function: {
       name: "run_command",
-      description: "Run a CLI command for writes. Examples: 'categorize rule add Food --description \"שופרסל\"', 'spending 2025-03', 'insights', 'transactions set-category 42 Food'.",
+      description: "Run a CLI command for writes/reports. Examples: 'spending 2025-03', 'insights', 'categorize rule add Food --description \"שופרסל\"'.",
       parameters: {
         type: "object",
         properties: {
           command: { type: "string", description: "Command without 'kolshek' prefix" },
         },
         required: ["command"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "load_skill",
-      description: "Load reference material: schema, analysis, categories, budgeting, hebrew, cli-reference.",
-      parameters: {
-        type: "object",
-        properties: {
-          name: { type: "string", description: "Skill name" },
-        },
-        required: ["name"],
       },
     },
   },

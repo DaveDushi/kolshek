@@ -17,8 +17,9 @@ export function buildRunnerContext(
   enabledSkillNames?: string[],
   activeMode?: string,
   modeContent?: string,
+  modelTier?: number,
 ): RunnerContext {
-  const systemPrompt = buildSystemPrompt(skills, enabledSkillNames, activeMode, modeContent);
+  const systemPrompt = buildSystemPrompt(skills, enabledSkillNames, activeMode, modeContent, modelTier);
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
     ...structuredClone(frontendMessages),
