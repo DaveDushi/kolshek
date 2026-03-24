@@ -139,6 +139,8 @@ export function AgentPage() {
       await api.post("/api/v2/agent/model/load", { modelId });
       queryClient.invalidateQueries({ queryKey: ["agent", "models"] });
       refetchConfig();
+      // Pre-evaluate system prompt so first message is fast
+      api.post("/api/v2/agent/warmup", {}).catch(() => {});
     } catch {
       // ignore
     } finally {
@@ -149,6 +151,8 @@ export function AgentPage() {
   // Called when model setup completes (model downloaded + loaded)
   const handleModelReady = useCallback(() => {
     refetchConfig();
+    // Pre-evaluate system prompt so first message is fast
+    api.post("/api/v2/agent/warmup", {}).catch(() => {});
   }, [refetchConfig]);
 
   // Track last used model in localStorage

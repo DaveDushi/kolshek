@@ -154,6 +154,28 @@ export async function unloadModel(): Promise<void> {
   }
 }
 
+// Pre-evaluate the system prompt + a minimal user message into the context
+// sequence so the first real request skips the costly prompt processing.
+// The KV cache retains the evaluated prefix — when the real request uses
+// the same system prompt, llama.cpp reuses the cached prefix automatically.
+export async function warmupContext(systemPrompt: string): Promise<void> {
+  if (!modelInstance || !contextInstance || !sequenceInstance || !activeProfile) return;
+
+  const start = Date.now();
+  try {
+    const { LlamaChatSession } = await import("node-llama-cpp");
+    const session = new LlamaChatSession({
+      contextSequence: sequenceInstance,
+      systemPrompt: systemPrompt || undefined,
+    });
+    // Generate 1 token to force full system prompt evaluation through the model
+    await session.prompt("Hi", { maxTokens: 1 });
+    console.log(`[engine] Context warmup done in ${Date.now() - start}ms`);
+  } catch (err) {
+    console.warn("[engine] Context warmup failed (non-fatal):", err);
+  }
+}
+
 export function isModelLoaded(): boolean {
   return modelInstance !== null && loadedModelId !== null;
 }
@@ -377,6 +399,97 @@ export async function runLocalInference(
   const genStart = Date.now();
   let tokenCount = 0;
 
+  // Filter out Qwen-style <think>...</think> reasoning tags from streamed output.
+  // Tokens arrive one at a time, so tags span multiple chunks — track state.
+  let insideThink = false;
+  let tagBuffer = "";
+
+  function emitFiltered(text: string) {
+    // Fast path: no tag characters and not inside think block
+    if (!insideThink && !tagBuffer && !text.includes("<") && !text.includes("/")) {
+      tokenCount++;
+      onEvent({ type: "token", content: text });
+      return;
+    }
+
+    tagBuffer += text;
+
+    while (tagBuffer) {
+      if (insideThink) {
+        // Look for </think>
+        const closeIdx = tagBuffer.indexOf("</think>");
+        if (closeIdx !== -1) {
+          insideThink = false;
+          tagBuffer = tagBuffer.slice(closeIdx + 8);
+          continue;
+        }
+        // Might be a partial </think> at the end — keep buffering
+        if (tagBuffer.endsWith("<") || tagBuffer.endsWith("</") ||
+            tagBuffer.endsWith("</t") || tagBuffer.endsWith("</th") ||
+            tagBuffer.endsWith("</thi") || tagBuffer.endsWith("</thin") ||
+            tagBuffer.endsWith("</think")) {
+          return; // wait for more chunks
+        }
+        // No close tag forming — discard thinking content
+        tagBuffer = "";
+        return;
+      }
+
+      // Not inside think block — look for <think> or stray </think>
+      const openIdx = tagBuffer.indexOf("<think>");
+      const strayClose = tagBuffer.indexOf("</think>");
+      // Handle whichever comes first
+      const firstTag = (openIdx !== -1 && (strayClose === -1 || openIdx <= strayClose))
+        ? { idx: openIdx, len: 7, startThink: true }
+        : (strayClose !== -1)
+          ? { idx: strayClose, len: 8, startThink: false }
+          : null;
+
+      if (firstTag) {
+        // Emit text before the tag
+        const before = tagBuffer.slice(0, firstTag.idx);
+        if (before) {
+          tokenCount++;
+          onEvent({ type: "token", content: before });
+        }
+        if (firstTag.startThink) {
+          insideThink = true;
+        }
+        // Skip the tag itself
+        tagBuffer = tagBuffer.slice(firstTag.idx + firstTag.len);
+        continue;
+      }
+
+      // Check for partial <think> or </think> forming at the end
+      const partials = ["<think>", "</think>"];
+      let partialAt = -1;
+      for (const p of partials) {
+        for (let i = Math.max(0, tagBuffer.length - (p.length - 1)); i < tagBuffer.length; i++) {
+          const tail = tagBuffer.slice(i);
+          if (p.startsWith(tail)) {
+            if (partialAt === -1 || i < partialAt) partialAt = i;
+          }
+        }
+      }
+
+      if (partialAt !== -1) {
+        const safe = tagBuffer.slice(0, partialAt);
+        if (safe) {
+          tokenCount++;
+          onEvent({ type: "token", content: safe });
+        }
+        tagBuffer = tagBuffer.slice(partialAt);
+        return; // wait for more
+      }
+
+      // No tag found — emit everything
+      tokenCount++;
+      onEvent({ type: "token", content: tagBuffer });
+      tagBuffer = "";
+      return;
+    }
+  }
+
   try {
     const response = await session.prompt(fullPrompt, {
       functions: Object.keys(functions).length > 0 ? functions : undefined,
@@ -385,11 +498,17 @@ export async function runLocalInference(
       signal,
       onTextChunk(text: string) {
         if (text) {
-          tokenCount++;
-          onEvent({ type: "token", content: text });
+          emitFiltered(text);
         }
       },
     });
+
+    // Flush any remaining buffer (partial tag that never completed)
+    if (tagBuffer && !insideThink) {
+      tokenCount++;
+      onEvent({ type: "token", content: tagBuffer });
+      tagBuffer = "";
+    }
 
     const elapsed = (Date.now() - genStart) / 1000;
     const tokPerSec = elapsed > 0 ? parseFloat((tokenCount / elapsed).toFixed(1)) : 0;

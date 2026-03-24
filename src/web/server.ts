@@ -25,6 +25,7 @@ import {
   getLoadedModelInfo,
   getActiveTools,
   getContextBounds,
+  warmupContext,
 } from "./ai/local/engine.js";
 import {
   listProviders,
@@ -1303,6 +1304,30 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         if (method === "POST" && path === "/api/v2/agent/model/unload") {
           await unloadModel();
           return json({ unloaded: true });
+        }
+
+        // POST /api/v2/agent/warmup — pre-evaluate system prompt to speed up first message
+        if (method === "POST" && path === "/api/v2/agent/warmup") {
+          if (!isModelLoaded()) {
+            return json({ warmed: false });
+          }
+          const skills = await discoverSkills();
+          const tools = getActiveTools();
+          const modelInfo = getLoadedModelInfo();
+          const tier = modelInfo?.tier ?? 1;
+          const ctx = buildRunnerContext(
+            [{ role: "user", content: "warmup" }],
+            skills,
+            tools,
+            undefined,
+            undefined,
+            undefined,
+            tier,
+            false,
+          );
+          const sysPrompt = ctx.messages[0]?.role === "system" ? (ctx.messages[0].content || "") : "";
+          await warmupContext(sysPrompt);
+          return json({ warmed: true });
         }
 
         // GET /api/v2/agent/model/status — get loaded model info
