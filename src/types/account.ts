@@ -10,6 +10,7 @@ export interface Account {
   displayName: string | null;
   balance: number | null;
   currency: string;
+  excluded: boolean;
   createdAt: string;
 }
 

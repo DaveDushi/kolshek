@@ -111,12 +111,14 @@ export interface TranslatedGroup {
 
 // Matches BalanceRow from src/db/repositories/reports.ts
 export interface BalanceRow {
+  accountId: number;
   provider: string;
   providerAlias: string;
   providerType: string;
   accountNumber: string;
   balance: number | null;
   currency: string;
+  excluded: boolean;
   lastSyncedAt: string | null;
   recentExpenses30d: number;
   recentIncome30d: number;
