@@ -15,10 +15,34 @@ import type { ModelEntry } from "./models.js";
 const CTX_MIN = 2048;
 const CTX_MAX_HARDWARE = 65536; // Beyond this, memory/quality degrades on consumer hardware
 const CTX_TIER1 = 8192;
-const CTX_TIER2 = 8192;
+const CTX_TIER2 = 12288; // Tier 2 (8-12B) gets more context than tier 1 (3-4B)
 const CTX_TIER3 = 16384;
 const CTX_TIER4 = 32768;
 const CTX_DEFAULT = 4096;
+
+// Inference lock — prevents concurrent access to shared sequence/context singletons.
+// node-llama-cpp sequences are not re-entrant; concurrent prompts corrupt KV cache.
+let inferenceLock: Promise<void> | null = null;
+let inferenceLockResolve: (() => void) | null = null;
+
+function acquireInferenceLock(): boolean {
+  if (inferenceLock) return false; // already held
+  inferenceLock = new Promise<void>((resolve) => {
+    inferenceLockResolve = resolve;
+  });
+  return true;
+}
+
+function releaseInferenceLock(): void {
+  const resolve = inferenceLockResolve;
+  inferenceLock = null;
+  inferenceLockResolve = null;
+  if (resolve) resolve();
+}
+
+export function isInferenceRunning(): boolean {
+  return inferenceLock !== null;
+}
 
 // Tool result truncation limits (chars fed back to model)
 const TOOL_RESULT_SMALL_CTX = 1500;
@@ -160,7 +184,10 @@ export async function unloadModel(): Promise<void> {
     try { modelInstance.dispose(); } catch { /* already disposed */ }
     modelInstance = null;
   }
-  llamaInstance = null;
+  if (llamaInstance) {
+    try { await llamaInstance.dispose(); } catch { /* already disposed */ }
+    llamaInstance = null;
+  }
   loadedModelId = null;
   if (wasLoaded) {
     console.log(`[engine] Model unloaded: ${wasLoaded}`);
@@ -174,6 +201,11 @@ export async function unloadModel(): Promise<void> {
 export async function warmupContext(systemPrompt: string): Promise<void> {
   if (!modelInstance || !contextInstance || !sequenceInstance || !activeProfile) return;
 
+  if (!acquireInferenceLock()) {
+    console.warn("[engine] Warmup skipped — inference already running");
+    return;
+  }
+
   const start = Date.now();
   try {
     const { LlamaChatSession } = await import("node-llama-cpp");
@@ -183,9 +215,13 @@ export async function warmupContext(systemPrompt: string): Promise<void> {
     });
     // Generate 1 token to force full system prompt evaluation through the model
     await session.prompt("Hi", { maxTokens: 1 });
+    // Clear the warmup exchange from the sequence so real requests start clean
+    try { sequenceInstance.clearHistory(); } catch { /* method may not exist in all versions */ }
     console.log(`[engine] Context warmup done in ${Date.now() - start}ms`);
   } catch (err) {
     console.warn("[engine] Context warmup failed (non-fatal):", err);
+  } finally {
+    releaseInferenceLock();
   }
 }
 
@@ -278,12 +314,31 @@ export async function runLocalInference(
     throw new Error("No model loaded — download and load a model first");
   }
 
+  if (!acquireInferenceLock()) {
+    onEvent({ type: "error", message: "Another inference is already running. Please wait." });
+    return;
+  }
+
+  try {
+    await _runLocalInferenceInner(messages, tools, onEvent, signal, contextSizeOverride);
+  } finally {
+    releaseInferenceLock();
+  }
+}
+
+async function _runLocalInferenceInner(
+  messages: ChatMessage[],
+  tools: ToolDef[],
+  onEvent: EventCallback,
+  signal?: AbortSignal,
+  contextSizeOverride?: number,
+): Promise<void> {
   // If user requested a different context size, resize on-the-fly
-  if (contextSizeOverride && contextSizeOverride !== (contextInstance.contextSize ?? activeProfile.contextSize)) {
+  if (contextSizeOverride && contextSizeOverride !== (contextInstance!.contextSize ?? activeProfile!.contextSize)) {
     await resizeContext(contextSizeOverride);
   }
 
-  const profile = activeProfile;
+  const profile = activeProfile!;
   const { LlamaChatSession, defineChatSessionFunction } = await import("node-llama-cpp");
 
   // Extract system prompt
@@ -503,7 +558,7 @@ export async function runLocalInference(
   }
 
   try {
-    const response = await session.prompt(fullPrompt, {
+    await session.prompt(fullPrompt, {
       functions: Object.keys(functions).length > 0 ? functions : undefined,
       maxTokens: profile.contextSize,
       stopOnAbortSignal: true,
@@ -528,7 +583,7 @@ export async function runLocalInference(
 
     // Emit context usage stats — estimate total tokens in context window.
     // Includes system prompt, tool definitions, conversation history, and generated tokens.
-    const contextMax = contextInstance.contextSize ?? activeProfile.contextSize;
+    const contextMax = contextInstance?.contextSize ?? profile.contextSize;
     const toolDefsText = tools.map((t) =>
       `${t.function.name}: ${t.function.description} ${JSON.stringify(t.function.parameters)}`
     ).join("\n");
