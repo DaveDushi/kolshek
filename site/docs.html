@@ -833,6 +833,43 @@ kolshek db schema transactions --json</code></pre></div>
       <section id="changelog" class="docs-section">
         <h1 class="docs-h1">Changelog</h1>
 
+        <h2 class="docs-h2">v0.4.0</h2>
+        <h3 class="docs-h3">Features</h3>
+        <ul class="docs-ul">
+          <li><strong>AI chat agent</strong> &mdash; Talk to your financial data in the dashboard using a local LLM. Download and run GGUF models (Qwen, Gemma, Llama) with Vulkan/CUDA/CPU auto-detection &mdash; no cloud API keys required. The agent can query your database, run CLI commands, search transactions, analyze spending, and load domain-specific skills, all with real-time streaming, markdown rendering, and tool call visualization.</li>
+          <li><strong>AI model management</strong> &mdash; Download, switch, and configure models from the dashboard. Tier-based inference profiles automatically scale context window, available tools, and iteration limits to match model capability. Toggle thinking mode and resize context per-session.</li>
+          <li><strong>Sync cancellation</strong> &mdash; Cancel in-progress bank syncs from the dashboard.</li>
+          <li><strong>Category rules from transactions</strong> &mdash; Create categorization rules directly from individual transactions.</li>
+          <li><strong>Translation pagination</strong> &mdash; Server-side pagination for translation rule lists.</li>
+          <li><strong>Currency normalization</strong> &mdash; Automatically normalize currency symbols to ISO 4217 codes during sync.</li>
+        </ul>
+
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li><strong>Aborted stream handling</strong> &mdash; Properly handle aborted SSE streams and filter empty assistant messages that caused the LLM to loop on tool calls.</li>
+          <li><strong>Stale chat history</strong> &mdash; Fixed race condition where rapid messages during active streaming would send incomplete conversation history to the model.</li>
+        </ul>
+
+        <h3 class="docs-h3">Security</h3>
+        <ul class="docs-ul">
+          <li><strong>SQL injection hardening</strong> &mdash; Block write keywords (INSERT, UPDATE, DELETE, DROP, etc.) even inside CTEs that bypass the read-only prefix check. Secondary defense via <code class="docs-code">columnNames</code> check retained.</li>
+          <li><strong>Subprocess credential isolation</strong> &mdash; Subprocess environment uses a denylist to strip secrets (API keys, tokens, passwords, cloud credentials) while keeping system vars needed for module resolution.</li>
+          <li><strong>Subprocess timeout</strong> &mdash; CLI commands spawned by the agent are killed after 60 seconds to prevent hung processes from blocking inference indefinitely.</li>
+          <li><strong>Inference concurrency lock</strong> &mdash; Prevents concurrent access to the shared LLM sequence/context singletons, avoiding KV cache corruption and native crashes.</li>
+          <li><strong>Context warmup isolation</strong> &mdash; Warmup exchanges are cleared from the sequence after completion and gated behind the inference lock to prevent overlap with real requests.</li>
+          <li><strong>GPU memory leak fix</strong> &mdash; Properly dispose the native Vulkan/CUDA runtime (<code class="docs-code">llamaInstance</code>) on model unload &mdash; was previously only nulled, leaking GPU memory on every model switch.</li>
+          <li><strong>Windows device name guard</strong> &mdash; Block reserved device names (CON, NUL, PRN, AUX, COM0-9, LPT0-9) in config file path validation to prevent hang-on-read DoS.</li>
+        </ul>
+
+        <h3 class="docs-h3">Other</h3>
+        <ul class="docs-ul">
+          <li>Removed underperforming local models from the registry.</li>
+          <li>Added email/GitHub fields and OS tracking to the issue feedback form.</li>
+          <li>Added uninstall command documentation.</li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
         <h2 class="docs-h2">v0.3.10</h2>
         <h3 class="docs-h3">Features</h3>
         <ul class="docs-ul">
