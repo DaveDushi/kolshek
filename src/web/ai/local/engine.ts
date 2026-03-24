@@ -406,8 +406,8 @@ async function _runLocalInferenceInner(
     const toolName = tool.function.name;
     functions[toolName] = defineChatSessionFunction({
       description: tool.function.description,
-      params: tool.function.parameters,
-      async handler(params: Record<string, unknown>) {
+      params: tool.function.parameters as any,
+      handler: (async (params: Record<string, unknown>) => {
         const callId = `local_${++toolCallCounter}`;
 
         // Duplicate detection — small models loop on the same call
@@ -455,7 +455,7 @@ async function _runLocalInferenceInner(
 
         // Return parsed result — node-llama-cpp stringifies it for the model
         try { return JSON.parse(trimmed); } catch { return trimmed; }
-      },
+      }) as any,
     });
   }
 
