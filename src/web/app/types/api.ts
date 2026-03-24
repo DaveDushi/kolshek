@@ -217,6 +217,36 @@ export interface Insight {
   amount?: number;
 }
 
+// Schedule & sync history types
+export interface ScheduleInfo {
+  registered: boolean;
+  intervalHours?: number;
+  registeredAt?: string;
+  nextRunAt?: string;
+  platform?: string;
+}
+
+export interface SyncLogEntry {
+  id: number;
+  providerId: number;
+  providerAlias: string;
+  providerDisplayName: string;
+  startedAt: string;
+  completedAt: string | null;
+  status: "success" | "error";
+  transactionsAdded: number;
+  transactionsUpdated: number;
+  errorMessage: string | null;
+  scrapeStartDate: string;
+  scrapeEndDate: string | null;
+}
+
+export interface ScheduleData {
+  schedule: ScheduleInfo;
+  syncHistory: SyncLogEntry[];
+  missedRuns: number;
+}
+
 export interface SyncEvent {
   type: "start" | "progress" | "result" | "error" | "done" | "queued";
   provider?: string;

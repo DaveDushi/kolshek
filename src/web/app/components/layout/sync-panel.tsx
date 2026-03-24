@@ -6,6 +6,7 @@ import {
   XCircle,
   Loader2,
   Clock,
+  Square,
 } from "lucide-react";
 import {
   Sheet,
@@ -27,6 +28,7 @@ interface SyncPanelProps {
   events: SyncEvent[];
   isRunning: boolean;
   onRetry: () => void;
+  onCancel?: () => void;
 }
 
 // Derive per-provider status from the flat event stream
@@ -191,6 +193,7 @@ export function SyncPanel({
   events,
   isRunning,
   onRetry,
+  onCancel,
 }: SyncPanelProps) {
   const providers = useMemo(() => deriveProviderStatuses(events), [events]);
 
@@ -255,6 +258,20 @@ export function SyncPanel({
             </div>
           ))}
         </ScrollArea>
+
+        {isRunning && onCancel && (
+          <div className="pt-4 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={onCancel}
+            >
+              <Square className="h-3.5 w-3.5 mr-1.5" />
+              Cancel Sync
+            </Button>
+          </div>
+        )}
 
         {isDone && (
           <div className="pt-4 border-t space-y-3">

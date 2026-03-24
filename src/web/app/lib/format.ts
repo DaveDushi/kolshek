@@ -8,10 +8,11 @@ const ilsFormatter = new Intl.NumberFormat("he-IL", {
 });
 
 export function formatCurrency(amount: number, currency = "ILS"): string {
-  if (currency !== "ILS") {
+  const curr = currency || "ILS";
+  if (curr !== "ILS") {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency,
+      currency: curr,
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(amount);

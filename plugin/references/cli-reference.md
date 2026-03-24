@@ -137,6 +137,11 @@ kolshek dashboard [-p, --port <port>] [--no-open]   # open local settings dashbo
 kolshek update [--check]           # update to latest release; --check only reports without installing
 ```
 
+### Uninstall
+```
+kolshek uninstall [--purge]        # remove KolShek; --purge also removes config, data, and cache
+```
+
 ### Plugin Management
 ```
 kolshek plugin install <tool>      # install AI agent plugin (claude-code, opencode, codex, openclaw)

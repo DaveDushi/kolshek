@@ -1,73 +1,43 @@
-/**
- * Windows Task Scheduler backend.
- * Uses schtasks + XML task definition.
- */
+// Windows Task Scheduler backend.
+// Uses inline schtasks params (no XML) so it works without admin elevation.
 
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { unlink } from "node:fs/promises";
 import type { ScheduleConfig } from "../../types/index.js";
 import type { SchedulerBackend } from "./index.js";
 import { run } from "./index.js";
-import { escapeXml } from "./escape.js";
+import { validateBinaryPath } from "./escape.js";
 
 const TASK_NAME = "KolShek Fetch";
 
-function buildTaskXml(config: ScheduleConfig): string {
-  const interval = `PT${config.intervalHours}H`;
-  const cmd = escapeXml(config.binaryPath);
+// Map intervalHours → schtasks /SC and /MO flags.
+// Supports fractional hours (e.g. 0.5 = 30 min). Uses /SC MINUTE for sub-hour
+// or non-integer-hour intervals, /SC HOURLY for 1–23h, DAILY/WEEKLY for longer.
+function scheduleFlags(hours: number): string[] {
+  const totalMinutes = Math.round(hours * 60);
+  if (hours >= 168) return ["/SC", "WEEKLY"];
+  if (hours >= 24 && Number.isInteger(hours / 24)) return ["/SC", "DAILY", "/MO", String(Math.round(hours / 24))];
+  // Use MINUTE for sub-hour or fractional-hour intervals (max 1439)
+  if (!Number.isInteger(hours) || hours < 1) return ["/SC", "MINUTE", "/MO", String(totalMinutes)];
+  return ["/SC", "HOURLY", "/MO", String(hours)];
+}
 
-  return `<?xml version="1.0" encoding="UTF-16"?>
-<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <Settings>
-    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
-    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
-    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
-    <StartWhenAvailable>true</StartWhenAvailable>
-    <RunOnlyIfNetworkAvailable>true</RunOnlyIfNetworkAvailable>
-    <ExecutionTimeLimit>PT1H</ExecutionTimeLimit>
-    <AllowHardTerminate>true</AllowHardTerminate>
-    <Hidden>false</Hidden>
-  </Settings>
-  <Triggers>
-    <TimeTrigger>
-      <StartBoundary>${new Date().toISOString().replace(/\.\d{3}Z$/, "")}</StartBoundary>
-      <Enabled>true</Enabled>
-      <Repetition>
-        <Interval>${interval}</Interval>
-        <StopAtDurationEnd>false</StopAtDurationEnd>
-      </Repetition>
-    </TimeTrigger>
-    <LogonTrigger>
-      <Enabled>true</Enabled>
-      <Delay>PT5M</Delay>
-    </LogonTrigger>
-  </Triggers>
-  <Actions Context="Author">
-    <Exec>
-      <Command>${cmd}</Command>
-      <Arguments>fetch --non-interactive</Arguments>
-    </Exec>
-  </Actions>
-</Task>`;
+// Format current time as HH:MM for /ST flag
+function nowHHMM(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 const backend: SchedulerBackend = {
   async register(config: ScheduleConfig): Promise<void> {
-    // Write XML to temp file
-    const xmlPath = join(tmpdir(), `kolshek-task-${Date.now()}.xml`);
-    await Bun.write(xmlPath, buildTaskXml(config));
-
-    try {
-      await run([
-        "schtasks", "/Create",
-        "/TN", TASK_NAME,
-        "/XML", xmlPath,
-        "/F", // force overwrite if exists
-      ]);
-    } finally {
-      try { await unlink(xmlPath); } catch { /* ignore cleanup errors */ }
-    }
+    const safePath = validateBinaryPath(config.binaryPath);
+    const tr = `"${safePath}" fetch --non-interactive`;
+    await run([
+      "schtasks", "/Create",
+      "/TN", TASK_NAME,
+      ...scheduleFlags(config.intervalHours),
+      "/TR", tr,
+      "/ST", nowHHMM(),
+      "/F", // overwrite if exists
+    ]);
   },
 
   async unregister(): Promise<void> {

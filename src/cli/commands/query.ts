@@ -44,6 +44,11 @@ function validateSql(sql: string): string | null {
     return "Only read-only queries (SELECT, WITH, EXPLAIN) are allowed";
   }
 
+  // Block DML keywords anywhere in the query body (defense-in-depth for CTEs like WITH ... DELETE)
+  if (/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|ATTACH|DETACH|REPLACE)\b/i.test(cleaned)) {
+    return "Write operations (INSERT, UPDATE, DELETE, DROP, etc.) are not allowed";
+  }
+
   // Block mutating PRAGMAs — only allow known safe read-only ones.
   // Any PRAGMA with '=' is a setter (mutation), always block it.
   if (/^\s*PRAGMA\b/i.test(cleaned)) {

@@ -4,7 +4,7 @@ description: Translate Hebrew transaction descriptions to English for better rea
 compatibility: Requires KolShek CLI (kolshek) installed and configured with at least one provider.
 metadata:
   author: kolshek
-  version: "0.3.8"
+  version: "0.3.10"
 allowed-tools: Bash Read AskUserQuestion
 ---
 

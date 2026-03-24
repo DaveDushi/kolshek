@@ -24,8 +24,10 @@ export const queryKeys = {
   },
   translations: {
     all: ["translations"] as const,
-    untranslated: () => [...queryKeys.translations.all, "untranslated"] as const,
-    translated: () => [...queryKeys.translations.all, "translated"] as const,
+    untranslated: (params?: Record<string, unknown>) =>
+      [...queryKeys.translations.all, "untranslated", params ?? null] as const,
+    translated: (params?: Record<string, unknown>) =>
+      [...queryKeys.translations.all, "translated", params ?? null] as const,
     rules: () => [...queryKeys.translations.all, "rules"] as const,
   },
   reports: {
@@ -51,6 +53,10 @@ export const queryKeys = {
       [...queryKeys.trends.all, "category", cat, months, exclude ?? null] as const,
     fixedVariable: (months: number, exclude?: string[]) =>
       [...queryKeys.trends.all, "fixed-variable", months, exclude ?? null] as const,
+  },
+  schedule: {
+    all: ["schedule"] as const,
+    status: () => [...queryKeys.schedule.all, "status"] as const,
   },
   insights: {
     all: ["insights"] as const,

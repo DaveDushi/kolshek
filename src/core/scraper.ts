@@ -58,6 +58,7 @@ export interface ScrapeOptions {
   onProgress?: (type: string) => void;
   browser?: Browser;
   scraperOptions?: Partial<ScraperOptions>;
+  signal?: AbortSignal;
 }
 
 export interface ScrapeResult {
@@ -152,6 +153,7 @@ export async function scrapeProvider(
     chromePath,
     onProgress,
     scraperOptions,
+    signal,
   } = options;
 
   const companyType =
@@ -171,8 +173,26 @@ export async function scrapeProvider(
   let context: Awaited<ReturnType<Browser["createBrowserContext"]>> | null =
     null;
 
+  // Abort handler — hoisted so it's accessible in finally for cleanup
+  const onAbort = () => {
+    context?.close().catch(() => {});
+  };
+
   try {
+    // Check if already cancelled before creating context
+    if (signal?.aborted) {
+      return {
+        success: false,
+        accounts: [],
+        error: "Sync cancelled",
+        errorType: "CANCELLED",
+      };
+    }
+
     context = await browser.createBrowserContext();
+
+    // Register abort handler to close context and stop scraping
+    signal?.addEventListener("abort", onAbort, { once: true });
 
     // Inject fetch throttling for providers prone to bot detection
     if (THROTTLED_PROVIDERS.has(companyId)) {
@@ -220,6 +240,16 @@ export async function scrapeProvider(
 
     return { success: true, accounts };
   } catch (err) {
+    // If cancelled, return a clean cancellation result instead of the error
+    // from the forcefully-closed browser context
+    if (signal?.aborted) {
+      return {
+        success: false,
+        accounts: [],
+        error: "Sync cancelled",
+        errorType: "CANCELLED",
+      };
+    }
     const message = sanitizeErrorMessage(
       err instanceof Error ? err.message : String(err),
       credentials,
@@ -231,6 +261,8 @@ export async function scrapeProvider(
       errorType: "GENERAL_ERROR",
     };
   } finally {
+    // Remove abort listener to avoid leaks (context may already be closed by onAbort)
+    signal?.removeEventListener("abort", onAbort);
     if (context) {
       await context.close().catch(() => {});
     }

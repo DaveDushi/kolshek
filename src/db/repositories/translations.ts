@@ -99,23 +99,47 @@ export interface UntranslatedGroup {
   totalAmount: number;
 }
 
-export function listUntranslatedGrouped(): UntranslatedGroup[] {
+export function listUntranslatedGrouped(
+  options?: { limit?: number; offset?: number },
+): { groups: UntranslatedGroup[]; total: number } {
   const db = getDatabase();
-  const rows = db
+
+  const totalRow = db
     .prepare(
-      `SELECT description, COUNT(*) AS count, SUM(ABS(charged_amount)) AS total_amount
+      `SELECT COUNT(DISTINCT description) AS total FROM transactions WHERE description_en IS NULL`,
+    )
+    .get() as { total: number };
+
+  let sql = `SELECT description, COUNT(*) AS count, SUM(ABS(charged_amount)) AS total_amount
        FROM transactions
        WHERE description_en IS NULL
        GROUP BY description
-       ORDER BY count DESC, total_amount DESC`,
-    )
-    .all() as Array<{ description: string; count: number; total_amount: number }>;
+       ORDER BY count DESC, total_amount DESC`;
 
-  return rows.map((r) => ({
-    description: r.description,
-    count: r.count,
-    totalAmount: r.total_amount,
-  }));
+  const params: Record<string, string | number> = {};
+  if (options?.limit) {
+    sql += ` LIMIT $limit`;
+    params.$limit = options.limit;
+    if (options.offset) {
+      sql += ` OFFSET $offset`;
+      params.$offset = options.offset;
+    }
+  }
+
+  const rows = db.prepare(sql).all(params) as Array<{
+    description: string;
+    count: number;
+    total_amount: number;
+  }>;
+
+  return {
+    groups: rows.map((r) => ({
+      description: r.description,
+      count: r.count,
+      totalAmount: r.total_amount,
+    })),
+    total: totalRow.total,
+  };
 }
 
 // Translate all transactions matching a Hebrew description
@@ -140,24 +164,61 @@ export interface TranslatedGroup {
   totalAmount: number;
 }
 
-export function listTranslatedGrouped(): TranslatedGroup[] {
+export function listTranslatedGrouped(
+  options?: { limit?: number; offset?: number; search?: string },
+): { groups: TranslatedGroup[]; total: number } {
   const db = getDatabase();
-  const rows = db
-    .prepare(
-      `SELECT description, description_en, COUNT(*) AS count, SUM(ABS(charged_amount)) AS total_amount
-       FROM transactions
-       WHERE description_en IS NOT NULL
-       GROUP BY description, description_en
-       ORDER BY count DESC, total_amount DESC`,
-    )
-    .all() as Array<{ description: string; description_en: string; count: number; total_amount: number }>;
 
-  return rows.map((r) => ({
-    description: r.description,
-    descriptionEn: r.description_en,
-    count: r.count,
-    totalAmount: r.total_amount,
-  }));
+  const whereClauses = [`description_en IS NOT NULL`];
+  const params: Record<string, string | number> = {};
+
+  if (options?.search) {
+    const pattern = `%${escapeLike(options.search)}%`;
+    whereClauses.push(`(description LIKE $search ESCAPE '\\' OR description_en LIKE $search ESCAPE '\\')`);
+    params.$search = pattern;
+  }
+
+  const where = whereClauses.join(" AND ");
+
+  const totalRow = db
+    .prepare(
+      `SELECT COUNT(*) AS total FROM (
+         SELECT 1 FROM transactions WHERE ${where} GROUP BY description, description_en
+       )`,
+    )
+    .get(params) as { total: number };
+
+  let sql = `SELECT description, description_en, COUNT(*) AS count, SUM(ABS(charged_amount)) AS total_amount
+       FROM transactions
+       WHERE ${where}
+       GROUP BY description, description_en
+       ORDER BY count DESC, total_amount DESC`;
+
+  if (options?.limit) {
+    sql += ` LIMIT $limit`;
+    params.$limit = options.limit;
+    if (options.offset) {
+      sql += ` OFFSET $offset`;
+      params.$offset = options.offset;
+    }
+  }
+
+  const rows = db.prepare(sql).all(params) as Array<{
+    description: string;
+    description_en: string;
+    count: number;
+    total_amount: number;
+  }>;
+
+  return {
+    groups: rows.map((r) => ({
+      description: r.description,
+      descriptionEn: r.description_en,
+      count: r.count,
+      totalAmount: r.total_amount,
+    })),
+    total: totalRow.total,
+  };
 }
 
 // Update translation for all transactions matching a Hebrew description (overwrites existing)

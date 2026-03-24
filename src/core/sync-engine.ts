@@ -107,6 +107,8 @@ export interface SyncOptions {
   stealth?: boolean;
   /** Show the browser window (non-headless) */
   visible?: boolean;
+  /** Abort signal for cancellation */
+  signal?: AbortSignal;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +172,7 @@ export async function syncProviders(
       concurrency,
       (provider) =>
         syncSingleProvider(provider, config, chromePath, browser, options),
+      options?.signal,
     );
 
     const totalAdded = results.reduce((s, r) => s + r.transactionsAdded, 0);
@@ -206,6 +209,20 @@ async function syncSingleProvider(
       transactionsAdded: 0,
       transactionsUpdated: 0,
       error: `Unknown provider: ${companyId}`,
+      durationMs: Date.now() - startTime,
+    };
+  }
+
+  // Check for cancellation before starting
+  if (syncOptions?.signal?.aborted) {
+    return {
+      companyId,
+      alias,
+      success: false,
+      accountsFound: 0,
+      transactionsAdded: 0,
+      transactionsUpdated: 0,
+      error: "Sync cancelled",
       durationMs: Date.now() - startTime,
     };
   }
@@ -258,6 +275,7 @@ async function syncSingleProvider(
         scraperOptions: {
           timeout: 120000, // 2 minutes max per navigation
         },
+        signal: syncOptions?.signal,
       });
     } catch (err) {
       const errMsg = sanitizeErrorMessage(
@@ -426,11 +444,15 @@ async function runWithConcurrency<T, R>(
   items: T[],
   concurrency: number,
   fn: (item: T) => Promise<R>,
+  signal?: AbortSignal,
 ): Promise<R[]> {
   const results = new Array<R>(items.length);
   const executing: Set<Promise<void>> = new Set();
 
   for (let i = 0; i < items.length; i++) {
+    // Skip remaining items if cancelled
+    if (signal?.aborted) break;
+
     const index = i;
     const p = fn(items[index]).then((result) => {
       results[index] = result;

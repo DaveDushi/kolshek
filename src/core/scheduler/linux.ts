@@ -8,7 +8,7 @@ import { mkdir, unlink } from "node:fs/promises";
 import type { ScheduleConfig } from "../../types/index.js";
 import type { SchedulerBackend } from "./index.js";
 import { run } from "./index.js";
-import { shellQuote, systemdEscape } from "./escape.js";
+import { shellQuote, systemdEscape, validateBinaryPath } from "./escape.js";
 
 const UNIT_NAME = "kolshek-fetch";
 const SYSTEMD_DIR = join(homedir(), ".config", "systemd", "user");
@@ -32,7 +32,7 @@ Description=KolShek fetch timer
 
 [Timer]
 OnBootSec=5min
-OnUnitActiveSec=${config.intervalHours}h
+OnUnitActiveSec=${Math.round(config.intervalHours * 60)}min
 Persistent=true
 
 [Install]
@@ -97,7 +97,11 @@ async function cronRegister(config: ScheduleConfig): Promise<void> {
   const existing = await getCrontab();
   // Remove existing kolshek entry if any
   const lines = existing.split("\n").filter((l) => !l.includes(CRON_MARKER));
-  const cronExpr = `0 */${config.intervalHours} * * *`;
+  // Cron only supports integer hour intervals; for sub-hour use minute intervals
+  const totalMin = Math.round(config.intervalHours * 60);
+  const cronExpr = totalMin < 60
+    ? `*/${totalMin} * * * *`
+    : `0 */${Math.max(1, Math.round(config.intervalHours))} * * *`;
   lines.push(`${cronExpr} ${shellQuote(config.binaryPath)} fetch --non-interactive ${CRON_MARKER}`);
   const newCrontab = lines.filter((l) => l.trim()).join("\n") + "\n";
   await run(["crontab", "-"], newCrontab);
@@ -121,6 +125,7 @@ async function cronIsRegistered(): Promise<boolean> {
 
 const backend: SchedulerBackend = {
   async register(config: ScheduleConfig): Promise<void> {
+    validateBinaryPath(config.binaryPath);
     if (await hasSystemd()) {
       await systemdRegister(config);
     } else {

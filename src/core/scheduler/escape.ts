@@ -21,3 +21,13 @@ export function shellQuote(s: string): string {
 export function systemdEscape(s: string): string {
   return '"' + s.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
 }
+
+// Validate a binary path for use in OS scheduler commands.
+// Rejects control characters and cmd.exe/shell metacharacters that could
+// allow command injection when the path is embedded in a scheduled task.
+export function validateBinaryPath(p: string): string {
+  if (!p || typeof p !== "string") throw new Error("binaryPath is required");
+  if (/[\n\r\0]/.test(p)) throw new Error("binaryPath contains control characters");
+  if (/[&|><^%!`$]/.test(p)) throw new Error("binaryPath contains unsafe shell characters");
+  return p;
+}

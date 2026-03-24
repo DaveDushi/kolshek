@@ -6,6 +6,7 @@ import {
   useTranslate,
 } from "@/hooks/use-translations";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Pagination } from "@/components/shared/pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,8 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const DEFAULT_PAGE_SIZE = 25;
+
 // Per-row state for the translation input
 interface RowState {
   englishName: string;
@@ -26,8 +29,17 @@ interface RowState {
 }
 
 export function UntranslatedList() {
-  const { data: groups, isLoading } = useUntranslated();
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [page, setPage] = useState(1);
+
+  const { data, isLoading } = useUntranslated({
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+  });
   const translate = useTranslate();
+
+  const groups = data?.groups ?? [];
+  const total = data?.total ?? 0;
 
   // Track input state per description
   const [rowStates, setRowStates] = useState<Record<string, RowState>>({});
@@ -65,6 +77,12 @@ export function UntranslatedList() {
     );
   }
 
+  const handlePageChange = useCallback((p: number) => setPage(p), []);
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    setPage(1);
+  }, []);
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -74,7 +92,7 @@ export function UntranslatedList() {
     );
   }
 
-  if (!groups || groups.length === 0) {
+  if (total === 0) {
     return (
       <EmptyState
         icon={<Languages />}
@@ -88,7 +106,7 @@ export function UntranslatedList() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Untranslated Descriptions</h3>
-        <Badge variant="secondary">{groups.length} remaining</Badge>
+        <Badge variant="secondary">{total} remaining</Badge>
       </div>
 
       <Table>
@@ -159,6 +177,14 @@ export function UntranslatedList() {
           })}
         </TableBody>
       </Table>
+
+      <Pagination
+        total={total}
+        pageSize={pageSize}
+        currentPage={page}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+      />
     </div>
   );
 }
