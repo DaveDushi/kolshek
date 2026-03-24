@@ -103,6 +103,49 @@ export function getLatestCompletedSyncLog(providerId: number): SyncLog | null {
   return row ? rowToSyncLog(row) : null;
 }
 
+// Extended row type for JOINed queries
+interface SyncLogWithProviderRow extends SyncLogRow {
+  provider_alias: string;
+  provider_display_name: string;
+}
+
+export interface SyncLogWithProvider extends SyncLog {
+  providerAlias: string;
+  providerDisplayName: string;
+}
+
+export function listRecentSyncLogs(limit = 20): SyncLogWithProvider[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT sl.*, p.alias AS provider_alias, p.display_name AS provider_display_name
+       FROM sync_log sl
+       LEFT JOIN providers p ON p.id = sl.provider_id
+       WHERE sl.status != 'running'
+       ORDER BY sl.started_at DESC
+       LIMIT $limit`,
+    )
+    .all({ $limit: limit }) as SyncLogWithProviderRow[];
+
+  return rows.map((row) => ({
+    ...rowToSyncLog(row),
+    providerAlias: row.provider_alias ?? "unknown",
+    providerDisplayName: row.provider_display_name ?? "Unknown",
+  }));
+}
+
+// Count completed sync logs since a given date (for missed-run detection)
+export function countSyncLogsSince(since: string): number {
+  const db = getDatabase();
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS cnt FROM sync_log
+       WHERE started_at >= $since AND status != 'running'`,
+    )
+    .get({ $since: since }) as { cnt: number };
+  return row.cnt;
+}
+
 // Count consecutive recent failures (from newest sync backward, stopping at first success)
 export function countConsecutiveFailures(providerId: number): number {
   const db = getDatabase();

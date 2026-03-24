@@ -325,8 +325,10 @@ export async function getCredentials(
   try {
     const encoded = await keychainRead(target);
     if (encoded) return decodePayload(encoded);
-  } catch {
-    // Keychain failed — fall through to file
+  } catch (err) {
+    // Keychain read failed — warn so users can diagnose, then fall through to file backend
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[keychain] Read failed for "${target}" (${msg}). Falling back to credential file.`);
   }
 
   // Credentials file (fallback)

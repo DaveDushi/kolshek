@@ -2,10 +2,9 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { Tags, Plus } from "lucide-react";
+import { Tags } from "lucide-react";
 import {
   useCategorySummary,
-  useApplyCategoryRules,
   useClassificationMap,
 } from "@/hooks/use-categories";
 import { PageHeader } from "@/components/shared/page-header";
@@ -15,7 +14,6 @@ import { TriageInbox } from "@/components/categories/triage-inbox";
 import { RulesTable } from "@/components/categories/rules-table";
 import { RuleBuilder } from "@/components/categories/rule-builder";
 import { ClassificationPanel } from "@/components/categories/classification-panel";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,7 +26,6 @@ export function CategoriesPage() {
 
   const { data: categories, isLoading } = useCategorySummary();
   const { data: classificationMap } = useClassificationMap();
-  const applyRules = useApplyCategoryRules();
 
   function handleSelectCategory(cat: string) {
     setSearchParams({ cat });
@@ -36,16 +33,7 @@ export function CategoriesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Categories" description="Organize and categorize your transactions">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => applyRules.mutate()}
-          disabled={applyRules.isPending}
-        >
-          {applyRules.isPending ? "Applying..." : "Apply Rules"}
-        </Button>
-      </PageHeader>
+      <PageHeader title="Categories" description="Organize and categorize your transactions" />
 
       {isLoading && (
         <div className="flex gap-6">
@@ -101,17 +89,7 @@ export function CategoriesPage() {
 
             {/* Rules section */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div />
-                <Button
-                  size="sm"
-                  onClick={() => setRuleBuilderOpen(true)}
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Rule
-                </Button>
-              </div>
-              <RulesTable />
+              <RulesTable onAddRule={() => setRuleBuilderOpen(true)} />
             </div>
           </div>
         </div>

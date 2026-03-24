@@ -167,5 +167,28 @@ export function useSync() {
     processQueue(options);
   }, [processQueue]);
 
-  return { events, isRunning, start };
+  const cancel = useCallback(async () => {
+    // Abort client-side SSE stream
+    abortRef.current?.abort();
+    // Clear the queue so no more syncs run after cancellation
+    queueRef.current = [];
+    // Tell server to abort the in-progress sync
+    try {
+      await fetch("/api/v2/fetch/cancel", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // ignore — sync may already be done
+    }
+    setEvents((prev) => [
+      ...prev,
+      { type: "error", error: "Sync cancelled" },
+    ]);
+    runningRef.current = false;
+    setIsRunning(false);
+    queryClient.invalidateQueries();
+  }, [queryClient]);
+
+  return { events, isRunning, start, cancel };
 }

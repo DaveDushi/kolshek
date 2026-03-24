@@ -14,6 +14,7 @@ import { TranslationsPage } from "./pages/translations-page";
 import { ProvidersPage } from "./pages/providers-page";
 import { ImportPage } from "./pages/import-page";
 import { ReconcilePage } from "./pages/reconcile-page";
+import { SchedulePage } from "./pages/schedule-page";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,6 +47,7 @@ export function App() {
                 <Route path="/providers" element={<ProvidersPage />} />
                 <Route path="/import" element={<ImportPage />} />
                 <Route path="/reconcile" element={<ReconcilePage />} />
+                <Route path="/schedule" element={<SchedulePage />} />
               </Routes>
             </ErrorBoundary>
           </AppShell>

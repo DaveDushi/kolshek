@@ -464,7 +464,7 @@ describe("sync log", () => {
   });
 
   it("creates a running sync log entry", () => {
-    const log = createSyncLog(providerId, "2025-11-01");
+    const log = createSyncLog(providerId, "2025-11-01", "2025-11-30");
     expect(log.id).toBeDefined();
     expect(log.providerId).toBe(providerId);
     expect(log.status).toBe("running");
@@ -473,7 +473,7 @@ describe("sync log", () => {
   });
 
   it("completes a sync log as success", () => {
-    const log = createSyncLog(providerId, "2025-12-01");
+    const log = createSyncLog(providerId, "2025-12-01", "2025-12-31");
     completeSyncLog(log.id, "success", 10, 2);
 
     const last = getLastSuccessfulSync(providerId);
@@ -486,7 +486,7 @@ describe("sync log", () => {
   });
 
   it("completes a sync log as error", () => {
-    const log = createSyncLog(providerId, "2025-12-10");
+    const log = createSyncLog(providerId, "2025-12-10", "2025-12-31");
     completeSyncLog(log.id, "error", 0, 0, "Connection timeout");
 
     // The last *successful* sync should still be the previous one
@@ -663,15 +663,14 @@ describe("listCategoriesWithSource", () => {
 
     // Entertainment was added as a rule (match: Netflix) and Netflix has a transaction
     const entertainment = categories.find((c) => c.category === "Entertainment");
-    if (entertainment) {
-      expect(entertainment.ruleCount).toBeGreaterThanOrEqual(1);
-    }
+    expect(entertainment).toBeDefined();
+    expect(entertainment!.ruleCount).toBeGreaterThanOrEqual(1);
 
     // Transport was added as rules only (no transactions categorized as Transport)
     const transport = categories.find((c) => c.category === "Transport");
-    if (transport && transport.transactionCount === 0) {
-      expect(transport.source).toBe("rules");
-    }
+    expect(transport).toBeDefined();
+    expect(transport!.transactionCount).toBe(0);
+    expect(transport!.source).toBe("rules");
   });
 });
 

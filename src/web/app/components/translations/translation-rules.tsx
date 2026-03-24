@@ -1,6 +1,7 @@
 // Table of translation rules with add and delete actions
 import { useState } from "react";
 import { Trash2, Plus, Play, BookOpen } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   useTranslationRules,
   useAddTranslationRule,
@@ -140,36 +141,38 @@ export function TranslationRules() {
       )}
 
       {rules && rules.length > 0 && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Hebrew Pattern</TableHead>
-              <TableHead>English Name</TableHead>
-              <TableHead className="w-16">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rules.map((rule) => (
-              <TableRow key={rule.id}>
-                <TableCell dir="rtl" className="font-medium text-right">
-                  {rule.matchPattern}
-                </TableCell>
-                <TableCell>{rule.englishName}</TableCell>
-                <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeRule.mutate(rule.id)}
-                    disabled={removeRule.isPending}
-                    aria-label={`Delete rule for ${rule.englishName}`}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </TableCell>
+        <ScrollArea className="max-h-[400px]">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Hebrew Pattern</TableHead>
+                <TableHead>English Name</TableHead>
+                <TableHead className="w-16">Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {rules.map((rule) => (
+                <TableRow key={rule.id}>
+                  <TableCell dir="rtl" className="font-medium text-right">
+                    {rule.matchPattern}
+                  </TableCell>
+                  <TableCell>{rule.englishName}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeRule.mutate(rule.id)}
+                      disabled={removeRule.isPending}
+                      aria-label={`Delete rule for ${rule.englishName}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </ScrollArea>
       )}
     </div>
   );

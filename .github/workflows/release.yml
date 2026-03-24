@@ -46,6 +46,11 @@ jobs:
           bun scripts/generate-web-embed.ts
           bun scripts/generate-plugin-embed.ts
 
+      - name: Run tests and type check
+        run: |
+          bun run typecheck
+          bun test
+
       - run: bun build ./src/cli/index.ts --compile --target=${{ matrix.target }} --outfile dist/${{ matrix.artifact }}
 
       - uses: actions/upload-artifact@v5

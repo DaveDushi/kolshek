@@ -1,6 +1,7 @@
 // Dialog for creating a category rule using sentence-style UI
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAddCategoryRule, useCategoryList } from "@/hooks/use-categories";
+import { useBalanceReport } from "@/hooks/use-accounts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +20,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { CircleHelp } from "lucide-react";
 import type { RuleConditions } from "@/types/api";
 
 interface RuleBuilderProps {
@@ -45,6 +53,7 @@ interface Condition {
 
 export function RuleBuilder({ open, onClose, prefill }: RuleBuilderProps) {
   const { data: categoryList } = useCategoryList();
+  const { data: accounts } = useBalanceReport();
   const addRule = useAddCategoryRule();
 
   // Primary condition
@@ -55,6 +64,13 @@ export function RuleBuilder({ open, onClose, prefill }: RuleBuilderProps) {
       pattern: prefill?.description ?? "",
     },
   ]);
+
+  // Sync prefill when dialog opens with new prefill data
+  useEffect(() => {
+    if (open && prefill?.description) {
+      setConditions([{ field: "description", mode: "substring", pattern: prefill.description }]);
+    }
+  }, [open, prefill?.description]);
 
   // Additional filters
   const [direction, setDirection] = useState<"" | "debit" | "credit">("");
@@ -225,7 +241,20 @@ export function RuleBuilder({ open, onClose, prefill }: RuleBuilderProps) {
           {/* Additional filters */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Direction</Label>
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                Direction
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <CircleHelp className="h-3.5 w-3.5 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[220px]">
+                      <p>Debit = money out (expenses)</p>
+                      <p>Credit = money in (income/refunds)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </Label>
               <Select
                 value={direction}
                 onValueChange={(v) => setDirection(v as "" | "debit" | "credit")}
@@ -242,11 +271,22 @@ export function RuleBuilder({ open, onClose, prefill }: RuleBuilderProps) {
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Account</Label>
-              <Input
+              <Select
                 value={account}
-                onChange={(e) => setAccount(e.target.value)}
-                placeholder="Account number"
-              />
+                onValueChange={(v) => setAccount(v === "any" ? "" : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Any" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any</SelectItem>
+                  {accounts?.map((a) => (
+                    <SelectItem key={`${a.providerAlias}-${a.accountNumber}`} value={a.accountNumber}>
+                      {a.providerAlias} · {a.accountNumber}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Min Amount</Label>
@@ -294,7 +334,19 @@ export function RuleBuilder({ open, onClose, prefill }: RuleBuilderProps) {
 
           {/* Priority */}
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Priority</Label>
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+              Priority
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <CircleHelp className="h-3.5 w-3.5 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[240px]">
+                    Higher priority rules are checked first when multiple rules match
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </Label>
             <Select
               value={priority}
               onValueChange={(v) => setPriority(v as Priority)}
@@ -303,9 +355,9 @@ export function RuleBuilder({ open, onClose, prefill }: RuleBuilderProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="low">Low (0)</SelectItem>
-                <SelectItem value="normal">Normal (10)</SelectItem>
-                <SelectItem value="high">High (100)</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="normal">Normal</SelectItem>
+                <SelectItem value="high">High</SelectItem>
               </SelectContent>
             </Select>
           </div>
