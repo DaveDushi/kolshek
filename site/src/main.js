@@ -293,17 +293,23 @@ window.submitFeedback = async function (event) {
   var type = checkedRadio ? checkedRadio.value : "other";
   var title = form.querySelector('[name="title"]').value.trim();
   var details = form.querySelector('[name="details"]').value.trim();
+  var email = (form.querySelector('[name="email"]').value || "").trim();
+  var github = (form.querySelector('[name="github"]').value || "").trim();
 
-  if (!title || !details) return;
+  if (!title || !details || !email) return;
 
   submitBtn.disabled = true;
   submitBtn.innerHTML = "Submitting...";
 
   try {
+    var ua = navigator.userAgent;
+    var os = /Win/.test(ua) ? "Windows" : /Mac/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : /Android/.test(ua) ? "Android" : /iPhone|iPad/.test(ua) ? "iOS" : "Unknown";
+    var payload = { type: type, title: title, details: details, email: email, os: os };
+    if (github) payload.github = github;
     var res = await fetch(WORKER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: type, title: title, details: details }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) throw new Error("Failed to submit");
