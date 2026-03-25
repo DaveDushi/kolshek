@@ -995,8 +995,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             if (!isValidClassification(classification)) {
               return jsonError("INVALID_CLASSIFICATION", "Classification must be lowercase alphanumeric + underscores.");
             }
-            const updated = setCategoryClassification(name, classification);
-            if (!updated) return jsonError("NOT_FOUND", "Category not found.", 404);
+            setCategoryClassification(name, classification);
             return json({ name, classification });
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
