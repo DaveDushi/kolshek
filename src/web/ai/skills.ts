@@ -100,7 +100,15 @@ export async function discoverSkills(): Promise<Skill[]> {
     }
   }
 
-  skillCache = cache;
+  // Merge into existing cache rather than replacing — preserves entries
+  // added by discoverModeSkills() (e.g. cli-reference) across requests
+  if (skillCache) {
+    for (const [name, skill] of cache) {
+      skillCache.set(name, skill);
+    }
+  } else {
+    skillCache = cache;
+  }
   return skills.sort((a, b) => a.name.localeCompare(b.name));
 }
 
