@@ -265,7 +265,9 @@ function parseClassificationParams(
 }
 
 export function startDashboard(port: number): { server: ReturnType<typeof Bun.serve>; token: string } {
-  const allowedOrigins = getAllowedOrigins(port);
+  // allowedOrigins is set after Bun.serve() starts so it uses the actual port
+  // (which may differ from the requested port when port=0 or the port is unavailable).
+  let allowedOrigins: string[] = [];
 
   // Generate a one-time session token — only the CLI user sees this in the terminal.
   // The token is exchanged for an HttpOnly cookie on first visit.
@@ -1470,6 +1472,9 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       }
     },
   });
+
+  // Set allowed origins using the actual port (handles port=0 / fallback).
+  allowedOrigins = getAllowedOrigins(server.port ?? port);
 
   return { server, token: sessionToken };
 }
