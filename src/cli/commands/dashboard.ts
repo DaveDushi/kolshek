@@ -1,28 +1,8 @@
 // kolshek dashboard — starts a local settings dashboard web server.
 
-import { resolve } from "node:path";
 import type { Command } from "commander";
 import { startDashboard } from "../../web/server.js";
 import { info, success, warn } from "../output.js";
-
-// Auto-build the React SPA if dist/app/index.html is missing.
-// Compiled binaries already have it embedded, so this only fires in dev.
-async function ensureDashboardBuilt(): Promise<void> {
-  const distIndex = resolve(import.meta.dir, "../../web/dist/app/index.html");
-  const exists = await Bun.file(distIndex).exists();
-  if (exists) return;
-
-  info("Building dashboard frontend...");
-  const viteConfig = resolve(import.meta.dir, "../../web/app/vite.config.ts");
-  const proc = Bun.spawn(["bun", "--bun", "vite", "build", "--config", viteConfig], {
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const code = await proc.exited;
-  if (code !== 0) {
-    throw new Error(`Dashboard build failed (exit ${code}). Run 'bun run build:web' manually.`);
-  }
-}
 
 export function registerDashboardCommand(program: Command): void {
   program
@@ -32,8 +12,6 @@ export function registerDashboardCommand(program: Command): void {
     .option("--no-open", "Don't auto-open the browser")
     .action(async (opts: { port: string; open: boolean }) => {
       const port = Number(opts.port);
-
-      await ensureDashboardBuilt();
 
       let result: ReturnType<typeof startDashboard>;
       try {
