@@ -272,7 +272,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
   // This file is gitignored and only used for local development.
   try {
     const devSessionPath = resolve(import.meta.dir, "../../.dev-session");
-    Bun.write(devSessionPath, `${cookieName}=${sessionToken}`);
+    Bun.write(devSessionPath, `${cookieName}=${sessionToken}`).catch(() => {});
   } catch {
     // Non-fatal — only needed for Vite dev mode
   }
