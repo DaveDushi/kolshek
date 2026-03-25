@@ -12,6 +12,7 @@ import {
   Upload,
   GitCompareArrows,
   Building2,
+  Bot,
   Clock,
   Sun,
   Moon,
@@ -136,6 +137,12 @@ export function Sidebar() {
         },
         { label: "Import", path: "/import", icon: Upload },
         { label: "Reconcile", path: "/reconcile", icon: GitCompareArrows },
+      ],
+    },
+    {
+      title: "AI",
+      items: [
+        { label: "Agent", path: "/agent", icon: Bot },
       ],
     },
     {

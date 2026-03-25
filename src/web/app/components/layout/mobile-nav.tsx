@@ -13,6 +13,7 @@ import {
   Upload,
   GitCompareArrows,
   Building2,
+  Bot,
   Clock,
   RefreshCw,
   Sun,
@@ -143,6 +144,7 @@ export function MobileNav() {
         ) : null,
     },
     {
+<<<<<<< HEAD
       label: "Import",
       path: "/import",
       icon: Upload,
@@ -151,6 +153,11 @@ export function MobileNav() {
       label: "Reconcile",
       path: "/reconcile",
       icon: GitCompareArrows,
+=======
+      label: "Agent",
+      path: "/agent",
+      icon: Bot,
+>>>>>>> origin/master
     },
     {
       label: "Providers",

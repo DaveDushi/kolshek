@@ -3,9 +3,30 @@
 // Authentication: single-use token in URL → HttpOnly session cookie.
 
 import { resolve } from "node:path";
-import { randomBytes, timingSafeEqual } from "node:crypto";
-import { unlinkSync } from "node:fs";
-import { WEB_FILES } from "./web-files.js";
+import { randomBytes } from "node:crypto";
+import { createAgentStream } from "./ai/stream.js";
+import { buildRunnerContext } from "./ai/agent.js";
+import { discoverSkills, discoverModeSkills, getModeByName, getModeIndex } from "./ai/skills.js";
+import { loadAiConfig, saveAiConfig } from "./ai/config.js";
+import type { AgentChatRequest } from "./ai/types.js";
+import { detectHardware } from "./ai/local/hardware.js";
+import {
+  getModelStatuses,
+  downloadModel,
+  cancelDownload,
+  deleteModel,
+  MODEL_REGISTRY,
+} from "./ai/local/models.js";
+import {
+  loadModel,
+  unloadModel,
+  isModelLoaded,
+  getLoadedModelId,
+  getLoadedModelInfo,
+  getActiveTools,
+  getContextBounds,
+  warmupContext,
+} from "./ai/local/engine.js";
 import {
   listProviders,
   createProvider,
@@ -111,28 +132,40 @@ import type { TransactionFilters } from "../types/transaction.js";
 // Track active fetch so we don't allow concurrent syncs
 let activeFetch: { promise: Promise<void>; events: string[]; listeners: Set<(event: string) => void>; abort: AbortController } | null = null;
 
-// Serve embedded SPA assets from web-files.ts (survives bun build --compile)
-function serveEmbedded(key: string, cacheControl: string, extraHeaders?: Record<string, string>): Response | null {
-  const asset = WEB_FILES[key];
-  if (!asset) return null;
-  const body = asset.binary ? Buffer.from(asset.content, "base64") : asset.content;
-  return new Response(body, {
-    headers: { "Content-Type": asset.mime, "Cache-Control": cacheControl, ...extraHeaders },
-  });
+// Resolve paths to static assets (import.meta.dir is Bun-native, handles Windows)
+const logoPath = resolve(import.meta.dir, "../../assets/logo.png");
+const faviconPath = resolve(import.meta.dir, "../../assets/favicon.png");
+const appDistDir = resolve(import.meta.dir, "dist/app");
+
+// MIME types for serving static SPA assets
+const MIME_TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+};
+
+function getMimeType(filePath: string): string {
+  const ext = filePath.slice(filePath.lastIndexOf("."));
+  return MIME_TYPES[ext] || "application/octet-stream";
 }
 
 // --- JSON API helpers ---
 
-// Allowed origins for CORS — include Vite dev port only in dev mode
+// Allowed origins for CORS (Vite dev on :5173, server on :3000)
 function getAllowedOrigins(port: number): string[] {
-  const origins = [
+  return [
     `http://localhost:${port}`,
     `http://127.0.0.1:${port}`,
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
   ];
-  if (IS_DEV) {
-    origins.push("http://localhost:5173", "http://127.0.0.1:5173");
-  }
-  return origins;
 }
 
 function corsHeaders(origin: string | null, allowedOrigins: string[]): Record<string, string> {
@@ -160,20 +193,8 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'",
 };
 
-// Dev mode — set KOLSHEK_DEV=1 to enable Vite proxy support and dev CORS origins
-const IS_DEV = process.env.KOLSHEK_DEV === "1";
-
 // MAX_PAGINATION_LIMIT prevents dumping entire DB via ?limit=999999999
 const MAX_PAGINATION_LIMIT = 500;
-
-// Constant-time string comparison to prevent timing attacks on tokens
-function safeEqual(a: string, b: string): boolean {
-  if (typeof a !== "string" || typeof b !== "string") return false;
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
-}
 
 // Validate that a user-supplied regex isn't pathologically complex (ReDoS)
 function isSafeRegex(pattern: string): boolean {
@@ -192,22 +213,12 @@ function isSafeRegex(pattern: string): boolean {
   }
 }
 
-// Sanitize error messages — strip file paths, stack traces, and credential-like values
-const CREDENTIAL_KEYWORDS = "password|passwd|secret|token|credential|apiKey|api_key|sessionId|bearer|authorization|access_key|private_key|jwt";
-const CREDENTIAL_RE = new RegExp(
-  // Match key=value, key: value, and JSON "key":"value" patterns
-  `["']?(${CREDENTIAL_KEYWORDS})["']?\\s*[=:]\\s*["']?\\S+["']?`,
-  "gi",
-);
+// Sanitize error messages — strip file paths and internal details
 function sanitizeError(msg: string): string {
-  return msg
-    // Remove Windows/Unix file paths
-    .replace(/[A-Z]:\\[^\s:]+/gi, "[path]")
+  // Remove Windows/Unix file paths
+  return msg.replace(/[A-Z]:\\[^\s:]+/gi, "[path]")
     .replace(/\/[^\s:]*\/[^\s:]*/g, "[path]")
-    // Remove stack trace lines
     .replace(/at\s+.+\(.+\)/g, "")
-    // Strip values that look like credentials
-    .replace(CREDENTIAL_RE, "$1=[redacted]")
     .trim();
 }
 
@@ -268,20 +279,17 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
   const allowedOrigins = getAllowedOrigins(port);
 
   // Generate a one-time session token — only the CLI user sees this in the terminal.
-  // The URL token is single-use: consumed on first browser visit, then invalidated.
+  // The token is exchanged for an HttpOnly cookie on first visit.
   const sessionToken = randomBytes(32).toString("hex");
-  let urlTokenConsumed = false;
   const cookieName = "kolshek_session";
 
   // Write session token to .dev-session so the Vite dev proxy can inject it.
-  // Only written in dev mode (KOLSHEK_DEV=1). Cleaned up on server stop.
-  const devSessionPath = resolve(import.meta.dir, "../../.dev-session");
-  if (IS_DEV) {
-    try {
-      Bun.write(devSessionPath, `${cookieName}=${sessionToken}`);
-    } catch {
-      // Non-fatal — only needed for Vite dev mode
-    }
+  // This file is gitignored and only used for local development.
+  try {
+    const devSessionPath = resolve(import.meta.dir, "../../.dev-session");
+    Bun.write(devSessionPath, `${cookieName}=${sessionToken}`);
+  } catch {
+    // Non-fatal — only needed for Vite dev mode
   }
 
   // Parse the session cookie from a Cookie header
@@ -294,20 +302,26 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
     return null;
   }
 
-  // Check if a request is authenticated (has valid session cookie)
-  function isAuthenticated(req: Request): boolean {
-    const cookie = getSessionCookie(req);
-    return cookie !== null && safeEqual(cookie, sessionToken);
+  // Check if a request is authenticated (has valid cookie OR valid token query param)
+  function isAuthenticated(req: Request, url: URL): boolean {
+    // Check cookie first (most requests)
+    if (getSessionCookie(req) === sessionToken) return true;
+    // Check query param (initial browser open)
+    if (url.searchParams.get("token") === sessionToken) return true;
+    return false;
   }
 
   // Build a Set-Cookie header that persists the session
   function sessionCookieHeader(): string {
-    return `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=86400`;
+    return `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400`;
   }
 
   const server = Bun.serve({
     port,
     hostname: "127.0.0.1",
+    // SSE streams for chat + model downloads need long-lived connections.
+    // Default 10s kills them mid-response.
+    idleTimeout: 255, // max allowed by Bun (seconds)
     async fetch(req) {
       const url = new URL(req.url);
       const path = url.pathname;
@@ -332,7 +346,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       if (method === "POST" && path === "/api/v2/auth/token") {
         const body = await parseJsonBody(req);
         const token = typeof body.token === "string" ? body.token : "";
-        if (!safeEqual(token, sessionToken)) {
+        if (token !== sessionToken) {
           return jsonError("UNAUTHORIZED", "Invalid token.", 401);
         }
         return new Response(JSON.stringify({ success: true, data: null }), {
@@ -347,15 +361,13 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       }
 
       // If the request has ?token= in the URL, validate it and set a cookie.
-      // The URL token is single-use — once consumed, replay from browser history is rejected.
+      // This is the initial browser open from the CLI.
       if (url.searchParams.has("token")) {
-        const urlToken = url.searchParams.get("token") ?? "";
-        if (urlTokenConsumed || !safeEqual(urlToken, sessionToken)) {
-          return new Response("Unauthorized: token already used or invalid. Relaunch the dashboard.", { status: 401 });
+        if (url.searchParams.get("token") !== sessionToken) {
+          return new Response("Unauthorized: invalid token", { status: 401 });
         }
-        // Mark token as consumed — future URL token attempts will fail
-        urlTokenConsumed = true;
-        // Redirect to clean URL and set session cookie.
+        // Valid token — redirect to the same URL without the token param
+        // and set the session cookie so future requests are authenticated.
         url.searchParams.delete("token");
         const cleanUrl = url.pathname + (url.search || "");
         return new Response(null, {
@@ -363,13 +375,12 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           headers: {
             Location: cleanUrl || "/",
             "Set-Cookie": sessionCookieHeader(),
-            "Cache-Control": "no-store",
           },
         });
       }
 
       // All other requests must have the session cookie
-      if (!isAuthenticated(req)) {
+      if (!isAuthenticated(req, url)) {
         if (path.startsWith("/api/")) {
           return jsonError("UNAUTHORIZED", "Session expired. Relaunch the dashboard.", 401);
         }
@@ -392,21 +403,42 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       }
 
       try {
-        // --- Static assets (served from embedded web-files.ts) ---
+        // --- Static assets ---
         if (method === "GET" && path === "/favicon.png") {
-          const res = serveEmbedded("/favicon.png", "public, max-age=86400");
-          if (res) return res;
+          const file = Bun.file(faviconPath);
+          if (await file.exists()) {
+            return new Response(file, {
+              headers: {
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=86400",
+              },
+            });
+          }
           return new Response("Not found", { status: 404 });
         }
 
         if (method === "GET" && path === "/logo.png") {
-          const res = serveEmbedded("/logo.png", "public, max-age=86400");
-          if (res) return res;
+          const file = Bun.file(logoPath);
+          if (await file.exists()) {
+            return new Response(file, {
+              headers: {
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=86400",
+              },
+            });
+          }
           return new Response("Not found", { status: 404 });
         }
         if (method === "GET" && path === "/favicon.ico") {
-          const res = serveEmbedded("/favicon.png", "public, max-age=86400");
-          if (res) return res;
+          const file = Bun.file(faviconPath);
+          if (await file.exists()) {
+            return new Response(file, {
+              headers: {
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=86400",
+              },
+            });
+          }
           return new Response("Not found", { status: 404 });
         }
 
@@ -427,12 +459,10 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
                 const txCount = countTransactions({ providerId: p.id });
                 const latestSync = getLatestCompletedSyncLog(p.id);
                 const everSucceeded = hasSuccessfulSync(p.id);
-                const failures = countConsecutiveFailures(p.id);
                 const authStatus = computeAuthStatus(
                   hasCreds,
                   (latestSync?.status as "success" | "error") ?? null,
                   everSucceeded,
-                  failures,
                 );
                 return {
                   ...p,
@@ -1403,15 +1433,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           }
           const body = await parseJsonBody(req);
           const visible = body.visible === true || body.visible === 1;
-          const rawProviders = Array.isArray(body.providers) ? body.providers : undefined;
-          // Validate and coerce providerIds to numbers, reject non-numeric values
-          let providerIds: number[] | undefined;
-          if (rawProviders) {
-            providerIds = rawProviders.map(Number).filter((n) => Number.isFinite(n) && n > 0);
-            if (providerIds.length === 0) {
-              return jsonError("INVALID_PROVIDERS", "Provider IDs must be positive numbers.", 400);
-            }
-          }
+          const providerIds = Array.isArray(body.providers) ? (body.providers as number[]) : undefined;
           return startFetchSSE(visible, providerIds, jsonError);
         }
 
@@ -1419,6 +1441,211 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         if (method === "GET" && path === "/api/v2/fetch/events") {
           return fetchEventsSSE();
         }
+
+        // =================================================================
+        // --- AI Agent API ---
+
+        // POST /api/v2/agent/chat — stream an agent conversation via SSE
+        if (method === "POST" && path === "/api/v2/agent/chat") {
+          const body = await parseJsonBody(req) as unknown as AgentChatRequest;
+          if (!body.messages || !Array.isArray(body.messages) || body.messages.length === 0) {
+            return jsonError("BAD_REQUEST", "messages array is required", 400);
+          }
+
+          if (!isModelLoaded()) {
+            return jsonError("BAD_REQUEST", "No model loaded. Download and load a model first.", 400);
+          }
+
+          // Discover skills + modes, build runner context
+          const skills = await discoverSkills();
+          await discoverModeSkills();
+
+          const modelInfo = getLoadedModelInfo();
+          const tier = modelInfo?.tier ?? 1;
+
+          // Resolve active mode content — only for tier 3+ models.
+          // Mode content is too large for small model context windows.
+          let modeContent: string | undefined;
+          let activeMode = body.activeMode;
+          if (activeMode && tier >= 3) {
+            const mode = getModeByName(activeMode);
+            if (mode) modeContent = mode.content;
+          } else {
+            activeMode = undefined;
+          }
+
+          const ctx = buildRunnerContext(
+            body.messages,
+            skills,
+            getActiveTools(),
+            tier >= 3 ? body.enabledSkills : undefined,
+            activeMode,
+            modeContent,
+            tier,
+            body.thinking,
+          );
+
+          return createAgentStream(ctx, cors, req.signal, body.contextSize);
+        }
+
+        // GET /api/v2/agent/config — current AI configuration + model status
+        if (method === "GET" && path === "/api/v2/agent/config") {
+          const config = await loadAiConfig();
+          const modelInfo = getLoadedModelInfo();
+          return json({
+            modelId: config?.modelId || null,
+            modelLoaded: isModelLoaded(),
+            modelInfo,
+            contextBounds: getContextBounds(),
+          });
+        }
+
+        // PUT /api/v2/agent/config — save selected model ID + load it
+        if (method === "PUT" && path === "/api/v2/agent/config") {
+          const body = await parseJsonBody(req);
+          const modelId = body.modelId as string;
+          if (!modelId) {
+            return jsonError("BAD_REQUEST", "modelId is required", 400);
+          }
+          if (!MODEL_REGISTRY.find((m) => m.id === modelId)) {
+            return jsonError("BAD_REQUEST", `Unknown model: ${modelId}`, 400);
+          }
+          await saveAiConfig({ modelId });
+          return json({ saved: true });
+        }
+
+        // GET /api/v2/agent/skills — list available skills
+        if (method === "GET" && path === "/api/v2/agent/skills") {
+          const skills = await discoverSkills();
+          return json(skills.map((s) => ({ name: s.name, filename: s.filename, description: s.description, tier: s.tier })));
+        }
+
+        // GET /api/v2/agent/modes — list available workflow modes
+        if (method === "GET" && path === "/api/v2/agent/modes") {
+          await discoverModeSkills();
+          return json(getModeIndex());
+        }
+
+        // GET /api/v2/agent/hardware — detect system hardware capabilities
+        if (method === "GET" && path === "/api/v2/agent/hardware") {
+          const hw = await detectHardware();
+          return json(hw);
+        }
+
+        // GET /api/v2/agent/models — model registry with download/load status
+        if (method === "GET" && path === "/api/v2/agent/models") {
+          const hw = await detectHardware();
+          const statuses = await getModelStatuses(hw, getLoadedModelId());
+          return json(statuses);
+        }
+
+        // POST /api/v2/agent/models/download — download a model (SSE progress stream)
+        if (method === "POST" && path === "/api/v2/agent/models/download") {
+          const body = await parseJsonBody(req);
+          const modelId = body.modelId as string;
+          if (!modelId) {
+            return jsonError("BAD_REQUEST", "modelId is required", 400);
+          }
+
+          const encoder = new TextEncoder();
+          const stream = new ReadableStream({
+            async start(controller) {
+              function push(data: Record<string, unknown>) {
+                try {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+                } catch { /* closed */ }
+              }
+              try {
+                await downloadModel(modelId, (percent, downloaded, total) => {
+                  push({ type: "progress", percent, downloaded, total });
+                }, req.signal);
+                push({ type: "done" });
+              } catch (err) {
+                push({ type: "error", message: err instanceof Error ? err.message : String(err) });
+              } finally {
+                try { controller.close(); } catch { /* already closed */ }
+              }
+            },
+          });
+
+          return new Response(stream, {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+              ...cors,
+            },
+          });
+        }
+
+        // POST /api/v2/agent/models/cancel-download — cancel in-flight download
+        if (method === "POST" && path === "/api/v2/agent/models/cancel-download") {
+          cancelDownload();
+          return json({ cancelled: true });
+        }
+
+        // DELETE /api/v2/agent/models/:id — delete a downloaded model
+        if (method === "DELETE" && path.startsWith("/api/v2/agent/models/")) {
+          const modelId = decodeURIComponent(path.split("/").pop() || "");
+          if (!modelId || !MODEL_REGISTRY.find((m) => m.id === modelId)) {
+            return jsonError("BAD_REQUEST", "Unknown model ID", 400);
+          }
+          // Unload if this model is currently loaded
+          if (getLoadedModelId() === modelId) {
+            await unloadModel();
+          }
+          await deleteModel(modelId);
+          return json({ deleted: true });
+        }
+
+        // POST /api/v2/agent/model/load — load a downloaded model into memory
+        if (method === "POST" && path === "/api/v2/agent/model/load") {
+          const body = await parseJsonBody(req);
+          const modelId = body.modelId as string;
+          if (!modelId) {
+            return jsonError("BAD_REQUEST", "modelId is required", 400);
+          }
+          try {
+            await loadModel(modelId);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("BAD_REQUEST", msg, 400);
+          }
+          await saveAiConfig({ modelId });
+          return json({ loaded: true, modelInfo: getLoadedModelInfo() });
+        }
+
+        // POST /api/v2/agent/model/unload — unload the current model from memory
+        if (method === "POST" && path === "/api/v2/agent/model/unload") {
+          await unloadModel();
+          return json({ unloaded: true });
+        }
+
+        // POST /api/v2/agent/warmup — pre-evaluate system prompt to speed up first message
+        if (method === "POST" && path === "/api/v2/agent/warmup") {
+          if (!isModelLoaded()) {
+            return json({ warmed: false });
+          }
+          const skills = await discoverSkills();
+          const tools = getActiveTools();
+          const modelInfo = getLoadedModelInfo();
+          const tier = modelInfo?.tier ?? 1;
+          const ctx = buildRunnerContext(
+            [{ role: "user", content: "warmup" }],
+            skills,
+            tools,
+            undefined,
+            undefined,
+            undefined,
+            tier,
+            false,
+          );
+          const sysPrompt = ctx.messages[0]?.role === "system" ? (ctx.messages[0].content || "") : "";
+          await warmupContext(sysPrompt);
+          return json({ warmed: true });
+        }
+
+        // Note: model status is available via GET /api/v2/agent/config (superset)
 
         // POST /api/v2/fetch/cancel — cancel an in-progress sync
         if (method === "POST" && path === "/api/v2/fetch/cancel") {
@@ -1428,19 +1655,35 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           activeFetch.abort.abort();
           return json({ cancelled: true });
         }
-
         // --- React SPA fallback (never for /api/ routes) ---
         if (method === "GET" && !path.startsWith("/api/")) {
-          // Try serving from embedded SPA assets
-          const cachePolicy = path.includes("/assets/")
-            ? "public, max-age=31536000, immutable"
-            : "public, max-age=3600";
-          const res = serveEmbedded(path, cachePolicy, SECURITY_HEADERS);
-          if (res) return res;
+          // Try serving a static file from the React build output.
+          // SECURITY: resolve the path and verify it stays within appDistDir
+          // to prevent path traversal (e.g. /../../../etc/passwd).
+          const assetPath = resolve(appDistDir, path.slice(1));
+          if (!assetPath.startsWith(appDistDir)) {
+            return new Response("Forbidden", { status: 403 });
+          }
+          const assetFile = Bun.file(assetPath);
+          if (await assetFile.exists()) {
+            return new Response(assetFile, {
+              headers: {
+                "Content-Type": getMimeType(assetPath),
+                "Cache-Control": assetPath.includes("/assets/")
+                  ? "public, max-age=31536000, immutable"
+                  : "public, max-age=3600",
+                ...SECURITY_HEADERS,
+              },
+            });
+          }
 
           // SPA fallback: serve index.html for all unmatched GET routes
-          const indexRes = serveEmbedded("/index.html", "public, max-age=3600", SECURITY_HEADERS);
-          if (indexRes) return indexRes;
+          const indexFile = Bun.file(resolve(appDistDir, "index.html"));
+          if (await indexFile.exists()) {
+            return new Response(indexFile, {
+              headers: { "Content-Type": "text/html; charset=utf-8" },
+            });
+          }
         }
 
         // --- 404 ---
@@ -1455,16 +1698,6 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       }
     },
   });
-
-  // Clean up .dev-session file when process exits
-  if (IS_DEV) {
-    const cleanup = () => {
-      try { unlinkSync(devSessionPath); } catch { /* already gone */ }
-    };
-    process.on("exit", cleanup);
-    process.on("SIGINT", () => { cleanup(); process.exit(0); });
-    process.on("SIGTERM", () => { cleanup(); process.exit(0); });
-  }
 
   return { server, token: sessionToken };
 }
