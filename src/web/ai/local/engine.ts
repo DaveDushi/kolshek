@@ -6,7 +6,7 @@
 // calling — node-llama-cpp handles history, result matching, and looping internally.
 
 import { join } from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import envPaths from "env-paths";
 import type { AgentSSEEvent, ChatMessage, ToolDef } from "../types.js";
 import { executeToolAsync } from "../tools.js";
@@ -40,10 +40,14 @@ async function importLlamaCpp(): Promise<typeof import("node-llama-cpp")> {
       );
     }
 
+    // Ensure LLAMA_DIR exists
+    const { mkdirSync } = await import("node:fs");
+    mkdirSync(LLAMA_DIR, { recursive: true });
+
     // Create package.json if missing
     const pkgJson = join(LLAMA_DIR, "package.json");
     if (!existsSync(pkgJson)) {
-      await Bun.write(pkgJson, JSON.stringify({ private: true }));
+      writeFileSync(pkgJson, JSON.stringify({ private: true }));
     }
 
     console.log(`[engine] Installing via ${pm.name}...`);
@@ -59,23 +63,17 @@ async function importLlamaCpp(): Promise<typeof import("node-llama-cpp")> {
     console.log("[engine] node-llama-cpp installed successfully.");
   }
 
-  // Add LLAMA_DIR/node_modules to NODE_PATH so the resolver can find
-  // node-llama-cpp AND all its transitive deps (lifecycle-utils, etc.).
-  // Compiled Bun binaries resolve from the binary's location by default,
-  // which doesn't contain these packages.
-  const nodeModulesDir = join(LLAMA_DIR, "node_modules");
-  const sep = process.platform === "win32" ? ";" : ":";
-  const existing = process.env.NODE_PATH || "";
-  if (!existing.includes(nodeModulesDir)) {
-    process.env.NODE_PATH = existing
-      ? `${existing}${sep}${nodeModulesDir}`
-      : nodeModulesDir;
-  }
-
-  // Write an ESM loader inside LLAMA_DIR so that import resolution
-  // starts from that directory (belt + suspenders with NODE_PATH above).
+  // Write an ESM loader file inside LLAMA_DIR. When Bun imports this file,
+  // it resolves "node-llama-cpp" relative to _loader.mjs's directory,
+  // finding LLAMA_DIR/node_modules/node-llama-cpp/ and all transitive deps.
+  // This is the only reliable approach for compiled Bun binaries.
   const loaderPath = join(LLAMA_DIR, "_loader.mjs");
-  await Bun.write(loaderPath, 'export * from "node-llama-cpp";\n');
+  console.log(`[engine] LLAMA_DIR=${LLAMA_DIR}`);
+  console.log(`[engine] node-llama-cpp exists=${existsSync(pkgPath)}`);
+  console.log(`[engine] lifecycle-utils exists=${existsSync(join(LLAMA_DIR, "node_modules", "lifecycle-utils"))}`);
+  console.log(`[engine] Writing loader to ${loaderPath}`);
+  writeFileSync(loaderPath, 'export * from "node-llama-cpp";\n');
+  console.log(`[engine] Importing via loader...`);
   return await import(loaderPath);
 }
 

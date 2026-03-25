@@ -1374,6 +1374,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           try {
             await loadModel(modelId);
           } catch (err) {
+            console.error("[dashboard] Model load failed:", err);
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("BAD_REQUEST", msg, 400);
           }
