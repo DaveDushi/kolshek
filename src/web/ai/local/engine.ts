@@ -63,16 +63,17 @@ async function importLlamaCpp(): Promise<typeof import("node-llama-cpp")> {
     console.log("[engine] node-llama-cpp installed successfully.");
   }
 
-  // Write an ESM loader file inside LLAMA_DIR. When Bun imports this file,
-  // it resolves "node-llama-cpp" relative to _loader.mjs's directory,
-  // finding LLAMA_DIR/node_modules/node-llama-cpp/ and all transitive deps.
-  // This is the only reliable approach for compiled Bun binaries.
+  // Write an ESM loader file inside LLAMA_DIR that uses a RELATIVE path
+  // to the entry point, avoiding bare specifier resolution entirely.
+  // Compiled Bun binaries with --external mark the package in their
+  // module graph, which can override filesystem resolution even from
+  // dynamically imported files. Relative paths bypass this.
   const loaderPath = join(LLAMA_DIR, "_loader.mjs");
   console.log(`[engine] LLAMA_DIR=${LLAMA_DIR}`);
   console.log(`[engine] node-llama-cpp exists=${existsSync(pkgPath)}`);
   console.log(`[engine] lifecycle-utils exists=${existsSync(join(LLAMA_DIR, "node_modules", "lifecycle-utils"))}`);
   console.log(`[engine] Writing loader to ${loaderPath}`);
-  writeFileSync(loaderPath, 'export * from "node-llama-cpp";\n');
+  writeFileSync(loaderPath, 'export * from "./node_modules/node-llama-cpp/dist/index.js";\n');
   console.log(`[engine] Importing via loader...`);
   return await import(loaderPath);
 }
