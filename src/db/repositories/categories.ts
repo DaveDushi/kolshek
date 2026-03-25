@@ -59,12 +59,12 @@ export function createCategory(name: string, classification: Classification = "e
   return result.changes > 0;
 }
 
-export function setCategoryClassification(name: string, classification: Classification): boolean {
+export function setCategoryClassification(name: string, classification: Classification): void {
   const db = getDatabase();
-  const result = db
-    .prepare("UPDATE categories SET classification = $classification WHERE name = $name")
-    .run({ $name: name, $classification: classification });
-  return result.changes > 0;
+  db.prepare(
+    `INSERT INTO categories (name, classification) VALUES ($name, $classification)
+     ON CONFLICT(name) DO UPDATE SET classification = $classification`,
+  ).run({ $name: name, $classification: classification });
 }
 
 export function getCategoryClassification(name: string): string | null {

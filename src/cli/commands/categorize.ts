@@ -21,6 +21,7 @@ import {
   bulkReassignCategories,
   bulkReassignCategoriesDryRun,
   setCategoryClassification,
+  getCategoryClassification,
   getClassificationMap,
 } from "../../db/repositories/categories.js";
 import { getDatabase } from "../../db/database.js";
@@ -857,7 +858,9 @@ Examples:
         process.exit(ExitCode.BadArgs);
       }
 
-      const updated = setCategoryClassification(category, classification);
+      const previous = getCategoryClassification(category);
+      setCategoryClassification(category, classification);
+      const updated = previous !== classification;
 
       if (isJsonMode()) {
         printJson(jsonSuccess({ category, classification, updated }));
@@ -867,7 +870,7 @@ Examples:
       if (updated) {
         success(`"${category}" classified as ${classification}.`);
       } else {
-        warn(`Category "${category}" not found.`);
+        info(`"${category}" is already classified as ${classification}.`);
       }
     });
 

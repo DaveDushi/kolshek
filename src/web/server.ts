@@ -4,6 +4,7 @@
 
 import { resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import { WEB_FILES } from "./web-files.js";
 import { createAgentStream } from "./ai/stream.js";
 import { buildRunnerContext } from "./ai/agent.js";
 import { discoverSkills, discoverModeSkills, getModeByName, getModeIndex } from "./ai/skills.js";
@@ -134,28 +135,14 @@ import type { TransactionFilters } from "../types/transaction.js";
 // Track active fetch so we don't allow concurrent syncs
 let activeFetch: { promise: Promise<void>; events: string[]; listeners: Set<(event: string) => void>; abort: AbortController } | null = null;
 
-// Resolve paths to static assets (import.meta.dir is Bun-native, handles Windows)
-const logoPath = resolve(import.meta.dir, "../../assets/logo.png");
-const faviconPath = resolve(import.meta.dir, "../../assets/favicon.png");
-const appDistDir = resolve(import.meta.dir, "dist/app");
-
-// MIME types for serving static SPA assets
-const MIME_TYPES: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "application/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".svg": "image/svg+xml",
-  ".ico": "image/x-icon",
-  ".woff": "font/woff",
-  ".woff2": "font/woff2",
-};
-
-function getMimeType(filePath: string): string {
-  const ext = filePath.slice(filePath.lastIndexOf("."));
-  return MIME_TYPES[ext] || "application/octet-stream";
+// Serve embedded SPA assets from web-files.ts (survives bun build --compile)
+function serveEmbedded(key: string, cacheControl: string, extraHeaders?: Record<string, string>): Response | null {
+  const asset = WEB_FILES[key];
+  if (!asset) return null;
+  const body = asset.binary ? Buffer.from(asset.content, "base64") : asset.content;
+  return new Response(body, {
+    headers: { "Content-Type": asset.mime, "Cache-Control": cacheControl, ...extraHeaders },
+  });
 }
 
 // --- JSON API helpers ---
@@ -289,7 +276,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
   // This file is gitignored and only used for local development.
   try {
     const devSessionPath = resolve(import.meta.dir, "../../.dev-session");
-    Bun.write(devSessionPath, `${cookieName}=${sessionToken}`);
+    Bun.write(devSessionPath, `${cookieName}=${sessionToken}`).catch(() => {});
   } catch {
     // Non-fatal — only needed for Vite dev mode
   }
@@ -405,42 +392,21 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       }
 
       try {
-        // --- Static assets ---
+        // --- Static assets (served from embedded web-files.ts) ---
         if (method === "GET" && path === "/favicon.png") {
-          const file = Bun.file(faviconPath);
-          if (await file.exists()) {
-            return new Response(file, {
-              headers: {
-                "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=86400",
-              },
-            });
-          }
+          const res = serveEmbedded("/favicon.png", "public, max-age=86400");
+          if (res) return res;
           return new Response("Not found", { status: 404 });
         }
 
         if (method === "GET" && path === "/logo.png") {
-          const file = Bun.file(logoPath);
-          if (await file.exists()) {
-            return new Response(file, {
-              headers: {
-                "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=86400",
-              },
-            });
-          }
+          const res = serveEmbedded("/logo.png", "public, max-age=86400");
+          if (res) return res;
           return new Response("Not found", { status: 404 });
         }
         if (method === "GET" && path === "/favicon.ico") {
-          const file = Bun.file(faviconPath);
-          if (await file.exists()) {
-            return new Response(file, {
-              headers: {
-                "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=86400",
-              },
-            });
-          }
+          const res = serveEmbedded("/favicon.png", "public, max-age=86400");
+          if (res) return res;
           return new Response("Not found", { status: 404 });
         }
 
@@ -1020,8 +986,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             if (!isValidClassification(classification)) {
               return jsonError("INVALID_CLASSIFICATION", "Classification must be lowercase alphanumeric + underscores.");
             }
-            const updated = setCategoryClassification(name, classification);
-            if (!updated) return jsonError("NOT_FOUND", "Category not found.", 404);
+            setCategoryClassification(name, classification);
             return json({ name, classification });
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -1481,33 +1446,16 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         }
         // --- React SPA fallback (never for /api/ routes) ---
         if (method === "GET" && !path.startsWith("/api/")) {
-          // Try serving a static file from the React build output.
-          // SECURITY: resolve the path and verify it stays within appDistDir
-          // to prevent path traversal (e.g. /../../../etc/passwd).
-          const assetPath = resolve(appDistDir, path.slice(1));
-          if (!assetPath.startsWith(appDistDir)) {
-            return new Response("Forbidden", { status: 403 });
-          }
-          const assetFile = Bun.file(assetPath);
-          if (await assetFile.exists()) {
-            return new Response(assetFile, {
-              headers: {
-                "Content-Type": getMimeType(assetPath),
-                "Cache-Control": assetPath.includes("/assets/")
-                  ? "public, max-age=31536000, immutable"
-                  : "public, max-age=3600",
-                ...SECURITY_HEADERS,
-              },
-            });
-          }
+          // Try serving from embedded SPA assets
+          const cachePolicy = path.includes("/assets/")
+            ? "public, max-age=31536000, immutable"
+            : "public, max-age=3600";
+          const res = serveEmbedded(path, cachePolicy, SECURITY_HEADERS);
+          if (res) return res;
 
           // SPA fallback: serve index.html for all unmatched GET routes
-          const indexFile = Bun.file(resolve(appDistDir, "index.html"));
-          if (await indexFile.exists()) {
-            return new Response(indexFile, {
-              headers: { "Content-Type": "text/html; charset=utf-8" },
-            });
-          }
+          const indexRes = serveEmbedded("/index.html", "public, max-age=3600", SECURITY_HEADERS);
+          if (indexRes) return indexRes;
         }
 
         // --- 404 ---
