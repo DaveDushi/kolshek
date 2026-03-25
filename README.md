@@ -145,7 +145,7 @@ echo '[{"englishName":"Ouri'\''s Market","matchPattern":"אורי מרקט"}]' |
 kolshek tr rule import rules.json
 
 # Schedule automatic sync every 12 hours
-kolshek schedule set 12h
+kolshek schedule set --every 12h
 
 # Run a SQL query
 kolshek query "SELECT description, SUM(chargedAmount) as total FROM transactions GROUP BY description ORDER BY total LIMIT 10"

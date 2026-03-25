@@ -79,6 +79,8 @@ export function useAgent() {
   const [status, setStatus] = useState<AgentStatus | null>(null);
   const [usage, setUsage] = useState<AgentUsage | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
   const iterationRef = useRef(0);
   const totalGeneratedRef = useRef(0);
 
@@ -125,7 +127,7 @@ export function useAgent() {
         // Sending empty assistant messages confuses the LLM into repeating tool calls
         // without ever producing text.
         const history = [
-          ...messages
+          ...messagesRef.current
             .filter((m) => !(m.role === "assistant" && !m.content))
             .map((m) => ({ role: m.role, content: m.content })),
           { role: "user" as const, content: text.trim() },
@@ -343,7 +345,7 @@ export function useAgent() {
         );
       }
     },
-    [messages]
+    [] // eslint-disable-line react-hooks/exhaustive-deps -- uses messagesRef to avoid stale closure
   );
 
   const stop = useCallback(() => {

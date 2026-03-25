@@ -59,7 +59,6 @@ import {
   hasSuccessfulSync,
   listRecentSyncLogs,
   countSyncLogsSince,
-  countConsecutiveFailures,
 } from "../db/repositories/sync-log.js";
 import {
   readScheduleConfig,

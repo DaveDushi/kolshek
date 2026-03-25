@@ -38,3 +38,4 @@ bun.lock
 
 .dev.vars
 .wrangler/
+river-repo

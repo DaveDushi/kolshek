@@ -1,6 +1,6 @@
 {
   "name": "kolshek",
-  "version": "0.3.10",
+  "version": "0.4.1",
   "description": "CLI tool for tracking finances from Israeli banks and credit cards (כל שקל)",
   "type": "module",
   "bin": {
