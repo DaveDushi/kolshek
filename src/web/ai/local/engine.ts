@@ -7,7 +7,6 @@
 
 import { join } from "node:path";
 import { existsSync } from "node:fs";
-import { createRequire } from "node:module";
 import envPaths from "env-paths";
 import type { AgentSSEEvent, ChatMessage, ToolDef } from "../types.js";
 import { executeToolAsync } from "../tools.js";
@@ -60,9 +59,14 @@ async function importLlamaCpp(): Promise<typeof import("node-llama-cpp")> {
     console.log("[engine] node-llama-cpp installed successfully.");
   }
 
-  // Use createRequire so transitive deps (lifecycle-utils etc.) resolve correctly
-  const localRequire = createRequire(join(LLAMA_DIR, "package.json"));
-  return localRequire("node-llama-cpp");
+  // Write an ESM loader inside LLAMA_DIR so that import resolution
+  // starts from that directory — this lets node-llama-cpp and all its
+  // transitive deps (lifecycle-utils, etc.) resolve from LLAMA_DIR/node_modules.
+  const loaderPath = join(LLAMA_DIR, "_loader.mjs");
+  if (!existsSync(loaderPath)) {
+    await Bun.write(loaderPath, 'export * from "node-llama-cpp";\n');
+  }
+  return await import(loaderPath);
 }
 
 function findPackageManager(): { name: string; cmd: string[] } | null {
