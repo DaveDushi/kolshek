@@ -1,10 +1,7 @@
-## v0.4.1
+## v0.4.2
 
-### Features
+### Bug Fixes
 
-- **Landing page AI showcase**: Updated landing page with "Built-in AI Agent" feature card and added an interactive AI Agent tab to the mini dashboard preview, highlighting on-device LLM inference and privacy.
-
-### Other
-
-- Rebuilt dashboard frontend to include the AI Agent page added in v0.4.0.
-- Synced documentation with codebase.
+- **Dashboard assets in compiled binary**: The server now falls back to embedded assets when filesystem files don't exist, fixing "Not Found" errors when running the compiled binary on a fresh machine.
+- **Category classification**: Use upsert pattern for category rules, preventing duplicate constraint errors when reclassifying transactions.
+- **Auto-build in dev**: The `dashboard` command now auto-builds the React SPA if `dist/` is missing, so `bun run dev -- dashboard` works without a manual `bun run build:web` step.

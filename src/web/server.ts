@@ -4,6 +4,7 @@
 
 import { resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import { WEB_FILES } from "./web-files.js";
 import { createAgentStream } from "./ai/stream.js";
 import { buildRunnerContext } from "./ai/agent.js";
 import { discoverSkills, discoverModeSkills, getModeByName, getModeIndex } from "./ai/skills.js";
@@ -190,6 +191,16 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Referrer-Policy": "no-referrer",
   "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'",
 };
+
+// Serve from embedded WEB_FILES (used in compiled binary where dist/ doesn't exist on disk).
+function serveEmbedded(urlPath: string, cacheControl: string): Response | null {
+  const asset = WEB_FILES[urlPath];
+  if (!asset) return null;
+  const body = asset.binary ? Buffer.from(asset.content, "base64") : asset.content;
+  return new Response(body, {
+    headers: { "Content-Type": asset.mime, "Cache-Control": cacheControl, ...SECURITY_HEADERS },
+  });
+}
 
 // MAX_PAGINATION_LIMIT prevents dumping entire DB via ?limit=999999999
 const MAX_PAGINATION_LIMIT = 500;
@@ -401,43 +412,27 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       }
 
       try {
-        // --- Static assets ---
-        if (method === "GET" && path === "/favicon.png") {
+        // --- Static assets (filesystem first, then embedded fallback) ---
+        if (method === "GET" && (path === "/favicon.png" || path === "/favicon.ico")) {
           const file = Bun.file(faviconPath);
           if (await file.exists()) {
             return new Response(file, {
-              headers: {
-                "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=86400",
-              },
+              headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" },
             });
           }
-          return new Response("Not found", { status: 404 });
+          return serveEmbedded("/favicon.png", "public, max-age=86400")
+            ?? new Response("Not found", { status: 404 });
         }
 
         if (method === "GET" && path === "/logo.png") {
           const file = Bun.file(logoPath);
           if (await file.exists()) {
             return new Response(file, {
-              headers: {
-                "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=86400",
-              },
+              headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" },
             });
           }
-          return new Response("Not found", { status: 404 });
-        }
-        if (method === "GET" && path === "/favicon.ico") {
-          const file = Bun.file(faviconPath);
-          if (await file.exists()) {
-            return new Response(file, {
-              headers: {
-                "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=86400",
-              },
-            });
-          }
-          return new Response("Not found", { status: 404 });
+          return serveEmbedded("/logo.png", "public, max-age=86400")
+            ?? new Response("Not found", { status: 404 });
         }
 
         // =================================================================
@@ -1475,6 +1470,13 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             });
           }
 
+          // Filesystem miss — try embedded assets (compiled binary)
+          const cacheEmbed = path.startsWith("/assets/")
+            ? "public, max-age=31536000, immutable"
+            : "public, max-age=3600";
+          const embedded = serveEmbedded(path, cacheEmbed);
+          if (embedded) return embedded;
+
           // SPA fallback: serve index.html for all unmatched GET routes
           const indexFile = Bun.file(resolve(appDistDir, "index.html"));
           if (await indexFile.exists()) {
@@ -1482,6 +1484,10 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
               headers: { "Content-Type": "text/html; charset=utf-8" },
             });
           }
+
+          // SPA fallback from embedded assets (compiled binary)
+          const embeddedIndex = serveEmbedded("/index.html", "public, max-age=3600");
+          if (embeddedIndex) return embeddedIndex;
         }
 
         // --- 404 ---
