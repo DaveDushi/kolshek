@@ -25,6 +25,19 @@ import {
   completeSyncLog,
   getLastSuccessfulSync,
 } from "../db/repositories/sync-log.js";
+// Map common currency symbols to ISO 4217 codes.
+// israeli-bank-scrapers-core sometimes returns symbols instead of codes.
+const SYMBOL_TO_ISO: Record<string, string> = {
+  "\u20AA": "ILS",
+  "$": "USD",
+  "\u20AC": "EUR",
+  "\u00A3": "GBP",
+};
+
+function normalizeCurrency(raw: string): string {
+  return SYMBOL_TO_ISO[raw] || raw;
+}
+
 import {
   findChromePath,
   launchBrowser,
@@ -355,9 +368,9 @@ async function syncSingleProvider(
             date: tx.date,
             processedDate: tx.processedDate ?? tx.date,
             originalAmount: tx.originalAmount ?? tx.chargedAmount,
-            originalCurrency: tx.originalCurrency ?? "ILS",
+            originalCurrency: normalizeCurrency(tx.originalCurrency ?? "ILS"),
             chargedAmount: tx.chargedAmount,
-            chargedCurrency: tx.chargedCurrency ?? null,
+            chargedCurrency: tx.chargedCurrency ? normalizeCurrency(tx.chargedCurrency) : null,
             description: tx.description ?? "",
             descriptionEn: null,
             memo: tx.memo ?? null,

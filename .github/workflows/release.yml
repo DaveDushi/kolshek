@@ -51,7 +51,7 @@ jobs:
           bun run typecheck
           bun test
 
-      - run: bun build ./src/cli/index.ts --compile --target=${{ matrix.target }} --outfile dist/${{ matrix.artifact }}
+      - run: bun build ./src/cli/index.ts --compile --target=${{ matrix.target }} --outfile dist/${{ matrix.artifact }} --external node-llama-cpp
 
       - uses: actions/upload-artifact@v5
         with:

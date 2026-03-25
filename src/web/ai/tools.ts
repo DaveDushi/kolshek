@@ -49,6 +49,12 @@ function validateSql(sql: string): string | null {
     return "Only read-only queries (SELECT, WITH, EXPLAIN) are allowed";
   }
 
+  // Block write keywords even inside CTEs (WITH ... DELETE/INSERT/UPDATE)
+  const WRITE_KEYWORDS = /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|UPSERT)\b/i;
+  if (WRITE_KEYWORDS.test(decommented)) {
+    return "Write operations (INSERT, UPDATE, DELETE, DROP, etc.) are not allowed";
+  }
+
   if (/^\s*PRAGMA\b/i.test(decommented)) {
     if (decommented.includes("=")) {
       return "PRAGMA setters (with =) are not allowed";
@@ -73,6 +79,26 @@ function capResult(data: unknown, maxBytes: number = MAX_RESULT_BYTES): string {
 
 // CLI entry point path (resolved relative to this file: ai/ → web/ → src/ → cli/index.ts)
 const CLI_ENTRY = join(import.meta.dir, "..", "..", "cli", "index.ts");
+
+// Denylist patterns for env vars that should NOT be passed to subprocesses.
+// Strips secrets/credentials while keeping system vars needed for module resolution.
+const SECRET_ENV_PATTERNS = [
+  /_(KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|CREDENTIALS)$/i,
+  /^(AWS_|AZURE_|GCP_|GOOGLE_|OPENAI_|ANTHROPIC_|GITHUB_TOKEN)/i,
+  /^(DATABASE_URL|DB_|REDIS_|MONGO_|POSTGRES_|MYSQL_)/i,
+  /^(SMTP_|MAIL_|EMAIL_PASSWORD)/i,
+  /^(PRIVATE_KEY|SSH_|GPG_)/i,
+  /^(STRIPE_|PAYPAL_|TWILIO_)/i,
+];
+function getSafeEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [key, val] of Object.entries(process.env)) {
+    if (!val) continue;
+    if (SECRET_ENV_PATTERNS.some((p) => p.test(key))) continue;
+    env[key] = val;
+  }
+  return env;
+}
 
 // Commands allowed from agent execution (explicit allowlist — new commands must be opted in)
 const ALLOWED_COMMANDS = new Set([
@@ -289,10 +315,16 @@ export const TOOL_DEFS = TOOL_DEFS_LOCAL;
 // Allowed extensions for config file access
 const ALLOWED_EXTENSIONS = new Set([".toml", ".json", ".md"]);
 
+// Windows reserved device names — reading from these hangs or errors
+const WINDOWS_RESERVED = /^(CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(\.|$)/i;
+
 // Validate a config file path — must be a flat filename with allowed extension, no traversal
 function validateConfigPath(path: string): string | null {
   if (!path || path.includes("..") || path.includes("/") || path.includes("\\")) {
     return "Path traversal is not allowed. Use a simple filename like 'budget.toml'";
+  }
+  if (WINDOWS_RESERVED.test(path)) {
+    return "Reserved device names are not allowed";
   }
   const ext = "." + path.split(".").pop();
   if (!ALLOWED_EXTENSIONS.has(ext)) {
@@ -455,16 +487,30 @@ async function executeRunCommandAsync(command: string): Promise<string> {
     return JSON.stringify({ error: `Command "${rootCmd}" is not available from the agent. Allowed: ${[...ALLOWED_COMMANDS].join(", ")}` });
   }
 
+  const COMMAND_TIMEOUT_MS = 60_000; // 60s max for any CLI command
+
   try {
     const proc = Bun.spawn(["bun", "run", CLI_ENTRY, "--json", "--non-interactive", ...argv], {
       stdout: "pipe",
       stderr: "pipe",
-      env: { ...process.env },
+      env: getSafeEnv(),
     });
 
-    const stdout = await new Response(proc.stdout).text();
-    const stderr = await new Response(proc.stderr).text();
-    const exitCode = await proc.exited;
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => {
+        proc.kill();
+        reject(new Error(`Command timed out after ${COMMAND_TIMEOUT_MS / 1000}s`));
+      }, COMMAND_TIMEOUT_MS),
+    );
+
+    const [stdout, stderr, exitCode] = await Promise.race([
+      Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+        proc.exited,
+      ]),
+      timeout,
+    ]) as [string, string, number];
 
     if (exitCode !== 0) {
       // Try to parse JSON error from stdout first (--json mode outputs there)
