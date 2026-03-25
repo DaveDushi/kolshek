@@ -59,13 +59,23 @@ async function importLlamaCpp(): Promise<typeof import("node-llama-cpp")> {
     console.log("[engine] node-llama-cpp installed successfully.");
   }
 
-  // Write an ESM loader inside LLAMA_DIR so that import resolution
-  // starts from that directory — this lets node-llama-cpp and all its
-  // transitive deps (lifecycle-utils, etc.) resolve from LLAMA_DIR/node_modules.
-  const loaderPath = join(LLAMA_DIR, "_loader.mjs");
-  if (!existsSync(loaderPath)) {
-    await Bun.write(loaderPath, 'export * from "node-llama-cpp";\n');
+  // Add LLAMA_DIR/node_modules to NODE_PATH so the resolver can find
+  // node-llama-cpp AND all its transitive deps (lifecycle-utils, etc.).
+  // Compiled Bun binaries resolve from the binary's location by default,
+  // which doesn't contain these packages.
+  const nodeModulesDir = join(LLAMA_DIR, "node_modules");
+  const sep = process.platform === "win32" ? ";" : ":";
+  const existing = process.env.NODE_PATH || "";
+  if (!existing.includes(nodeModulesDir)) {
+    process.env.NODE_PATH = existing
+      ? `${existing}${sep}${nodeModulesDir}`
+      : nodeModulesDir;
   }
+
+  // Write an ESM loader inside LLAMA_DIR so that import resolution
+  // starts from that directory (belt + suspenders with NODE_PATH above).
+  const loaderPath = join(LLAMA_DIR, "_loader.mjs");
+  await Bun.write(loaderPath, 'export * from "node-llama-cpp";\n');
   return await import(loaderPath);
 }
 
