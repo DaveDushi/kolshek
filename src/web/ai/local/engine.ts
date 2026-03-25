@@ -7,6 +7,7 @@
 
 import { join } from "node:path";
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import envPaths from "env-paths";
 import type { AgentSSEEvent, ChatMessage, ToolDef } from "../types.js";
 import { executeToolAsync } from "../tools.js";
@@ -22,7 +23,7 @@ const LLAMA_DIR = join(envPaths("kolshek").data, "node-llama-cpp");
 async function importLlamaCpp(): Promise<typeof import("node-llama-cpp")> {
   // Try direct import first (works in dev or if globally installed)
   try {
-    return await importLlamaCpp();
+    return await import("node-llama-cpp");
   } catch {
     // Not found — auto-install into data dir
   }
@@ -59,8 +60,9 @@ async function importLlamaCpp(): Promise<typeof import("node-llama-cpp")> {
     console.log("[engine] node-llama-cpp installed successfully.");
   }
 
-  // Import from the data dir
-  return await import(join(pkgPath, "dist", "index.js"));
+  // Use createRequire so transitive deps (lifecycle-utils etc.) resolve correctly
+  const localRequire = createRequire(join(LLAMA_DIR, "package.json"));
+  return localRequire("node-llama-cpp");
 }
 
 function findPackageManager(): { name: string; cmd: string[] } | null {
