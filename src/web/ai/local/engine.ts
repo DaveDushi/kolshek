@@ -6,7 +6,7 @@
 // calling — node-llama-cpp handles history, result matching, and looping internally.
 
 import { join } from "node:path";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync, mkdirSync } from "node:fs";
 import envPaths from "env-paths";
 import type { AgentSSEEvent, ChatMessage, ToolDef } from "../types.js";
 import { executeToolAsync } from "../tools.js";
@@ -41,7 +41,6 @@ async function importLlamaCpp(): Promise<typeof import("node-llama-cpp")> {
     }
 
     // Ensure LLAMA_DIR exists
-    const { mkdirSync } = await import("node:fs");
     mkdirSync(LLAMA_DIR, { recursive: true });
 
     // Create package.json if missing
@@ -63,17 +62,16 @@ async function importLlamaCpp(): Promise<typeof import("node-llama-cpp")> {
     console.log("[engine] node-llama-cpp installed successfully.");
   }
 
-  // Write an ESM loader file inside LLAMA_DIR that uses a RELATIVE path
-  // to the entry point, avoiding bare specifier resolution entirely.
-  // Compiled Bun binaries with --external mark the package in their
-  // module graph, which can override filesystem resolution even from
-  // dynamically imported files. Relative paths bypass this.
+  // Write an ESM loader file inside LLAMA_DIR that re-exports node-llama-cpp.
+  // Bun resolves the loader's imports from its filesystem location, finding
+  // LLAMA_DIR/node_modules/. CI pins Bun 1.3.2 which handles this correctly;
+  // newer Bun versions have a regression with --external resolution in
+  // compiled binaries.
   const loaderPath = join(LLAMA_DIR, "_loader.mjs");
   console.log(`[engine] LLAMA_DIR=${LLAMA_DIR}`);
   console.log(`[engine] node-llama-cpp exists=${existsSync(pkgPath)}`);
-  console.log(`[engine] lifecycle-utils exists=${existsSync(join(LLAMA_DIR, "node_modules", "lifecycle-utils"))}`);
   console.log(`[engine] Writing loader to ${loaderPath}`);
-  writeFileSync(loaderPath, 'export * from "./node_modules/node-llama-cpp/dist/index.js";\n');
+  writeFileSync(loaderPath, 'export * from "node-llama-cpp";\n');
   console.log(`[engine] Importing via loader...`);
   return await import(loaderPath);
 }
