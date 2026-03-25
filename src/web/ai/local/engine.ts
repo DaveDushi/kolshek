@@ -5,11 +5,80 @@
 // Uses LlamaChatSession with defineChatSessionFunction for reliable function
 // calling — node-llama-cpp handles history, result matching, and looping internally.
 
+import { join } from "node:path";
+import { existsSync } from "node:fs";
+import envPaths from "env-paths";
 import type { AgentSSEEvent, ChatMessage, ToolDef } from "../types.js";
 import { executeToolAsync } from "../tools.js";
 import { TOOL_DEFS_LOCAL, TOOL_DEFS_FULL } from "../tools.js";
 import { MODEL_REGISTRY, getModelPath } from "./models.js";
 import type { ModelEntry } from "./models.js";
+
+// Auto-install and import node-llama-cpp.
+// The package is --external in compiled binaries, so it must be
+// installed at runtime into the user's data directory.
+const LLAMA_DIR = join(envPaths("kolshek").data, "node-llama-cpp");
+
+async function importLlamaCpp(): Promise<typeof import("node-llama-cpp")> {
+  // Try direct import first (works in dev or if globally installed)
+  try {
+    return await importLlamaCpp();
+  } catch {
+    // Not found — auto-install into data dir
+  }
+
+  // Check if already installed in data dir
+  const pkgPath = join(LLAMA_DIR, "node_modules", "node-llama-cpp");
+  if (!existsSync(pkgPath)) {
+    console.log("[engine] node-llama-cpp not found, installing...");
+
+    // Find a package manager
+    const pm = findPackageManager();
+    if (!pm) {
+      throw new Error(
+        "node-llama-cpp is required for local AI. Install bun or Node.js, then retry."
+      );
+    }
+
+    // Create package.json if missing
+    const pkgJson = join(LLAMA_DIR, "package.json");
+    if (!existsSync(pkgJson)) {
+      await Bun.write(pkgJson, JSON.stringify({ private: true }));
+    }
+
+    console.log(`[engine] Installing via ${pm.name}...`);
+    const proc = Bun.spawn([...pm.cmd, "node-llama-cpp"], {
+      cwd: LLAMA_DIR,
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    const code = await proc.exited;
+    if (code !== 0) {
+      throw new Error(`Failed to install node-llama-cpp (exit ${code}). Install it manually: cd "${LLAMA_DIR}" && npm install node-llama-cpp`);
+    }
+    console.log("[engine] node-llama-cpp installed successfully.");
+  }
+
+  // Import from the data dir
+  return await import(join(pkgPath, "dist", "index.js"));
+}
+
+function findPackageManager(): { name: string; cmd: string[] } | null {
+  // Prefer bun, then npm
+  const candidates: Array<{ name: string; bins: string[]; cmd: string[] }> = [
+    { name: "bun", bins: ["bun", join(process.env.HOME || "", ".bun", "bin", "bun")], cmd: ["bun", "add"] },
+    { name: "npm", bins: ["npm"], cmd: ["npm", "install"] },
+  ];
+  for (const c of candidates) {
+    for (const bin of c.bins) {
+      try {
+        const result = Bun.spawnSync([bin, "--version"], { stdout: "pipe", stderr: "pipe" });
+        if (result.exitCode === 0) return { name: c.name, cmd: [bin, ...c.cmd.slice(1)] };
+      } catch { /* not found */ }
+    }
+  }
+  return null;
+}
 
 // Context window limits
 const CTX_MIN = 2048;
@@ -132,7 +201,7 @@ export async function loadModel(
     throw new Error(`Model file not found: ${modelPath}. Download it first.`);
   }
 
-  const { getLlama } = await import("node-llama-cpp");
+  const { getLlama } = await importLlamaCpp();
   // Try Vulkan first (Intel Arc, AMD), then CUDA (NVIDIA), then CPU fallback.
   // Auto-detect may miss Intel Arc — explicit Vulkan is needed.
   const gpuAttempts: Array<{ gpu: any; label: string }> = [
@@ -208,7 +277,7 @@ export async function warmupContext(systemPrompt: string): Promise<void> {
 
   const start = Date.now();
   try {
-    const { LlamaChatSession } = await import("node-llama-cpp");
+    const { LlamaChatSession } = await importLlamaCpp();
     const session = new LlamaChatSession({
       contextSequence: sequenceInstance,
       systemPrompt: systemPrompt || undefined,
@@ -339,7 +408,7 @@ async function _runLocalInferenceInner(
   }
 
   const profile = activeProfile!;
-  const { LlamaChatSession, defineChatSessionFunction } = await import("node-llama-cpp");
+  const { LlamaChatSession, defineChatSessionFunction } = await importLlamaCpp();
 
   // Extract system prompt
   const systemPrompt = messages[0]?.role === "system" ? (messages[0].content || "") : "";
