@@ -51,7 +51,7 @@ export function useWidgetQueries(
   return useQuery({
     queryKey: queryKeys.widgetQueries.batch(pageId, filters),
     queryFn: () =>
-      api.post<Record<string, unknown>>("/api/v2/query/batch", {
+      api.post<Record<string, unknown>>("/api/v2/query", {
         queries: queries.map((q) => ({
           key: q.key,
           query: filters ? mergeFiltersIntoQuery(q.query, filters) : q.query,

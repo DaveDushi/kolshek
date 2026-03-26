@@ -141,7 +141,7 @@ import {
 } from "../db/repositories/budgets.js";
 import { validatePage } from "../core/page-schema.js";
 import { querySchema } from "../core/page-schema.js";
-import { resolveQuery, resolveQueryBatch } from "../core/query-resolver.js";
+import { resolveQueryBatch } from "../core/query-resolver.js";
 
 // SSE listeners for custom page changes (create/update/delete notifications)
 const pageEventListeners = new Set<(event: string) => void>();
@@ -1317,25 +1317,8 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         // =================================================================
         // --- Query Resolution API ---
 
-        // POST /api/v2/query — resolve a single query
+        // POST /api/v2/query — resolve one or more queries in a single request
         if (method === "POST" && path === "/api/v2/query") {
-          try {
-            const body = await parseJsonBody(req);
-            const parsed = querySchema.safeParse(body.query ?? body);
-            if (!parsed.success) {
-              const msg = parsed.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ");
-              return jsonError("QUERY_VALIDATION_FAILED", msg, 400);
-            }
-            const result = resolveQuery(parsed.data);
-            return json(result);
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            return jsonError("QUERY_FAILED", sanitizeError(msg), 500);
-          }
-        }
-
-        // POST /api/v2/query/batch — resolve multiple queries in one request
-        if (method === "POST" && path === "/api/v2/query/batch") {
           try {
             const body = await parseJsonBody(req);
             const queries = body.queries;
