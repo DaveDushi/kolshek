@@ -3,7 +3,7 @@
  */
 
 import type { Command } from "commander";
-import { select, input, password, confirm } from "@inquirer/prompts";
+import { select, input, password, confirm, checkbox } from "@inquirer/prompts";
 import chalk from "chalk";
 import { formatISO } from "date-fns";
 import {
@@ -27,6 +27,7 @@ import {
   hasSuccessfulSync,
   countConsecutiveFailures,
 } from "../../db/repositories/sync-log.js";
+import { createExcludedAccount } from "../../db/repositories/accounts.js";
 import {
   storeCredentials,
   getCredentials,
@@ -201,6 +202,7 @@ export function registerProvidersCommand(program: Command): void {
       let testSucceeded = false;
       let testFailed = false;
       let testError: string | undefined;
+      let discoveredAccounts: Array<{ accountNumber: string; balance?: number }> = [];
       const chromePath = findChromePath();
       if (chromePath) {
         const doTest = await confirm({
@@ -230,6 +232,10 @@ export function registerProvidersCommand(program: Command): void {
             });
             if (result.success) {
               testSucceeded = true;
+              discoveredAccounts = result.accounts.map((a) => ({
+                accountNumber: a.accountNumber,
+                balance: a.balance,
+              }));
               spinner.succeed(
                 `Connected! Found ${result.accounts.length} account(s).`,
               );
@@ -255,6 +261,29 @@ export function registerProvidersCommand(program: Command): void {
         }
       }
 
+      // If multiple accounts discovered, let user choose which to exclude
+      let excludedAccountNumbers: string[] = [];
+      if (discoveredAccounts.length > 1) {
+        for (const acct of discoveredAccounts) {
+          const bal = acct.balance != null
+            ? ` (${acct.balance.toLocaleString("en-IL", { minimumFractionDigits: 2 })})`
+            : "";
+          info(`  Account: ${formatAccountNumber(acct.accountNumber)}${bal}`);
+        }
+
+        excludedAccountNumbers = await checkbox({
+          message: "Select accounts to EXCLUDE from syncing (space to toggle, enter to confirm):",
+          choices: discoveredAccounts.map((a) => ({
+            value: a.accountNumber,
+            name: `${formatAccountNumber(a.accountNumber)}${a.balance != null ? ` (${a.balance.toLocaleString("en-IL", { minimumFractionDigits: 2 })})` : ""}`,
+          })),
+        });
+
+        if (excludedAccountNumbers.length > 0) {
+          info(`Excluding ${excludedAccountNumbers.length} account(s) from syncing.`);
+        }
+      }
+
       // Save credentials (keychain or file fallback)
       const credBackend = await storeCredentials(alias, credentials);
       if (credBackend === "file") {
@@ -270,6 +299,11 @@ export function registerProvidersCommand(program: Command): void {
         providerInfo.type,
         alias,
       );
+
+      // Pre-create excluded accounts so sync engine skips them
+      for (const acctNum of excludedAccountNumbers) {
+        createExcludedAccount(provider.id, acctNum);
+      }
 
       // Record test result in sync_log so auth status reflects the test
       if (testSucceeded || testFailed) {

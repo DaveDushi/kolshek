@@ -8,6 +8,7 @@ interface AccountRow {
   display_name: string | null;
   balance: number | null;
   currency: string;
+  excluded: number;
   created_at: string;
 }
 
@@ -19,6 +20,7 @@ function rowToAccount(row: AccountRow): Account {
     displayName: row.display_name,
     balance: row.balance,
     currency: row.currency,
+    excluded: row.excluded === 1,
     createdAt: row.created_at,
   };
 }
@@ -103,4 +105,51 @@ export function getAccount(id: number): Account | null {
     .get({ $id: id }) as AccountRow | null;
 
   return row ? rowToAccount(row) : null;
+}
+
+export function setAccountExcluded(id: number, excluded: boolean): void {
+  const db = getDatabase();
+  db.prepare("UPDATE accounts SET excluded = $excluded WHERE id = $id").run({
+    $excluded: excluded ? 1 : 0,
+    $id: id,
+  });
+}
+
+// Check if an account is excluded by company_id + account_number.
+// Used by sync engine before processing scraped accounts.
+export function isAccountExcludedByKey(
+  companyId: string,
+  accountNumber: string,
+): boolean {
+  const db = getDatabase();
+  const row = db
+    .prepare(
+      `SELECT a.excluded FROM accounts a
+       JOIN providers p ON a.provider_id = p.id
+       WHERE p.company_id = $companyId
+         AND a.account_number = $accountNumber
+       LIMIT 1`,
+    )
+    .get({
+      $companyId: companyId,
+      $accountNumber: accountNumber,
+    }) as { excluded: number } | null;
+
+  return row?.excluded === 1;
+}
+
+// Pre-create an account marked as excluded (used during provider setup).
+export function createExcludedAccount(
+  providerId: number,
+  accountNumber: string,
+): void {
+  const db = getDatabase();
+  db.prepare(
+    `INSERT INTO accounts (provider_id, account_number, excluded)
+     VALUES ($providerId, $accountNumber, 1)
+     ON CONFLICT (provider_id, account_number) DO UPDATE SET excluded = 1`,
+  ).run({
+    $providerId: providerId,
+    $accountNumber: accountNumber,
+  });
 }

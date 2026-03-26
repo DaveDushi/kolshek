@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.4.4
+
+### Bug Fixes
+
+- **AI model loading in compiled binary**: Rewrote the `node-llama-cpp` import strategy to reliably resolve the package and all its transitive dependencies (e.g. `lifecycle-utils`) when running as a compiled binary. Uses an ESM loader file placed in the install directory so Bun resolves from the correct `node_modules` tree.
+- **Model load errors now visible**: Errors during model loading are logged to the terminal instead of being silently returned as HTTP 400 responses.
+
+---
+
+## v0.4.3
+
+### Features
+
+- **Auto-install AI runtime**: When loading a model for the first time, the dashboard automatically detects bun or npm and installs `node-llama-cpp` into the data directory. No manual setup required.
+
+### Bug Fixes
+
+- **Windows SmartScreen block after update**: The `kolshek update` command now removes the Zone.Identifier stream from downloaded binaries, preventing Windows Application Control from blocking the updated executable.
+
+---
+
+## v0.4.2
+
+### Bug Fixes
+
+- **Dashboard assets in compiled binary**: The server now falls back to embedded assets when filesystem files don't exist, fixing "Not Found" errors when running the compiled binary on a fresh machine.
+- **Category classification**: Use upsert pattern for category rules, preventing duplicate constraint errors when reclassifying transactions.
+- **Auto-build in dev**: The `dashboard` command now auto-builds the React SPA if `dist/` is missing, so `bun run dev -- dashboard` works without a manual `bun run build:web` step.
+
+---
+
 ## v0.4.1
 
 ### Features

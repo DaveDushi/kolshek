@@ -8,6 +8,17 @@
 
 $ErrorActionPreference = 'Stop'
 
+# Detect non-interactive execution (e.g., inside an AI coding agent)
+try {
+    if ([Console]::IsInputRedirected) {
+        Write-Warn "Running non-interactively (e.g., inside an AI agent)."
+        Write-Warn "Install will work, but open a new terminal afterward to use kolshek."
+        Write-Host ""
+    }
+} catch {
+    # [Console]::IsInputRedirected may not be available in all hosts
+}
+
 $Repo = "DaveDushi/kolshek"
 $DefaultInstallDir = "$env:LOCALAPPDATA\kolshek"
 $InstallDir = if ($env:KOLSHEK_INSTALL_DIR) { $env:KOLSHEK_INSTALL_DIR } else { $DefaultInstallDir }
@@ -157,14 +168,18 @@ Write-Host "  KolShek " -NoNewline
 Write-Host "v$DisplayVersion" -ForegroundColor Green -NoNewline
 Write-Host " installed successfully!"
 Write-Host ""
-Write-Host "  Get started:"
-Write-Host "    kolshek init" -ForegroundColor Cyan -NoNewline
-Write-Host "     Set up your first bank or credit card"
-Write-Host ""
 
-# Check if available in current session
+# Show appropriate next steps depending on whether kolshek is on PATH
 $TestCmd = Get-Command kolshek -ErrorAction SilentlyContinue
-if (-not $TestCmd) {
-    Write-Host "  Restart your terminal for PATH changes to take effect." -ForegroundColor Yellow
-    Write-Host ""
+if ($TestCmd) {
+    Write-Host "  Get started:"
+    Write-Host "    kolshek init" -ForegroundColor Cyan -NoNewline
+    Write-Host "     Set up your first bank or credit card"
+} else {
+    Write-Host "  Next steps:" -ForegroundColor Yellow
+    Write-Host "    1. Open a new PowerShell terminal"
+    Write-Host "    2. Run: " -NoNewline
+    Write-Host "kolshek init" -ForegroundColor Cyan -NoNewline
+    Write-Host "  to set up your first bank or credit card"
 }
+Write-Host ""

@@ -3,7 +3,7 @@
  */
 
 import type { Command } from "commander";
-import { select, input, password, confirm } from "@inquirer/prompts";
+import { select, input, password, confirm, checkbox } from "@inquirer/prompts";
 import {
   PROVIDERS,
   getProvidersByType,
@@ -22,6 +22,7 @@ import {
 import {
   storeCredentials,
 } from "../../security/keychain.js";
+import { createExcludedAccount } from "../../db/repositories/accounts.js";
 import { scrapeProvider, findChromePath } from "../../core/scraper.js";
 import {
   isJsonMode,
@@ -50,22 +51,38 @@ export function registerInitCommand(program: Command): void {
   program
     .command("init")
     .description("First-run setup wizard — configure your first provider")
-    .action(async () => {
+    .option("--setup-only", "Initialize database and directories only (no interactive wizard)")
+    .action(async (opts: { setupOnly?: boolean }) => {
+      // --setup-only: headless DB/dir init for use by AI agents
+      if (opts.setupOnly) {
+        await ensureDirectories();
+        initDatabase(getDbPath());
+        if (isJsonMode()) {
+          printJson(jsonSuccess({ status: "initialized" }));
+        } else {
+          success("Database and directories initialized.");
+          info("  Add providers: run 'kolshek init' in your terminal.");
+        }
+        return;
+      }
+
       if (!isInteractive()) {
         if (isJsonMode()) {
           printJson(
-            jsonError("NON_INTERACTIVE", "init requires interactive mode", {
+            jsonError("NON_INTERACTIVE", "init requires an interactive terminal for credential entry", {
               suggestions: [
-                "Run without --non-interactive",
-                "Use 'kolshek providers add' with env var credentials instead",
+                "Run 'kolshek init' in your own terminal (not inside an AI agent)",
+                "Use 'kolshek init --setup-only' to initialize the database without the wizard",
+                "Use 'kolshek providers add' in your terminal to add providers individually",
               ],
             }),
           );
         } else {
-          printError("NON_INTERACTIVE", "init requires interactive mode", {
+          printError("NON_INTERACTIVE", "init requires an interactive terminal for credential entry", {
             suggestions: [
-              "Run without --non-interactive",
-              "Use 'kolshek providers add' with env var credentials instead",
+              "Run 'kolshek init' in your own terminal (not inside an AI agent)",
+              "Use 'kolshek init --setup-only' to initialize the database without the wizard",
+              "Use 'kolshek providers add' in your terminal to add providers individually",
             ],
           });
         }
@@ -197,6 +214,8 @@ export function registerInitCommand(program: Command): void {
           default: true,
         });
 
+        let discoveredAccounts: Array<{ accountNumber: string; balance?: number }> = [];
+
         if (testIt) {
           if (process.env.DEBUG) {
             warn("DEBUG env var is set — upstream scrapers may log sensitive data (credentials, account numbers) to stderr.");
@@ -219,6 +238,10 @@ export function registerInitCommand(program: Command): void {
               spinner.succeed(
                 `Connected! Found ${result.accounts.length} account(s).`,
               );
+              discoveredAccounts = result.accounts.map((a) => ({
+                accountNumber: a.accountNumber,
+                balance: a.balance,
+              }));
               for (const acc of result.accounts) {
                 const bal =
                   acc.balance != null
@@ -273,6 +296,22 @@ export function registerInitCommand(program: Command): void {
           }
         }
 
+        // If multiple accounts discovered, let user choose which to exclude
+        let excludedAccountNumbers: string[] = [];
+        if (discoveredAccounts.length > 1) {
+          excludedAccountNumbers = await checkbox({
+            message: "Select accounts to EXCLUDE from syncing (space to toggle, enter to confirm):",
+            choices: discoveredAccounts.map((a) => ({
+              value: a.accountNumber,
+              name: `${formatAccountNumber(a.accountNumber)}${a.balance != null ? ` (${a.balance.toLocaleString("en-IL", { minimumFractionDigits: 2 })})` : ""}`,
+            })),
+          });
+
+          if (excludedAccountNumbers.length > 0) {
+            info(`Excluding ${excludedAccountNumbers.length} account(s) from syncing.`);
+          }
+        }
+
         // Step 5: Save credentials
         const saveIt = await confirm({
           message: "Save credentials securely?",
@@ -291,7 +330,12 @@ export function registerInitCommand(program: Command): void {
 
         // Save provider to DB
         if (!isUpdate) {
-          createProvider(companyId, providerInfo.displayName, providerInfo.type, alias);
+          const provider = createProvider(companyId, providerInfo.displayName, providerInfo.type, alias);
+
+          // Pre-create excluded accounts so sync engine skips them
+          for (const acctNum of excludedAccountNumbers) {
+            createExcludedAccount(provider.id, acctNum);
+          }
         }
         configuredProviders.push(companyId);
         success(`${providerInfo.displayName} configured successfully!`);
@@ -346,11 +390,20 @@ export function registerInitCommand(program: Command): void {
       });
 
       if (aiTool !== "skip") {
-        const { installPlugin } = await import("./plugin.js");
+        const { installPlugin, registerClaudeCodePlugin } = await import("./plugin.js");
         const result = installPlugin(aiTool);
         if (result.success) {
           success(`Installed ${result.count} files for ${result.description}`);
           info(`  Location: ${result.dir}`);
+          if (aiTool === "claude-code") {
+            const reg = registerClaudeCodePlugin(result.dir);
+            if (reg.ok) {
+              success(reg.message);
+              info("  Restart Claude Code to activate the plugin.");
+            } else {
+              warn(reg.message);
+            }
+          }
         }
       }
 

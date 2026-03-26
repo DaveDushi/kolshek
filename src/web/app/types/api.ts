@@ -12,10 +12,20 @@ export interface Provider {
 
 export type AuthStatus = "no" | "pending" | "connected" | "expired";
 
+export interface ProviderAccount {
+  id: number;
+  accountNumber: string;
+  displayName: string | null;
+  balance: number | null;
+  currency: string;
+  excluded: boolean;
+}
+
 export interface ProviderCard extends Provider {
   hasCredentials: boolean;
   authStatus: AuthStatus;
   accountCount: number;
+  accounts: ProviderAccount[];
   transactionCount: number;
 }
 
@@ -111,12 +121,14 @@ export interface TranslatedGroup {
 
 // Matches BalanceRow from src/db/repositories/reports.ts
 export interface BalanceRow {
+  accountId: number;
   provider: string;
   providerAlias: string;
   providerType: string;
   accountNumber: string;
   balance: number | null;
   currency: string;
+  excluded: boolean;
   lastSyncedAt: string | null;
   recentExpenses30d: number;
   recentIncome30d: number;

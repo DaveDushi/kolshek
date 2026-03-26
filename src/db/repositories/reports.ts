@@ -221,12 +221,14 @@ export function getMerchantReport(
 // ---------------------------------------------------------------------------
 
 export interface BalanceRow {
+  accountId: number;
   provider: string;
   providerAlias: string;
   providerType: string;
   accountNumber: string;
   balance: number | null;
   currency: string;
+  excluded: boolean;
   lastSyncedAt: string | null;
   recentExpenses30d: number;
   recentIncome30d: number;
@@ -249,12 +251,14 @@ export function getBalanceReport(
 
   const sql = `
     SELECT
+      a.id AS account_id,
       p.display_name AS provider,
       p.alias AS provider_alias,
       p.type AS provider_type,
       a.account_number,
       a.balance,
       a.currency,
+      a.excluded,
       (SELECT MAX(sl.completed_at) FROM sync_log sl WHERE sl.provider_id = p.id) AS last_synced_at,
       COALESCE(
         (SELECT SUM(ABS(t2.charged_amount))
@@ -280,24 +284,28 @@ export function getBalanceReport(
   `;
 
   const rows = db.prepare(sql).all({ ...excludeParams, ...excludeParams3 }) as Array<{
+    account_id: number;
     provider: string;
     provider_alias: string;
     provider_type: string;
     account_number: string;
     balance: number | null;
     currency: string;
+    excluded: number;
     last_synced_at: string | null;
     recent_expenses_30d: number;
     recent_income_30d: number;
   }>;
 
   return rows.map((r) => ({
+    accountId: r.account_id,
     provider: r.provider,
     providerAlias: r.provider_alias,
     providerType: r.provider_type,
     accountNumber: r.account_number,
     balance: r.balance,
     currency: r.currency,
+    excluded: r.excluded === 1,
     lastSyncedAt: r.last_synced_at,
     recentExpenses30d: r.recent_expenses_30d,
     recentIncome30d: r.recent_income_30d,
