@@ -18,7 +18,7 @@ export function getTotalTrends(
   excludeClassifications?: readonly string[],
 ): TrendTotal[] {
   const months = getMonthlyReport(range, providerType, excludeClassifications);
-  // months come DESC — reverse for chronological MoM calc, then reverse back
+  // months come DESC — reverse for chronological MoM calc
   const chrono = [...months].reverse();
 
   return chrono.map((m, i): TrendTotal => {
@@ -33,7 +33,7 @@ export function getTotalTrends(
         ? Math.round(((m.income - prev.income) / prev.income) * 10000) / 100
         : null,
     };
-  }).reverse();
+  });
 }
 
 // --- Category mode ---
@@ -98,7 +98,7 @@ export function getCategoryTrends(
         ? Math.round(((r.total_amount - prev.total_amount) / prev.total_amount) * 10000) / 100
         : null,
     };
-  }).reverse();
+  });
 }
 
 // --- Fixed vs Variable mode ---
@@ -181,7 +181,7 @@ export function getFixedVariableTrends(
   }
 
   return [...monthMap.entries()]
-    .sort(([a], [b]) => b.localeCompare(a))
+    .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, d]) => ({
       month,
       fixed: Math.round(d.fixed * 100) / 100,

@@ -4,7 +4,8 @@
     "teardown": null,
     "run": [
       "$env:KOLSHEK_DEV = \"1\"; bun run dev -- dashboard --no-open",
-      "bun run dev:web"
+      "bun run dev:web",
+      "bun run build:web"
     ]
   }
 }
