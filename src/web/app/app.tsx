@@ -12,7 +12,7 @@ import { InsightsPage } from "./pages/insights-page";
 import { CategoriesPage } from "./pages/categories-page";
 import { TranslationsPage } from "./pages/translations-page";
 import { ProvidersPage } from "./pages/providers-page";
-import { AgentPage } from "./pages/agent-page";
+
 import { SchedulePage } from "./pages/schedule-page";
 
 const queryClient = new QueryClient({
@@ -44,7 +44,7 @@ export function App() {
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/translations" element={<TranslationsPage />} />
                 <Route path="/providers" element={<ProvidersPage />} />
-                <Route path="/agent" element={<AgentPage />} />
+
                 <Route path="/schedule" element={<SchedulePage />} />
               </Routes>
             </ErrorBoundary>

@@ -10,7 +10,7 @@ import {
   Tags,
   Languages,
   Building2,
-  Bot,
+
   Clock,
   Sun,
   Moon,
@@ -133,12 +133,6 @@ export function Sidebar() {
               </Badge>
             ) : null,
         },
-      ],
-    },
-    {
-      title: "AI",
-      items: [
-        { label: "Agent", path: "/agent", icon: Bot },
       ],
     },
     {
