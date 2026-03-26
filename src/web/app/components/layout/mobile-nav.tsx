@@ -11,7 +11,6 @@ import {
   TrendingUp,
   Languages,
   Upload,
-  GitCompareArrows,
   Building2,
   Bot,
   Clock,
@@ -144,20 +143,14 @@ export function MobileNav() {
         ) : null,
     },
     {
-<<<<<<< HEAD
       label: "Import",
       path: "/import",
       icon: Upload,
     },
     {
-      label: "Reconcile",
-      path: "/reconcile",
-      icon: GitCompareArrows,
-=======
       label: "Agent",
       path: "/agent",
       icon: Bot,
->>>>>>> origin/master
     },
     {
       label: "Providers",

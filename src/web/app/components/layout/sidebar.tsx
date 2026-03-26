@@ -10,7 +10,6 @@ import {
   Tags,
   Languages,
   Upload,
-  GitCompareArrows,
   Building2,
   Bot,
   Clock,
@@ -136,7 +135,6 @@ export function Sidebar() {
             ) : null,
         },
         { label: "Import", path: "/import", icon: Upload },
-        { label: "Reconcile", path: "/reconcile", icon: GitCompareArrows },
       ],
     },
     {

@@ -125,7 +125,6 @@ import {
   detectTrendWarnings,
 } from "../core/insights.js";
 import { syncProviders } from "../core/sync-engine.js";
-import { getDatabase } from "../db/database.js";
 import type { RuleConditions } from "../types/category-rule.js";
 import type { TransactionFilters } from "../types/transaction.js";
 
@@ -1295,101 +1294,6 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           }
 
           return json({ imported, updated, duplicates, errors: importErrors });
-        }
-
-        // === Reconciliation ===
-
-        // GET /api/v2/reconciliation/duplicates — find fuzzy duplicate candidates
-        if (method === "GET" && path === "/api/v2/reconciliation/duplicates") {
-          const { computeFuzzyScore, rankDuplicates } = await import("../core/reconcile.js");
-          const { findFuzzyDuplicateCandidates } = await import("../db/repositories/reconciliation.js");
-          const tolerance = Number(url.searchParams.get("tolerance") ?? "1");
-          const dateWindow = Number(url.searchParams.get("dateWindow") ?? "3");
-          const crossAccount = url.searchParams.get("crossAccount") === "true";
-          const minScore = Number(url.searchParams.get("minScore") ?? "0.5");
-          const from = url.searchParams.get("from") ?? undefined;
-          const to = url.searchParams.get("to") ?? undefined;
-          const accountId = url.searchParams.get("accountId") ? Number(url.searchParams.get("accountId")) : undefined;
-
-          const config = { amountTolerance: tolerance, dateWindowDays: dateWindow, descriptionThreshold: 0.6, crossAccount };
-          const rawPairs = findFuzzyDuplicateCandidates(config, { from, to, accountId });
-          const candidates = rankDuplicates(
-            rawPairs.map((p) => computeFuzzyScore(p.txA, p.txB, config)).filter((c): c is NonNullable<typeof c> => c !== null),
-            minScore,
-          );
-
-          return json({ candidates, count: candidates.length });
-        }
-
-        // POST /api/v2/reconciliation/decide — record merge or dismiss decision
-        if (method === "POST" && path === "/api/v2/reconciliation/decide") {
-          const body = await parseJsonBody(req);
-          const txIdA = Number(body.txIdA);
-          const txIdB = Number(body.txIdB);
-          const decision = body.decision as string;
-          const keepTxId = body.keepTxId ? Number(body.keepTxId) : undefined;
-
-          if (!txIdA || !txIdB || (decision !== "merged" && decision !== "dismissed")) {
-            return jsonError("BAD_REQUEST", "Required: txIdA, txIdB, decision (merged|dismissed).", 400);
-          }
-
-          const { mergeDuplicate, recordReconciliationDecision } = await import("../db/repositories/reconciliation.js");
-
-          if (decision === "merged") {
-            if (!keepTxId) {
-              return jsonError("BAD_REQUEST", "keepTxId is required for merge decisions.", 400);
-            }
-            const deleteTxId = keepTxId === txIdA ? txIdB : txIdA;
-            const result = mergeDuplicate(keepTxId, deleteTxId, Number(body.score ?? 0));
-            return json({ decision: result.decision });
-          } else {
-            const record = recordReconciliationDecision(txIdA, txIdB, "dismissed", Number(body.score ?? 0));
-            return json({ decision: record });
-          }
-        }
-
-        // GET /api/v2/reconciliation/history — past reconciliation decisions
-        if (method === "GET" && path === "/api/v2/reconciliation/history") {
-          const { listReconciliationDecisions } = await import("../db/repositories/reconciliation.js");
-          const decision = url.searchParams.get("decision") as "merged" | "dismissed" | undefined;
-          const limit = Number(url.searchParams.get("limit") ?? "50");
-          const records = listReconciliationDecisions({ decision: decision || undefined, limit });
-          return json(records);
-        }
-
-        // POST /api/v2/reconciliation/balance — compute account balance
-        if (method === "POST" && path === "/api/v2/reconciliation/balance") {
-          const body = await parseJsonBody(req);
-          const accountId = Number(body.accountId);
-          const expectedBalance = Number(body.expectedBalance);
-          if (!accountId || isNaN(expectedBalance)) {
-            return jsonError("BAD_REQUEST", "Required: accountId, expectedBalance.", 400);
-          }
-
-          const { computeAccountBalance } = await import("../db/repositories/reconciliation.js");
-          const from = typeof body.from === "string" ? body.from : undefined;
-          const to = typeof body.to === "string" ? body.to : undefined;
-          const result = computeAccountBalance(accountId, from, to);
-
-          // Look up account info
-          const db = getDatabase();
-          const acctRow = db.prepare(
-            `SELECT a.account_number, a.currency, p.alias AS provider_alias
-             FROM accounts a JOIN providers p ON p.id = a.provider_id
-             WHERE a.id = $id`,
-          ).get({ $id: accountId }) as { account_number: string; currency: string; provider_alias: string } | null;
-
-          return json({
-            accountId,
-            accountNumber: acctRow?.account_number ?? "",
-            providerAlias: acctRow?.provider_alias ?? "",
-            expectedBalance,
-            computedBalance: result.sum,
-            discrepancy: expectedBalance - result.sum,
-            transactionCount: result.count,
-            dateRange: { from: result.from, to: result.to },
-            currency: acctRow?.currency ?? "ILS",
-          });
         }
 
         // POST /api/v2/fetch — start a fetch (JSON body). Returns SSE stream.
