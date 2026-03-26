@@ -3,7 +3,7 @@
  */
 
 import type { Command } from "commander";
-import { select, input, password, confirm } from "@inquirer/prompts";
+import { select, input, password, confirm, checkbox } from "@inquirer/prompts";
 import {
   PROVIDERS,
   getProvidersByType,
@@ -22,6 +22,7 @@ import {
 import {
   storeCredentials,
 } from "../../security/keychain.js";
+import { createExcludedAccount } from "../../db/repositories/accounts.js";
 import { scrapeProvider, findChromePath } from "../../core/scraper.js";
 import {
   isJsonMode,
@@ -213,6 +214,8 @@ export function registerInitCommand(program: Command): void {
           default: true,
         });
 
+        let discoveredAccounts: Array<{ accountNumber: string; balance?: number }> = [];
+
         if (testIt) {
           if (process.env.DEBUG) {
             warn("DEBUG env var is set — upstream scrapers may log sensitive data (credentials, account numbers) to stderr.");
@@ -235,6 +238,10 @@ export function registerInitCommand(program: Command): void {
               spinner.succeed(
                 `Connected! Found ${result.accounts.length} account(s).`,
               );
+              discoveredAccounts = result.accounts.map((a) => ({
+                accountNumber: a.accountNumber,
+                balance: a.balance,
+              }));
               for (const acc of result.accounts) {
                 const bal =
                   acc.balance != null
@@ -289,6 +296,22 @@ export function registerInitCommand(program: Command): void {
           }
         }
 
+        // If multiple accounts discovered, let user choose which to exclude
+        let excludedAccountNumbers: string[] = [];
+        if (discoveredAccounts.length > 1) {
+          excludedAccountNumbers = await checkbox({
+            message: "Select accounts to EXCLUDE from syncing (space to toggle, enter to confirm):",
+            choices: discoveredAccounts.map((a) => ({
+              value: a.accountNumber,
+              name: `${formatAccountNumber(a.accountNumber)}${a.balance != null ? ` (${a.balance.toLocaleString("en-IL", { minimumFractionDigits: 2 })})` : ""}`,
+            })),
+          });
+
+          if (excludedAccountNumbers.length > 0) {
+            info(`Excluding ${excludedAccountNumbers.length} account(s) from syncing.`);
+          }
+        }
+
         // Step 5: Save credentials
         const saveIt = await confirm({
           message: "Save credentials securely?",
@@ -307,7 +330,12 @@ export function registerInitCommand(program: Command): void {
 
         // Save provider to DB
         if (!isUpdate) {
-          createProvider(companyId, providerInfo.displayName, providerInfo.type, alias);
+          const provider = createProvider(companyId, providerInfo.displayName, providerInfo.type, alias);
+
+          // Pre-create excluded accounts so sync engine skips them
+          for (const acctNum of excludedAccountNumbers) {
+            createExcludedAccount(provider.id, acctNum);
+          }
         }
         configuredProviders.push(companyId);
         success(`${providerInfo.displayName} configured successfully!`);

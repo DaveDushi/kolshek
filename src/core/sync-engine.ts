@@ -18,7 +18,10 @@ import {
   updateLastSynced,
   listProviders,
 } from "../db/repositories/providers.js";
-import { upsertAccount } from "../db/repositories/accounts.js";
+import {
+  upsertAccount,
+  isAccountExcludedByKey,
+} from "../db/repositories/accounts.js";
 import { upsertTransaction } from "../db/repositories/transactions.js";
 import {
   createSyncLog,
@@ -340,6 +343,11 @@ async function syncSingleProvider(
     db.run("BEGIN");
     try {
       for (const acct of scrapeResult.accounts) {
+        // Skip accounts the user has excluded from syncing
+        if (isAccountExcludedByKey(companyId, acct.accountNumber)) {
+          continue;
+        }
+
         const account = upsertAccount(
           provider.id,
           acct.accountNumber,

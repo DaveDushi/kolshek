@@ -40,7 +40,10 @@ export function NetWorthCard() {
     return <NetWorthSkeleton />;
   }
 
-  const accounts = Array.isArray(data) ? data : [];
+  // Only show active (non-excluded) accounts
+  const accounts = (Array.isArray(data) ? data : []).filter(
+    (row) => !row.excluded
+  );
 
   if (isError || accounts.length === 0) {
     return (
