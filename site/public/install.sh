@@ -8,6 +8,13 @@
 #   KOLSHEK_VERSION      Install a specific version (default: latest)
 set -eu
 
+# Detect non-interactive execution (e.g., inside an AI coding agent)
+if [ ! -t 0 ]; then
+  printf '\033[33mwarn\033[0m  Running non-interactively (e.g., inside an AI agent).\n'
+  printf '\033[33mwarn\033[0m  Install will work, but open a new terminal afterward to use kolshek.\n'
+  printf '\n'
+fi
+
 REPO="DaveDushi/kolshek"
 DEFAULT_INSTALL_DIR="$HOME/.local/bin"
 INSTALL_DIR="${KOLSHEK_INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
@@ -258,13 +265,14 @@ DISPLAY_VERSION="$(echo "$TAG" | sed 's/^v//')"
 printf "\n"
 printf "  ${BOLD}KolShek ${GREEN}v%s${RESET} installed successfully!\n" "$DISPLAY_VERSION"
 printf "\n"
-printf "  Get started:\n"
-printf "    ${CYAN}kolshek init${RESET}     Set up your first bank or credit card\n"
-printf "\n"
 
-# Check if the binary is available in current PATH
-if ! command -v kolshek >/dev/null 2>&1; then
-  printf "  ${YELLOW}Restart your terminal${RESET} for PATH changes to take effect, or run:\n"
-  printf "    export PATH=\"%s:\$PATH\"\n" "$INSTALL_DIR"
-  printf "\n"
+# Show appropriate next steps depending on whether kolshek is on PATH
+if command -v kolshek >/dev/null 2>&1; then
+  printf "  Get started:\n"
+  printf "    ${CYAN}kolshek init${RESET}     Set up your first bank or credit card\n"
+else
+  printf "  ${YELLOW}Next steps:${RESET}\n"
+  printf "    1. Open a new terminal (or run: ${CYAN}export PATH=\"%s:\$PATH\"${RESET})\n" "$INSTALL_DIR"
+  printf "    2. Run: ${CYAN}kolshek init${RESET}  to set up your first bank or credit card\n"
 fi
+printf "\n"

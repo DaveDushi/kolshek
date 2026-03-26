@@ -5,7 +5,7 @@
  */
 
 import type { Command } from "commander";
-import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { homedir } from "os";
 import {
@@ -70,6 +70,78 @@ function writeFiles(
   return count;
 }
 
+const MARKETPLACE_NAME = "kolshek-local";
+
+// Write a marketplace.json wrapper so Claude Code discovers the plugin
+// via the extraKnownMarketplaces + enabledPlugins settings mechanism.
+function writeMarketplaceManifest(marketplaceDir: string): void {
+  const manifest = {
+    name: MARKETPLACE_NAME,
+    owner: { name: "KolShek" },
+    plugins: [
+      {
+        name: "kolshek",
+        source: "./kolshek",
+        description: "KolShek — Israeli finance CLI plugin for Claude Code",
+      },
+    ],
+  };
+  const manifestPath = join(marketplaceDir, ".claude-plugin", "marketplace.json");
+  mkdirSync(dirname(manifestPath), { recursive: true });
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf-8");
+}
+
+// Register the plugin in ~/.claude/settings.json so it auto-loads.
+// Merges extraKnownMarketplaces + enabledPlugins without clobbering
+// other settings. Returns a status message for display.
+export function registerClaudeCodePlugin(
+  marketplaceDir: string,
+): { ok: boolean; message: string } {
+  const claudeDir = join(homedir(), ".claude");
+  const settingsPath = join(claudeDir, "settings.json");
+
+  if (!existsSync(claudeDir)) {
+    mkdirSync(claudeDir, { recursive: true });
+  }
+
+  let settings: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+    } catch {
+      return {
+        ok: false,
+        message: `Could not parse ${settingsPath} — add plugin settings manually.`,
+      };
+    }
+  }
+
+  // Merge extraKnownMarketplaces
+  const markets = (settings.extraKnownMarketplaces ?? {}) as Record<string, unknown>;
+  markets[MARKETPLACE_NAME] = {
+    source: {
+      source: "directory",
+      path: marketplaceDir.replace(/\\/g, "/"),
+    },
+  };
+  settings.extraKnownMarketplaces = markets;
+
+  // Merge enabledPlugins
+  const enabled = (settings.enabledPlugins ?? {}) as Record<string, boolean>;
+  enabled[`kolshek@${MARKETPLACE_NAME}`] = true;
+  settings.enabledPlugins = enabled;
+
+  try {
+    writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+    return { ok: true, message: "Registered KolShek plugin in Claude Code settings." };
+  } catch (err) {
+    return {
+      ok: false,
+      message: `Could not write ${settingsPath}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
 export function installPlugin(
   tool: string,
   pluginFiles?: PluginBundle,
@@ -86,7 +158,16 @@ export function installPlugin(
   }
 
   const target = getInstallTarget(tool as Tool);
-  const count = writeFiles(files, target.dir);
+
+  // For claude-code, nest plugin files inside a marketplace wrapper
+  const writeDir = tool === "claude-code"
+    ? join(target.dir, "kolshek")
+    : target.dir;
+  const count = writeFiles(files, writeDir);
+
+  if (tool === "claude-code") {
+    writeMarketplaceManifest(target.dir);
+  }
 
   return { success: true, count, dir: target.dir, description: target.description };
 }
@@ -148,9 +229,13 @@ export function registerPluginCommand(program: Command): void {
         info(`  Location: ${result.dir}`);
 
         if (tool === "claude-code") {
-          info(
-            `  Add to settings: "pluginDirs": ["${result.dir}"]`,
-          );
+          const reg = registerClaudeCodePlugin(result.dir);
+          if (reg.ok) {
+            success(`  ${reg.message}`);
+            info("  Restart Claude Code to activate the plugin.");
+          } else {
+            warn(`  ${reg.message}`);
+          }
         } else if (tool === "opencode") {
           warn("  Project-scoped — run from your project root.");
         }
