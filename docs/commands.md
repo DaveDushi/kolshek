@@ -449,6 +449,33 @@ Financial alerts and recommendations based on spending patterns.
 
 ---
 
+### `import`
+
+Import transactions from external files.
+
+#### `import csv <file>`
+
+Import transactions from a CSV file.
+
+| Option | Description |
+|--------|-------------|
+| `--dry-run` | Preview without writing to database |
+| `--skip-errors` | Continue past invalid rows |
+
+**Required columns:** `date`, `description`, `charged_amount`, `provider`, `account_number`
+
+**Optional columns:** `charged_currency`, `original_amount`, `original_currency`, `processed_date`, `status`, `type`, `memo`, `category`, `description_en`, `identifier`, `installment_number`, `installment_total`
+
+Header row is mandatory. Column order doesn't matter. Unknown columns are ignored.
+
+The `provider` column accepts either a companyId (e.g. `hapoalim`) or a provider alias. If the provider/account doesn't exist in the DB, it's auto-created.
+
+The output of `kolshek transactions export csv` is a superset of this format, so round-trip export-then-import works out of the box.
+
+See [`docs/example-import.csv`](example-import.csv) for a ready-to-use template.
+
+---
+
 ### `dashboard`
 
 Open the settings dashboard in your browser.

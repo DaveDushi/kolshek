@@ -10,6 +10,7 @@ import {
   Lightbulb,
   TrendingUp,
   Languages,
+  Upload,
   Building2,
 
   Clock,
@@ -140,6 +141,12 @@ export function MobileNav() {
             {untranslatedCount}
           </Badge>
         ) : null,
+    },
+    {
+    {
+      label: "Import",
+      path: "/import",
+      icon: Upload,
     },
     {
       label: "Providers",

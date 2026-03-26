@@ -9,6 +9,7 @@ import {
   TrendingUp,
   Tags,
   Languages,
+  Upload,
   Building2,
 
   Clock,
@@ -133,6 +134,7 @@ export function Sidebar() {
               </Badge>
             ) : null,
         },
+        { label: "Import", path: "/import", icon: Upload },
       ],
     },
     {

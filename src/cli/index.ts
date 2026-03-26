@@ -31,6 +31,7 @@ import { registerInsightsCommand } from "./commands/insights.js";
 import { registerDashboardCommand } from "./commands/dashboard.js";
 import { registerUpdateCommand } from "./commands/update.js";
 import { registerUninstallCommand } from "./commands/uninstall.js";
+import { registerImportCommand } from "./commands/import.js";
 import { getMostRecentSyncTime, listProviders } from "../db/repositories/providers.js";
 import { loadConfig } from "../config/loader.js";
 import { syncProviders } from "../core/sync-engine.js";
@@ -160,6 +161,7 @@ registerIncomeCommand(program);
 registerTrendsCommand(program);
 registerInsightsCommand(program);
 registerDashboardCommand(program);
+registerImportCommand(program);
 registerUpdateCommand(program);
 registerUninstallCommand(program);
 

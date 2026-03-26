@@ -1202,6 +1202,110 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         // =================================================================
         // --- Fetch / Sync API ---
 
+        // === Import CSV ===
+
+        // POST /api/v2/import/csv — parse + validate CSV, return preview
+        if (method === "POST" && path === "/api/v2/import/csv") {
+          const formData = await req.formData();
+          const file = formData.get("file");
+          if (!file || !(file instanceof File)) {
+            return jsonError("BAD_REQUEST", "Missing 'file' field in form data.", 400);
+          }
+          const text = await file.text();
+          const { validateCsvImport } = await import("../core/csv-import.js");
+          const validation = validateCsvImport(text);
+
+          // Check for duplicates against DB
+          const { transactionHash } = await import("../core/sync-engine.js");
+          const { resolveProviders } = await import("../db/repositories/providers.js");
+          const { getDatabase } = await import("../db/database.js");
+          const db = getDatabase();
+
+          const preview = validation.transactions.slice(0, 50).map((tx) => {
+            let isDuplicate = false;
+            const providers = resolveProviders(tx.provider);
+            if (providers.length === 1) {
+              const hash = transactionHash(
+                { date: tx.date, chargedAmount: tx.chargedAmount, description: tx.description, memo: tx.memo },
+                providers[0].companyId,
+                tx.accountNumber,
+              );
+              const existing = db
+                .prepare("SELECT 1 FROM transactions t JOIN accounts a ON a.id = t.account_id WHERE a.account_number = $acct AND t.hash = $hash LIMIT 1")
+                .get({ $acct: tx.accountNumber, $hash: hash });
+              isDuplicate = !!existing;
+            }
+            return {
+              date: tx.date,
+              description: tx.description,
+              chargedAmount: tx.chargedAmount,
+              chargedCurrency: tx.chargedCurrency,
+              status: tx.status,
+              category: tx.category,
+              provider: tx.provider,
+              accountNumber: tx.accountNumber,
+              isDuplicate,
+            };
+          });
+
+          return json({
+            totalRows: validation.transactions.length + validation.errors.length,
+            valid: validation.transactions.length,
+            errors: validation.errors,
+            preview,
+          });
+        }
+
+        // POST /api/v2/import/csv/confirm — commit CSV import to DB
+        if (method === "POST" && path === "/api/v2/import/csv/confirm") {
+          const formData = await req.formData();
+          const file = formData.get("file");
+          const skipErrors = formData.get("skipErrors") === "true";
+          if (!file || !(file instanceof File)) {
+            return jsonError("BAD_REQUEST", "Missing 'file' field in form data.", 400);
+          }
+          const text = await file.text();
+          const { validateCsvImport, buildTransactionInput } = await import("../core/csv-import.js");
+          const { resolveProviders: resolve2 } = await import("../db/repositories/providers.js");
+          const { upsertAccount } = await import("../db/repositories/accounts.js");
+          const { upsertTransaction } = await import("../db/repositories/transactions.js");
+          const { getDatabase: getDb } = await import("../db/database.js");
+
+          const validation = validateCsvImport(text);
+          if (validation.errors.length > 0 && !skipErrors) {
+            return jsonError("VALIDATION_ERROR", `CSV has ${validation.errors.length} error(s).`, 400);
+          }
+
+          const db = getDb();
+          let imported = 0, updated = 0, duplicates = 0;
+          const importErrors: Array<{ row: number; message: string }> = [];
+
+          db.run("BEGIN");
+          try {
+            for (let i = 0; i < validation.transactions.length; i++) {
+              const tx = validation.transactions[i];
+              const providers = resolve2(tx.provider);
+              if (providers.length !== 1) {
+                importErrors.push({ row: i + 2, message: `Provider '${tx.provider}' not found or ambiguous.` });
+                continue;
+              }
+              const provider = providers[0];
+              const account = upsertAccount(provider.id, tx.accountNumber, provider.companyId);
+              const input = buildTransactionInput(tx, account.id, provider.companyId, tx.accountNumber);
+              const result = upsertTransaction(input);
+              if (result.action === "inserted") imported++;
+              else if (result.action === "updated") updated++;
+              else duplicates++;
+            }
+            db.run("COMMIT");
+          } catch (err) {
+            db.run("ROLLBACK");
+            return jsonError("IMPORT_ERROR", err instanceof Error ? err.message : String(err), 500);
+          }
+
+          return json({ imported, updated, duplicates, errors: importErrors });
+        }
+
         // POST /api/v2/fetch — start a fetch (JSON body). Returns SSE stream.
         if (method === "POST" && path === "/api/v2/fetch") {
           if (activeFetch) {
