@@ -277,6 +277,10 @@ UPDATE categories SET classification = 'cc_billing' WHERE name = 'CC Billing';
 
 -- Drop the spending_excludes table (replaced by classification system)
 DROP TABLE IF EXISTS spending_excludes;`],
+
+  ["013_account_excluded.sql", `-- Add excluded flag to accounts for per-account sync filtering.
+-- Excluded accounts are skipped during sync (no balance update, no transactions).
+ALTER TABLE accounts ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0;`],
 ];
 
 // Run all pending SQL migrations.

@@ -143,7 +143,6 @@ export function MobileNav() {
         ) : null,
     },
     {
-    {
       label: "Import",
       path: "/import",
       icon: Upload,
