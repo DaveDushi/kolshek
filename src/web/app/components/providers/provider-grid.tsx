@@ -12,6 +12,7 @@ import {
   MoreVertical,
   RefreshCw,
   Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   Card,
@@ -40,7 +41,14 @@ import {
 } from "@/components/ui/dialog";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { ProviderCard as ProviderCardType } from "@/types/api";
+import { useToggleAccountExclusion } from "@/hooks/use-accounts";
+import type { ProviderCard as ProviderCardType, ProviderAccount } from "@/types/api";
+
+// Mask account number to show only last 4 digits
+function maskAccountNumber(num: string): string {
+  if (num.length <= 4) return num;
+  return "****" + num.slice(-4);
+}
 
 interface ProviderGridProps {
   providers: ProviderCardType[];
@@ -85,6 +93,53 @@ function DeleteConfirmDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Account row with exclusion toggle
+function AccountRow({ account }: { account: ProviderAccount }) {
+  const toggleExclusion = useToggleAccountExclusion();
+
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[13px]",
+        account.excluded && "opacity-50"
+      )}
+    >
+      <span className="truncate text-muted-foreground">
+        {maskAccountNumber(account.accountNumber)}
+      </span>
+      <div className="flex items-center gap-2 shrink-0">
+        {account.balance != null && (
+          <span className={cn("text-xs tabular-nums", account.excluded && "line-through")}>
+            {account.balance.toLocaleString("en-IL", {
+              style: "currency",
+              currency: account.currency || "ILS",
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
+            })}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() =>
+            toggleExclusion.mutate({
+              accountId: account.id,
+              excluded: !account.excluded,
+            })
+          }
+          className="p-0.5 rounded hover:bg-muted/80 text-muted-foreground transition-colors"
+          title={account.excluded ? "Include in syncing" : "Exclude from syncing"}
+        >
+          {account.excluded ? (
+            <EyeOff className="h-3.5 w-3.5" />
+          ) : (
+            <Eye className="h-3.5 w-3.5" />
+          )}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -201,19 +256,37 @@ function ProviderCardItem({
           )}
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <p className="text-muted-foreground">Accounts</p>
-            <p className="font-medium">{provider.accountCount}</p>
+        {/* Accounts list with exclusion toggles */}
+        {provider.accounts.length > 0 ? (
+          <div className="space-y-0.5">
+            <p className="text-xs font-medium text-muted-foreground mb-1">Accounts</p>
+            {provider.accounts.map((account) => (
+              <AccountRow key={account.id} account={account} />
+            ))}
           </div>
-          <div>
-            <p className="text-muted-foreground">Transactions</p>
-            <p className="font-medium">
-              {provider.transactionCount.toLocaleString()}
-            </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <p className="text-muted-foreground">Accounts</p>
+              <p className="font-medium">0</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Transactions</p>
+              <p className="font-medium">
+                {provider.transactionCount.toLocaleString()}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Transaction count (when accounts exist) */}
+        {provider.accounts.length > 0 && (
+          <div className="text-sm">
+            <span className="text-muted-foreground">
+              {provider.transactionCount.toLocaleString()} transactions
+            </span>
+          </div>
+        )}
       </CardContent>
 
       <CardFooter className="text-xs text-muted-foreground">

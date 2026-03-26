@@ -439,6 +439,14 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
                   hasCredentials: hasCreds,
                   authStatus,
                   accountCount: accounts.length,
+                  accounts: accounts.map((a) => ({
+                    id: a.id,
+                    accountNumber: a.accountNumber,
+                    displayName: a.displayName,
+                    balance: a.balance,
+                    currency: a.currency,
+                    excluded: a.excluded,
+                  })),
                   transactionCount: txCount,
                 };
               }),

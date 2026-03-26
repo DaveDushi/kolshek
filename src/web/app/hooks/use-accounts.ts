@@ -18,6 +18,7 @@ export function useToggleAccountExclusion() {
       api.patch(`/api/v2/accounts/${accountId}`, { excluded }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.accounts.balance() });
+      qc.invalidateQueries({ queryKey: queryKeys.providers.list() });
     },
   });
 }
