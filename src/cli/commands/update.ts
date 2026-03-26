@@ -263,6 +263,15 @@ export function registerUpdateCommand(program: Command): void {
           }
         }
 
+        // Remove Windows Zone.Identifier so SmartScreen doesn't block the binary
+        if (process.platform === "win32") {
+          try {
+            unlinkSync(execPath + ":Zone.Identifier");
+          } catch {
+            // best-effort — stream may not exist
+          }
+        }
+
         // Clean up backup
         try {
           unlinkSync(backupPath);
