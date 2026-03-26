@@ -1,6 +1,6 @@
-/**
- * kolshek accounts — View accounts and balances.
- */
+// kolshek accounts — View accounts and balances.
+// kolshek accounts exclude <id> — Exclude an account from syncing.
+// kolshek accounts include <id> — Re-include a previously excluded account.
 
 import type { Command } from "commander";
 import {
@@ -8,12 +8,17 @@ import {
   printJson,
   jsonSuccess,
   info,
+  success,
   createTable,
   formatCurrency,
   formatAccountNumber,
   formatDate,
 } from "../output.js";
 import { getDatabase } from "../../db/database.js";
+import {
+  getAccount,
+  setAccountExcluded,
+} from "../../db/repositories/accounts.js";
 
 interface AccountWithProviderRow {
   id: number;
@@ -21,6 +26,7 @@ interface AccountWithProviderRow {
   display_name: string | null;
   balance: number | null;
   currency: string;
+  excluded: number;
   created_at: string;
   provider_display_name: string;
   provider_company_id: string;
@@ -39,6 +45,7 @@ function listAccountsWithProviders(): AccountWithProviderRow[] {
         a.display_name,
         a.balance,
         a.currency,
+        a.excluded,
         a.created_at,
         p.display_name AS provider_display_name,
         p.company_id AS provider_company_id,
@@ -53,10 +60,13 @@ function listAccountsWithProviders(): AccountWithProviderRow[] {
 }
 
 export function registerAccountsCommand(program: Command): void {
-  program
+  const cmd = program
     .command("accounts")
     .alias("bal")
-    .description("Show accounts and balances")
+    .description("Show accounts and balances");
+
+  // Default action: list accounts
+  cmd
     .option("--provider <name>", "Filter by provider company ID")
     .option("--type <type>", "Filter by provider type (bank|credit_card)")
     .action((opts) => {
@@ -80,16 +90,16 @@ export function registerAccountsCommand(program: Command): void {
               displayName: a.display_name,
               balance: a.balance,
               currency: a.currency,
+              excluded: a.excluded === 1,
               provider: a.provider_company_id,
               providerAlias: a.provider_alias,
               providerName: a.provider_display_name,
               providerType: a.provider_type,
               lastSyncedAt: a.last_synced_at,
             })),
-            totalBalance: accounts.reduce(
-              (sum, a) => sum + (a.balance ?? 0),
-              0,
-            ),
+            totalBalance: accounts
+              .filter((a) => a.excluded === 0)
+              .reduce((sum, a) => sum + (a.balance ?? 0), 0),
           }),
         );
         return;
@@ -103,22 +113,24 @@ export function registerAccountsCommand(program: Command): void {
       }
 
       const table = createTable(
-        ["Provider", "Account", "Balance", "Currency", "Last Synced"],
+        ["ID", "Provider", "Account", "Balance", "Currency", "Status", "Last Synced"],
         accounts.map((a) => [
+          String(a.id),
           a.provider_alias,
           formatAccountNumber(a.account_number, true),
           a.balance != null
             ? formatCurrency(a.balance, a.currency)
             : "N/A",
           a.currency,
+          a.excluded ? "Excluded" : "Active",
           a.last_synced_at ? formatDate(a.last_synced_at) : "Never",
         ]),
       );
       console.log(table);
 
-      // Show total for ILS accounts
+      // Show total for ILS accounts (only active)
       const ilsAccounts = accounts.filter(
-        (a) => a.currency === "ILS" && a.balance != null,
+        (a) => a.currency === "ILS" && a.balance != null && a.excluded === 0,
       );
       if (ilsAccounts.length > 1) {
         const total = ilsAccounts.reduce(
@@ -129,5 +141,59 @@ export function registerAccountsCommand(program: Command): void {
       }
 
       info(`\n${accounts.length} account(s).`);
+    });
+
+  // accounts exclude <id>
+  cmd
+    .command("exclude <id>")
+    .description("Exclude an account from syncing")
+    .action((idStr: string) => {
+      const id = parseInt(idStr, 10);
+      if (isNaN(id)) {
+        console.error("Invalid account ID.");
+        process.exit(2);
+      }
+      const account = getAccount(id);
+      if (!account) {
+        console.error(`Account ${id} not found.`);
+        process.exit(1);
+      }
+      if (account.excluded) {
+        info(`Account ${id} is already excluded.`);
+        return;
+      }
+      setAccountExcluded(id, true);
+      if (isJsonMode()) {
+        printJson(jsonSuccess({ id, excluded: true }));
+      } else {
+        success(`Account ${id} (${account.accountNumber}) excluded from syncing.`);
+      }
+    });
+
+  // accounts include <id>
+  cmd
+    .command("include <id>")
+    .description("Re-include a previously excluded account")
+    .action((idStr: string) => {
+      const id = parseInt(idStr, 10);
+      if (isNaN(id)) {
+        console.error("Invalid account ID.");
+        process.exit(2);
+      }
+      const account = getAccount(id);
+      if (!account) {
+        console.error(`Account ${id} not found.`);
+        process.exit(1);
+      }
+      if (!account.excluded) {
+        info(`Account ${id} is already active.`);
+        return;
+      }
+      setAccountExcluded(id, false);
+      if (isJsonMode()) {
+        printJson(jsonSuccess({ id, excluded: false }));
+      } else {
+        success(`Account ${id} (${account.accountNumber}) re-included for syncing.`);
+      }
     });
 }

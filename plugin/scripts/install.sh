@@ -54,16 +54,61 @@ get_frontmatter() {
 
 # --- Claude Code ---
 install_claude_code() {
-  local dest="${HOME}/.claude/plugins/kolshek"
-  mkdir -p "$dest"
-  cp -r "$PLUGIN_DIR/.claude-plugin" "$dest/" 2>&1 || true
-  cp -r "$PLUGIN_DIR/skills" "$dest/" 2>&1 || true
-  cp -r "$PLUGIN_DIR/hooks" "$dest/" 2>&1 || true
-  cp -r "$PLUGIN_DIR/references" "$dest/" 2>&1 || true
-  mkdir -p "$dest/scripts"
-  cp "$PLUGIN_DIR/scripts/check-config.sh" "$dest/scripts/" 2>&1 || true
-  info "Claude Code: plugin installed -> $dest"
-  echo "  Ensure ~/.claude/settings.json has: \"pluginDirs\": [\"$dest\"]"
+  local marketplace_dir="${HOME}/.claude/plugins/kolshek"
+  local plugin_dir="${marketplace_dir}/kolshek"
+  mkdir -p "$plugin_dir"
+
+  # Copy plugin files into nested kolshek/ subdirectory
+  cp -r "$PLUGIN_DIR/.claude-plugin" "$plugin_dir/" 2>&1 || true
+  cp -r "$PLUGIN_DIR/skills" "$plugin_dir/" 2>&1 || true
+  cp -r "$PLUGIN_DIR/hooks" "$plugin_dir/" 2>&1 || true
+  cp -r "$PLUGIN_DIR/references" "$plugin_dir/" 2>&1 || true
+  mkdir -p "$plugin_dir/scripts"
+  cp "$PLUGIN_DIR/scripts/check-config.sh" "$plugin_dir/scripts/" 2>&1 || true
+
+  # Write marketplace manifest at marketplace root
+  mkdir -p "$marketplace_dir/.claude-plugin"
+  cat > "$marketplace_dir/.claude-plugin/marketplace.json" <<'MANIFEST'
+{
+  "name": "kolshek-local",
+  "owner": { "name": "KolShek" },
+  "plugins": [
+    {
+      "name": "kolshek",
+      "source": "./kolshek",
+      "description": "KolShek — Israeli finance CLI plugin for Claude Code"
+    }
+  ]
+}
+MANIFEST
+
+  info "Claude Code: plugin installed -> $marketplace_dir"
+
+  # Auto-register in ~/.claude/settings.json
+  local settings_file="${HOME}/.claude/settings.json"
+  if command -v jq >/dev/null 2>&1; then
+    local tmp_settings
+    tmp_settings="$(mktemp)"
+    if [ -f "$settings_file" ]; then
+      jq --arg dir "$marketplace_dir" '
+        .extraKnownMarketplaces["kolshek-local"] = {source: {source: "directory", path: $dir}} |
+        .enabledPlugins["kolshek@kolshek-local"] = true
+      ' "$settings_file" > "$tmp_settings" && mv "$tmp_settings" "$settings_file"
+      info "Registered plugin in $settings_file"
+    else
+      mkdir -p "$(dirname "$settings_file")"
+      jq -n --arg dir "$marketplace_dir" '{
+        extraKnownMarketplaces: {"kolshek-local": {source: {source: "directory", path: $dir}}},
+        enabledPlugins: {"kolshek@kolshek-local": true}
+      }' > "$settings_file"
+      info "Created $settings_file with plugin settings"
+    fi
+  else
+    warn "jq not found — add these settings to $settings_file manually:"
+    echo '  "extraKnownMarketplaces": {"kolshek-local": {"source": {"source": "directory", "path": "'"$marketplace_dir"'"}}}'
+    echo '  "enabledPlugins": {"kolshek@kolshek-local": true}'
+  fi
+  echo "  Restart Claude Code to activate the plugin."
 }
 
 # --- OpenCode ---

@@ -50,7 +50,11 @@ import {
   searchTransactions,
   updateTransactionCategory,
 } from "../db/repositories/transactions.js";
-import { getAccountsByProvider } from "../db/repositories/accounts.js";
+import {
+  getAccountsByProvider,
+  getAccount,
+  setAccountExcluded,
+} from "../db/repositories/accounts.js";
 import {
   getLatestCompletedSyncLog,
   hasSuccessfulSync,
@@ -435,6 +439,14 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
                   hasCredentials: hasCreds,
                   authStatus,
                   accountCount: accounts.length,
+                  accounts: accounts.map((a) => ({
+                    id: a.id,
+                    accountNumber: a.accountNumber,
+                    displayName: a.displayName,
+                    balance: a.balance,
+                    currency: a.currency,
+                    excluded: a.excluded,
+                  })),
                   transactionCount: txCount,
                 };
               }),
@@ -553,6 +565,27 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("BALANCE_FAILED", msg, 500);
+          }
+        }
+
+        // PATCH /api/v2/accounts/:id — toggle account exclusion
+        const accountPatch = path.match(/^\/api\/v2\/accounts\/(\d+)$/);
+        if (method === "PATCH" && accountPatch) {
+          try {
+            const id = parseInt(accountPatch[1], 10);
+            const account = getAccount(id);
+            if (!account) {
+              return jsonError("NOT_FOUND", `Account ${id} not found`, 404);
+            }
+            const body = await req.json() as { excluded?: boolean };
+            if (typeof body.excluded !== "boolean") {
+              return jsonError("BAD_REQUEST", "Body must include { excluded: boolean }", 400);
+            }
+            setAccountExcluded(id, body.excluded);
+            return json({ ...account, excluded: body.excluded });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("ACCOUNT_UPDATE_FAILED", msg, 500);
           }
         }
 
