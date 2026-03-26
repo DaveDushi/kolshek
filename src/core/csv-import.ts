@@ -14,7 +14,7 @@ const REQUIRED_COLUMNS = ["date", "description", "charged_amount", "provider", "
 // Optional columns (accepted but not required):
 // charged_currency, original_amount, original_currency, processed_date,
 // status, type, memo, category, description_en, identifier,
-// installment_number, installment_total, provider_alias
+// installment_number, installment_total, provider_alias, provider_type
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,6 +37,7 @@ export interface CsvTransaction {
   installmentNumber: number | null;
   installmentTotal: number | null;
   provider: string;
+  providerType: string | null;
   accountNumber: string;
 }
 
@@ -248,6 +249,11 @@ export function parseRow(
   const rawInstTotal = get("installment_total");
   const installmentTotal = rawInstTotal ? Number(rawInstTotal) : null;
 
+  const rawProviderType = get("provider_type").toLowerCase() || null;
+  if (rawProviderType && rawProviderType !== "bank" && rawProviderType !== "credit_card") {
+    return { error: { row: rowIndex, column: "provider_type", message: `Invalid provider_type: '${rawProviderType}' (must be bank or credit_card)` } };
+  }
+
   return {
     tx: {
       date,
@@ -266,6 +272,7 @@ export function parseRow(
       installmentNumber,
       installmentTotal,
       provider,
+      providerType: rawProviderType,
       accountNumber,
     },
   };

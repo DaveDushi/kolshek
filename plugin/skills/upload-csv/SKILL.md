@@ -33,7 +33,9 @@ KolShek requires these **5 columns** (header names must match exactly):
 | `account_number` | string | Account number or last 4 digits |
 
 **Optional columns** (include if data is available):
-`charged_currency`, `original_amount`, `original_currency`, `processed_date`, `status`, `type`, `memo`, `category`, `description_en`, `identifier`, `installment_number`, `installment_total`
+`charged_currency`, `original_amount`, `original_currency`, `processed_date`, `status`, `type`, `memo`, `category`, `description_en`, `identifier`, `installment_number`, `installment_total`, `provider_type`
+
+> **Note:** If the provider doesn't exist in KolShek yet, it will be **auto-created** during import. Set `provider_type` to `bank` or `credit_card` to control the type (defaults to `bank` if omitted).
 
 ## Step 1: Identify the CSV File
 
@@ -90,7 +92,8 @@ Map source columns to KolShek columns. Present the mapping for user approval:
 > Does this mapping look correct?
 
 Ask the user for any missing required values:
-- **Provider name**: suggest a sensible default based on the filename or content (e.g., `chase`, `bofa`, `amex`, `wells-fargo`, `capital-one`). This becomes the provider alias in KolShek.
+- **Provider name**: suggest a sensible default based on the filename or content (e.g., `chase`, `bofa`, `amex`, `wells-fargo`, `capital-one`). This becomes the provider alias in KolShek. The provider will be **auto-created** if it doesn't exist — no need to run `kolshek providers add` first.
+- **Provider type**: include the `provider_type` column with value `bank` or `credit_card` so the auto-created provider gets the correct type.
 - **Account number**: ask the user — check if it appears in the CSV metadata rows first.
 - **Currency**: default to USD for US banks, EUR for European, etc.
 

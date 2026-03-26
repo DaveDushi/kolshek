@@ -12,11 +12,13 @@ import {
   resolveProviders,
   getProviderByAlias,
   getProviderByCompanyId,
+  createProvider,
 } from "../../db/repositories/providers.js";
 import { upsertAccount } from "../../db/repositories/accounts.js";
 import { upsertTransaction } from "../../db/repositories/transactions.js";
 import { getDatabase } from "../../db/database.js";
-import type { Provider } from "../../types/index.js";
+import type { Provider, ProviderType } from "../../types/index.js";
+import { isValidCompanyId, PROVIDERS } from "../../types/provider.js";
 import {
   isJsonMode,
   printJson,
@@ -88,6 +90,8 @@ export function registerImportCommand(program: Command): void {
         transactions: CsvTransaction[];
       }> = [];
 
+      const autoCreatedProviders: Array<{ alias: string; displayName: string; type: ProviderType }> = [];
+
       for (const [key, txns] of groups) {
         const [providerStr, accountNumber] = key.split("\0");
 
@@ -106,9 +110,28 @@ export function registerImportCommand(program: Command): void {
               `'${providerStr}' matches multiple providers. Use the alias to be specific.`);
             process.exit(ExitCode.BadArgs);
           } else {
-            printError("UNKNOWN_PROVIDER",
-              `Provider '${providerStr}' not found. Add it first with 'kolshek providers add'.`);
-            process.exit(ExitCode.BadArgs);
+            // Auto-create provider for unknown companyId (e.g., foreign banks)
+            let type: ProviderType = "bank";
+            let displayName = toDisplayName(providerStr);
+
+            if (isValidCompanyId(providerStr)) {
+              const providerInfo = PROVIDERS[providerStr];
+              type = providerInfo.type;
+              displayName = providerInfo.displayName;
+            }
+
+            // Check if any CSV row in this group specified a provider_type
+            const explicitType = txns.find((t) => t.providerType)?.providerType as ProviderType | undefined;
+            if (explicitType) {
+              type = explicitType;
+            }
+
+            provider = createProvider(providerStr, displayName, type);
+            autoCreatedProviders.push({ alias: providerStr, displayName, type });
+
+            if (!isJsonMode()) {
+              info(`Auto-created provider '${providerStr}' (${displayName}, ${type}).`);
+            }
           }
         }
 
@@ -169,6 +192,7 @@ export function registerImportCommand(program: Command): void {
             duplicates: dupCount,
             errors: validation.errors.length,
             skippedErrors: validation.errors,
+            autoCreatedProviders,
           }));
         } else {
           console.log(createTable(["Metric", "Count"], [
@@ -222,6 +246,7 @@ export function registerImportCommand(program: Command): void {
           duplicates: dupCount,
           errors: validation.errors.length,
           skippedErrors: opts.skipErrors ? validation.errors : [],
+          autoCreatedProviders,
         }));
       } else {
         console.log(createTable(["Metric", "Count"], [
@@ -233,6 +258,14 @@ export function registerImportCommand(program: Command): void {
         info(`Successfully imported ${newCount + updateCount} transactions.`);
       }
     });
+}
+
+// Convert a provider ID like "chase" or "wells-fargo" to a display name
+function toDisplayName(id: string): string {
+  return id
+    .split(/[-_]/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
 // Group CSV transactions by "provider\0account_number"

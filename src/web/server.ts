@@ -1266,10 +1266,11 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           }
           const text = await file.text();
           const { validateCsvImport, buildTransactionInput } = await import("../core/csv-import.js");
-          const { resolveProviders: resolve2 } = await import("../db/repositories/providers.js");
+          const { resolveProviders: resolve2, createProvider: createProv, getProviderByAlias: getByAlias } = await import("../db/repositories/providers.js");
           const { upsertAccount } = await import("../db/repositories/accounts.js");
           const { upsertTransaction } = await import("../db/repositories/transactions.js");
           const { getDatabase: getDb } = await import("../db/database.js");
+          const { isValidCompanyId, PROVIDERS } = await import("../types/provider.js");
 
           const validation = validateCsvImport(text);
           if (validation.errors.length > 0 && !skipErrors) {
@@ -1279,17 +1280,54 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           const db = getDb();
           let imported = 0, updated = 0, duplicates = 0;
           const importErrors: Array<{ row: number; message: string }> = [];
+          // Cache auto-created providers to avoid UNIQUE constraint violations
+          const autoCreated = new Map<string, { id: number; companyId: string }>();
+          const autoCreatedProviders: Array<{ alias: string; displayName: string; type: string }> = [];
+
+          const toName = (id: string): string =>
+            id.split(/[-_]/).map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 
           db.run("BEGIN");
           try {
             for (let i = 0; i < validation.transactions.length; i++) {
               const tx = validation.transactions[i];
               const providers = resolve2(tx.provider);
-              if (providers.length !== 1) {
-                importErrors.push({ row: i + 2, message: `Provider '${tx.provider}' not found or ambiguous.` });
+              let provider: { id: number; companyId: string } | undefined;
+
+              if (providers.length === 1) {
+                provider = providers[0];
+              } else if (providers.length > 1) {
+                importErrors.push({ row: i + 2, message: `Provider '${tx.provider}' is ambiguous.` });
                 continue;
+              } else {
+                // Auto-create provider if not found
+                const cached = autoCreated.get(tx.provider);
+                if (cached) {
+                  provider = cached;
+                } else {
+                  const existing = getByAlias(tx.provider);
+                  if (existing) {
+                    provider = existing;
+                    autoCreated.set(tx.provider, existing);
+                  } else {
+                    let type: "bank" | "credit_card" = "bank";
+                    let displayName = toName(tx.provider);
+                    if (isValidCompanyId(tx.provider)) {
+                      const pInfo = PROVIDERS[tx.provider];
+                      type = pInfo.type;
+                      displayName = pInfo.displayName;
+                    }
+                    if (tx.providerType === "bank" || tx.providerType === "credit_card") {
+                      type = tx.providerType;
+                    }
+                    const newProv = createProv(tx.provider, displayName, type);
+                    provider = newProv;
+                    autoCreated.set(tx.provider, newProv);
+                    autoCreatedProviders.push({ alias: tx.provider, displayName, type });
+                  }
+                }
               }
-              const provider = providers[0];
+
               const account = upsertAccount(provider.id, tx.accountNumber, provider.companyId);
               const input = buildTransactionInput(tx, account.id, provider.companyId, tx.accountNumber);
               const result = upsertTransaction(input);
@@ -1303,7 +1341,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             return jsonError("IMPORT_ERROR", err instanceof Error ? err.message : String(err), 500);
           }
 
-          return json({ imported, updated, duplicates, errors: importErrors });
+          return json({ imported, updated, duplicates, errors: importErrors, autoCreatedProviders });
         }
 
         // POST /api/v2/fetch — start a fetch (JSON body). Returns SSE stream.
