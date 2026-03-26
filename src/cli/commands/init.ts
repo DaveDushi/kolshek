@@ -50,22 +50,38 @@ export function registerInitCommand(program: Command): void {
   program
     .command("init")
     .description("First-run setup wizard — configure your first provider")
-    .action(async () => {
+    .option("--setup-only", "Initialize database and directories only (no interactive wizard)")
+    .action(async (opts: { setupOnly?: boolean }) => {
+      // --setup-only: headless DB/dir init for use by AI agents
+      if (opts.setupOnly) {
+        await ensureDirectories();
+        initDatabase(getDbPath());
+        if (isJsonMode()) {
+          printJson(jsonSuccess({ status: "initialized" }));
+        } else {
+          success("Database and directories initialized.");
+          info("  Add providers: run 'kolshek init' in your terminal.");
+        }
+        return;
+      }
+
       if (!isInteractive()) {
         if (isJsonMode()) {
           printJson(
-            jsonError("NON_INTERACTIVE", "init requires interactive mode", {
+            jsonError("NON_INTERACTIVE", "init requires an interactive terminal for credential entry", {
               suggestions: [
-                "Run without --non-interactive",
-                "Use 'kolshek providers add' with env var credentials instead",
+                "Run 'kolshek init' in your own terminal (not inside an AI agent)",
+                "Use 'kolshek init --setup-only' to initialize the database without the wizard",
+                "Use 'kolshek providers add' in your terminal to add providers individually",
               ],
             }),
           );
         } else {
-          printError("NON_INTERACTIVE", "init requires interactive mode", {
+          printError("NON_INTERACTIVE", "init requires an interactive terminal for credential entry", {
             suggestions: [
-              "Run without --non-interactive",
-              "Use 'kolshek providers add' with env var credentials instead",
+              "Run 'kolshek init' in your own terminal (not inside an AI agent)",
+              "Use 'kolshek init --setup-only' to initialize the database without the wizard",
+              "Use 'kolshek providers add' in your terminal to add providers individually",
             ],
           });
         }
@@ -346,11 +362,20 @@ export function registerInitCommand(program: Command): void {
       });
 
       if (aiTool !== "skip") {
-        const { installPlugin } = await import("./plugin.js");
+        const { installPlugin, registerClaudeCodePlugin } = await import("./plugin.js");
         const result = installPlugin(aiTool);
         if (result.success) {
           success(`Installed ${result.count} files for ${result.description}`);
           info(`  Location: ${result.dir}`);
+          if (aiTool === "claude-code") {
+            const reg = registerClaudeCodePlugin(result.dir);
+            if (reg.ok) {
+              success(reg.message);
+              info("  Restart Claude Code to activate the plugin.");
+            } else {
+              warn(reg.message);
+            }
+          }
         }
       }
 
