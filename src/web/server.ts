@@ -10,6 +10,8 @@ import {
   createProvider,
   deleteProvider,
   getProvider,
+  resolveProviders,
+  getProviderByAlias,
 } from "../db/repositories/providers.js";
 import {
   hasCredentials,
@@ -105,7 +107,11 @@ import {
   detectRecurringChanges,
   detectTrendWarnings,
 } from "../core/insights.js";
-import { syncProviders } from "../core/sync-engine.js";
+import { syncProviders, transactionHash } from "../core/sync-engine.js";
+import { validateCsvImport, buildTransactionInput } from "../core/csv-import.js";
+import { upsertAccount } from "../db/repositories/accounts.js";
+import { upsertTransaction } from "../db/repositories/transactions.js";
+import { getDatabase } from "../db/database.js";
 import type { RuleConditions } from "../types/category-rule.js";
 import type { TransactionFilters } from "../types/transaction.js";
 
@@ -1212,13 +1218,9 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             return jsonError("BAD_REQUEST", "Missing 'file' field in form data.", 400);
           }
           const text = await file.text();
-          const { validateCsvImport } = await import("../core/csv-import.js");
           const validation = validateCsvImport(text);
 
           // Check for duplicates against DB
-          const { transactionHash } = await import("../core/sync-engine.js");
-          const { resolveProviders } = await import("../db/repositories/providers.js");
-          const { getDatabase } = await import("../db/database.js");
           const db = getDatabase();
 
           const preview = validation.transactions.slice(0, 50).map((tx) => {
@@ -1265,19 +1267,12 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             return jsonError("BAD_REQUEST", "Missing 'file' field in form data.", 400);
           }
           const text = await file.text();
-          const { validateCsvImport, buildTransactionInput } = await import("../core/csv-import.js");
-          const { resolveProviders: resolve2, createProvider: createProv, getProviderByAlias: getByAlias } = await import("../db/repositories/providers.js");
-          const { upsertAccount } = await import("../db/repositories/accounts.js");
-          const { upsertTransaction } = await import("../db/repositories/transactions.js");
-          const { getDatabase: getDb } = await import("../db/database.js");
-          const { isValidCompanyId, PROVIDERS } = await import("../types/provider.js");
-
           const validation = validateCsvImport(text);
           if (validation.errors.length > 0 && !skipErrors) {
             return jsonError("VALIDATION_ERROR", `CSV has ${validation.errors.length} error(s).`, 400);
           }
 
-          const db = getDb();
+          const db = getDatabase();
           let imported = 0, updated = 0, duplicates = 0;
           const importErrors: Array<{ row: number; message: string }> = [];
           // Cache auto-created providers to avoid UNIQUE constraint violations
@@ -1291,7 +1286,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           try {
             for (let i = 0; i < validation.transactions.length; i++) {
               const tx = validation.transactions[i];
-              const providers = resolve2(tx.provider);
+              const providers = resolveProviders(tx.provider);
               let provider: { id: number; companyId: string } | undefined;
 
               if (providers.length === 1) {
@@ -1305,7 +1300,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
                 if (cached) {
                   provider = cached;
                 } else {
-                  const existing = getByAlias(tx.provider);
+                  const existing = getProviderByAlias(tx.provider);
                   if (existing) {
                     provider = existing;
                     autoCreated.set(tx.provider, existing);
@@ -1320,7 +1315,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
                     if (tx.providerType === "bank" || tx.providerType === "credit_card") {
                       type = tx.providerType;
                     }
-                    const newProv = createProv(tx.provider, displayName, type);
+                    const newProv = createProvider(tx.provider, displayName, type);
                     provider = newProv;
                     autoCreated.set(tx.provider, newProv);
                     autoCreatedProviders.push({ alias: tx.provider, displayName, type });
