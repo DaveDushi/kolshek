@@ -148,7 +148,7 @@ kolshek tr rule import rules.json
 kolshek schedule set --every 12h
 
 # Run a SQL query
-kolshek query "SELECT description, SUM(chargedAmount) as total FROM transactions GROUP BY description ORDER BY total LIMIT 10"
+kolshek query "SELECT description, SUM(charged_amount) as total FROM transactions GROUP BY description ORDER BY total LIMIT 10"
 
 # Open the web settings dashboard
 kolshek dashboard
@@ -171,6 +171,7 @@ The plugin gives your AI agent specialized skills for working with your financia
 | `/kolshek:categorize` | Analyze transactions and create auto-categorization rules for expenses and income |
 | `/kolshek:analyze` | Deep-dive financial analysis — income/expense mapping, savings opportunities, phased action plan |
 | `/kolshek:review` | Monthly financial review — budget compliance, anomaly detection, report card |
+| `/kolshek:upload-csv` | Import transactions from any bank's CSV export by auto-mapping columns to KolShek format |
 
 The `analyze` and `review` skills were designed by [Adir Traitel](https://adirtraitel.com/).
 

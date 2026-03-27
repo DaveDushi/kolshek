@@ -22,6 +22,10 @@ All commands support these flags:
 
 First-run setup wizard — configure your first provider.
 
+| Option | Description |
+|--------|-------------|
+| `--setup-only` | Initialize database and directories only (no interactive wizard) |
+
 ---
 
 ### `providers`
@@ -85,6 +89,14 @@ Show accounts and balances.
 |--------|-------------|
 | `--provider <name>` | Filter by provider company ID |
 | `--type <type>` | Filter by provider type (`bank` \| `credit_card`) |
+
+#### `accounts exclude <id>`
+
+Exclude an account from syncing.
+
+#### `accounts include <id>`
+
+Re-include a previously excluded account.
 
 ---
 
