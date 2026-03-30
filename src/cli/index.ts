@@ -32,6 +32,7 @@ import { registerDashboardCommand } from "./commands/dashboard.js";
 import { registerPageCommand } from "./commands/page.js";
 import { registerUpdateCommand } from "./commands/update.js";
 import { registerUninstallCommand } from "./commands/uninstall.js";
+import { registerImportCommand } from "./commands/import.js";
 import { getMostRecentSyncTime, listProviders } from "../db/repositories/providers.js";
 import { loadConfig } from "../config/loader.js";
 import { syncProviders } from "../core/sync-engine.js";
@@ -162,6 +163,7 @@ registerTrendsCommand(program);
 registerInsightsCommand(program);
 registerDashboardCommand(program);
 registerPageCommand(program);
+registerImportCommand(program);
 registerUpdateCommand(program);
 registerUninstallCommand(program);
 

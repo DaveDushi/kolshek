@@ -31,6 +31,7 @@ Run `kolshek plugin list` to see all available integrations and their install st
 | `categorize` | Analyze transactions and create auto-categorization rules |
 | `analyze` | Deep-dive financial analysis with savings opportunities and action plans |
 | `review` | Monthly financial review — budget compliance, anomalies, report card |
+| `upload-csv` | Import transactions from any bank's CSV export by auto-mapping columns to KolShek format |
 
 ## Structured Output
 

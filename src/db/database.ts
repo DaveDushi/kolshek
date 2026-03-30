@@ -278,7 +278,11 @@ UPDATE categories SET classification = 'cc_billing' WHERE name = 'CC Billing';
 -- Drop the spending_excludes table (replaced by classification system)
 DROP TABLE IF EXISTS spending_excludes;`],
 
-  ["013_custom_pages.sql", `-- Custom dashboard pages: JSON widget definitions rendered at runtime.
+  ["013_account_excluded.sql", `-- Add excluded flag to accounts for per-account sync filtering.
+-- Excluded accounts are skipped during sync (no balance update, no transactions).
+ALTER TABLE accounts ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0;`],
+
+  ["014_custom_pages.sql", `-- Custom dashboard pages: JSON widget definitions rendered at runtime.
 CREATE TABLE IF NOT EXISTS custom_pages (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -290,7 +294,7 @@ CREATE TABLE IF NOT EXISTS custom_pages (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );`],
 
-  ["014_budgets.sql", `-- Budget targets per category for budget-vs-actual views.
+  ["015_budgets.sql", `-- Budget targets per category for budget-vs-actual views.
 CREATE TABLE IF NOT EXISTS budgets (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   category TEXT NOT NULL,

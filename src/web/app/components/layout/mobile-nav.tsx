@@ -10,8 +10,9 @@ import {
   Lightbulb,
   TrendingUp,
   Languages,
+  Upload,
   Building2,
-  Bot,
+
   Clock,
   RefreshCw,
   Sun,
@@ -147,9 +148,9 @@ export function MobileNav() {
         ) : null,
     },
     {
-      label: "Agent",
-      path: "/agent",
-      icon: Bot,
+      label: "Import",
+      path: "/import",
+      icon: Upload,
     },
     {
       label: "Providers",

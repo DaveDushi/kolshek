@@ -290,3 +290,31 @@ export type BuiltinClassification =
 
 // Map of category name → classification
 export type ClassificationMap = Record<string, string>;
+
+// --- CSV Import ---
+
+export interface CsvImportPreview {
+  totalRows: number;
+  valid: number;
+  errors: Array<{ row: number; column?: string; message: string }>;
+  preview: CsvPreviewRow[];
+}
+
+export interface CsvPreviewRow {
+  date: string;
+  description: string;
+  chargedAmount: number;
+  chargedCurrency: string;
+  status: string;
+  category: string | null;
+  provider: string;
+  accountNumber: string;
+  isDuplicate: boolean;
+}
+
+export interface CsvImportResult {
+  imported: number;
+  updated: number;
+  duplicates: number;
+  errors: Array<{ row: number; message: string }>;
+}

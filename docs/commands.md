@@ -22,6 +22,10 @@ All commands support these flags:
 
 First-run setup wizard — configure your first provider.
 
+| Option | Description |
+|--------|-------------|
+| `--setup-only` | Initialize database and directories only (no interactive wizard) |
+
 ---
 
 ### `providers`
@@ -85,6 +89,14 @@ Show accounts and balances.
 |--------|-------------|
 | `--provider <name>` | Filter by provider company ID |
 | `--type <type>` | Filter by provider type (`bank` \| `credit_card`) |
+
+#### `accounts exclude <id>`
+
+Exclude an account from syncing.
+
+#### `accounts include <id>`
+
+Re-include a previously excluded account.
 
 ---
 
@@ -446,6 +458,33 @@ Financial alerts and recommendations based on spending patterns.
 | `--months <n>` | Lookback period in months (default: 3) |
 | `--exclude <classifications>` | Comma-separated classifications to exclude |
 | `--include <classifications>` | Only include these classifications (mutually exclusive with --exclude) |
+
+---
+
+### `import`
+
+Import transactions from external files.
+
+#### `import csv <file>`
+
+Import transactions from a CSV file.
+
+| Option | Description |
+|--------|-------------|
+| `--dry-run` | Preview without writing to database |
+| `--skip-errors` | Continue past invalid rows |
+
+**Required columns:** `date`, `description`, `charged_amount`, `provider`, `account_number`
+
+**Optional columns:** `charged_currency`, `original_amount`, `original_currency`, `processed_date`, `status`, `type`, `memo`, `category`, `description_en`, `identifier`, `installment_number`, `installment_total`
+
+Header row is mandatory. Column order doesn't matter. Unknown columns are ignored.
+
+The `provider` column accepts either a companyId (e.g. `hapoalim`) or a provider alias. If the provider/account doesn't exist in the DB, it's auto-created.
+
+The output of `kolshek transactions export csv` is a superset of this format, so round-trip export-then-import works out of the box.
+
+See [`docs/example-import.csv`](example-import.csv) for a ready-to-use template.
 
 ---
 

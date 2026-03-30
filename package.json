@@ -1,6 +1,6 @@
 {
   "name": "kolshek",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "CLI tool for tracking finances from Israeli banks and credit cards (כל שקל)",
   "type": "module",
   "bin": {
@@ -55,7 +55,7 @@
     "env-paths": "^3.0.0",
     "israeli-bank-scrapers-core": "6.7.1",
     "lucide-react": "^0.577.0",
-    "node-llama-cpp": "^3.18.1",
+
     "ora": "^8.0.0",
     "puppeteer-core": "^24.0.0",
     "puppeteer-extra": "^3.3.6",
@@ -84,7 +84,5 @@
     "vite": "^8.0.0",
     "vitest": "^3.0.0"
   },
-  "trustedDependencies": [
-    "node-llama-cpp"
-  ]
+  "trustedDependencies": []
 }

@@ -68,6 +68,8 @@ kolshek transactions search <query> [--from] [--to] [--provider] [--limit] [--js
 kolshek transactions delete <id> [--yes] [--json]
 kolshek transactions export <csv|json> [--from] [--to] [--output <path>] [--json]
 kolshek accounts [--provider] [--type] [--json]                                                                                       # alias: bal
+kolshek accounts exclude <id> [--json]                                                                                                # exclude account from syncing
+kolshek accounts include <id> [--json]                                                                                                # re-include excluded account
 ```
 
 ### Categorization (alias: cat)
@@ -127,6 +129,11 @@ kolshek db schema <table> [--json]
 kolshek query <sql> [--limit] [--json]
 ```
 
+### Import
+```
+kolshek import csv <file> [--dry-run] [--skip-errors] [--json]   # import transactions from CSV file
+```
+
 ### Dashboard
 ```
 kolshek dashboard [-p, --port <port>] [--no-open]   # open local settings dashboard (default port: 45091)
@@ -150,7 +157,7 @@ kolshek plugin list                # list available integrations and install sta
 
 ### Setup
 ```
-kolshek init [--json]              # interactive wizard — loops to add multiple providers
+kolshek init [--setup-only] [--json]   # interactive wizard; --setup-only skips wizard (DB/dir init only)
 ```
 
 ### JSON Output Envelope

@@ -89,6 +89,7 @@
           <a href="#income" class="docs-sidebar-link">income</a>
           <a href="#trends" class="docs-sidebar-link">trends</a>
           <a href="#insights" class="docs-sidebar-link">insights</a>
+          <a href="#import" class="docs-sidebar-link">import</a>
           <a href="#update" class="docs-sidebar-link">update</a>
           <a href="#uninstall" class="docs-sidebar-link">uninstall</a>
         </div>
@@ -136,6 +137,14 @@
         <h2 class="docs-h2">init</h2>
         <p class="docs-p">First-run setup wizard — configure your first provider.</p>
         <div class="docs-code"><pre><code>kolshek init</code></pre></div>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--setup-only</code></td><td>Initialize database and directories only (no interactive wizard)</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <!-- ── providers ─────────────────────────────────────────── -->
@@ -218,6 +227,12 @@ kolshek fetch --from 30d         # last 30 days</code></pre></div>
             </tbody>
           </table>
         </div>
+
+        <h3 class="docs-h3">accounts exclude &lt;id&gt;</h3>
+        <p class="docs-p">Exclude an account from syncing.</p>
+
+        <h3 class="docs-h3">accounts include &lt;id&gt;</h3>
+        <p class="docs-p">Re-include a previously excluded account.</p>
       </section>
 
       <!-- ── transactions ──────────────────────────────────────── -->
@@ -303,7 +318,7 @@ kolshek fetch --from 30d         # last 30 days</code></pre></div>
         <h2 class="docs-h2">query &lt;sql&gt; <span class="docs-alias">alias: sql</span></h2>
         <p class="docs-p">Run a read-only SQL query. Supports <code>SELECT</code>, <code>WITH</code>, <code>EXPLAIN</code>, <code>PRAGMA</code>, and <code>VALUES</code>.</p>
         <div class="docs-code"><pre><code>kolshek query "SELECT * FROM transactions ORDER BY date DESC LIMIT 10"
-kolshek sql "SELECT category, SUM(chargedAmount) FROM transactions GROUP BY category"</code></pre></div>
+kolshek sql "SELECT category, SUM(charged_amount) FROM transactions GROUP BY category"</code></pre></div>
         <div class="docs-table-wrap">
           <table class="docs-table">
             <thead><tr><th>Option</th><th>Description</th></tr></thead>
@@ -651,6 +666,24 @@ kolshek spending -m 3         # 3 months ago</code></pre></div>
         </div>
       </section>
 
+      <!-- ── import ────────────────────────────────────────────── -->
+      <section id="import" class="docs-section">
+        <h2 class="docs-h2">import</h2>
+        <p class="docs-p">Import transactions from external sources.</p>
+
+        <h3 class="docs-h3">import csv &lt;file&gt;</h3>
+        <p class="docs-p">Import transactions from a CSV file.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>--dry-run</code></td><td>Preview without writing to database</td></tr>
+              <tr><td><code>--skip-errors</code></td><td>Continue past invalid rows</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- ── update ────────────────────────────────────────────── -->
       <section id="update" class="docs-section">
         <h2 class="docs-h2">update</h2>
@@ -832,6 +865,50 @@ kolshek db schema transactions --json</code></pre></div>
       <!-- ── Changelog ──────────────────────────────────────────── -->
       <section id="changelog" class="docs-section">
         <h1 class="docs-h1">Changelog</h1>
+
+        <h2 class="docs-h2">v0.4.4</h2>
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li><strong>AI model loading in compiled binary</strong> &mdash; Rewrote the <code class="docs-code">node-llama-cpp</code> import strategy to reliably resolve the package and all its transitive dependencies when running as a compiled binary.</li>
+          <li><strong>Model load errors now visible</strong> &mdash; Errors during model loading are logged to the terminal instead of being silently returned as HTTP 400 responses.</li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
+        <h2 class="docs-h2">v0.4.3</h2>
+        <h3 class="docs-h3">Features</h3>
+        <ul class="docs-ul">
+          <li><strong>Auto-install AI runtime</strong> &mdash; When loading a model for the first time, the dashboard automatically detects bun or npm and installs <code class="docs-code">node-llama-cpp</code> into the data directory. No manual setup required.</li>
+        </ul>
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li><strong>Windows SmartScreen block after update</strong> &mdash; The <code class="docs-code">kolshek update</code> command now removes the Zone.Identifier stream from downloaded binaries, preventing Windows Application Control from blocking the updated executable.</li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
+        <h2 class="docs-h2">v0.4.2</h2>
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li><strong>Dashboard assets in compiled binary</strong> &mdash; The server now falls back to embedded assets when filesystem files don't exist, fixing "Not Found" errors when running the compiled binary on a fresh machine.</li>
+          <li><strong>Category classification</strong> &mdash; Use upsert pattern for category rules, preventing duplicate constraint errors when reclassifying transactions.</li>
+          <li><strong>Auto-build in dev</strong> &mdash; The <code class="docs-code">dashboard</code> command now auto-builds the React SPA if <code class="docs-code">dist/</code> is missing.</li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
+        <h2 class="docs-h2">v0.4.1</h2>
+        <h3 class="docs-h3">Features</h3>
+        <ul class="docs-ul">
+          <li><strong>Landing page AI showcase</strong> &mdash; Updated landing page with "Built-in AI Agent" feature card and added an interactive AI Agent tab to the mini dashboard preview.</li>
+        </ul>
+        <h3 class="docs-h3">Other</h3>
+        <ul class="docs-ul">
+          <li>Rebuilt dashboard frontend to include the AI Agent page added in v0.4.0.</li>
+          <li>Synced documentation with codebase.</li>
+        </ul>
+
+        <div class="docs-divider"></div>
 
         <h2 class="docs-h2">v0.4.0</h2>
         <h3 class="docs-h3">Features</h3>

@@ -153,7 +153,7 @@ function CashflowTab({ months, exclude }: { months: number; exclude: string[] })
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((row) => (
+              {[...data].reverse().map((row) => (
                 <TableRow key={row.month}>
                   <TableCell className="font-medium text-[13px]">
                     {formatMonth(row.month + "-01")}
@@ -308,7 +308,7 @@ function FixedVariableTab({ months, exclude }: { months: number; exclude: string
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((item) => (
+            {[...data].reverse().map((item) => (
               <TableRow key={item.month}>
                 <TableCell className="font-medium text-[13px]">
                   {formatMonth(item.month + "-01")}

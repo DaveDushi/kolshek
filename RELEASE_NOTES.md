@@ -1,6 +1,20 @@
-## v0.4.4
+## v0.4.5
+
+### Features
+
+- **CSV import: auto-create providers**: Uploading a CSV with an unknown provider (e.g., `chase`, `bofa`, `wells-fargo`) now automatically creates the provider instead of failing. This is the core use case for CSV import -- users importing from banks not supported by the scraper no longer need to manually run `kolshek providers add` first.
+- **CSV import: `provider_type` column**: Optional column in imported CSVs to specify whether an auto-created provider is a `bank` or `credit_card` (defaults to `bank` if omitted).
+- **Upload CSV skill**: New `/kolshek:upload-csv` skill that guides users through importing transactions from any bank's CSV export (Chase, Bank of America, Wells Fargo, Amex, Capital One, etc.) by auto-mapping columns to KolShek format.
+- **Account exclusion during setup**: Users can now exclude specific accounts from syncing during `kolshek providers add`.
+- **Account exclusion in dashboard**: Account exclusion toggles moved to provider cards in the dashboard for easier access.
 
 ### Bug Fixes
 
-- **AI model loading in compiled binary**: Rewrote the `node-llama-cpp` import strategy to reliably resolve the package and all its transitive dependencies (e.g. `lifecycle-utils`) when running as a compiled binary. Uses an ESM loader file placed in the install directory so Bun resolves from the correct `node_modules` tree.
-- **Model load errors now visible**: Errors during model loading are logged to the terminal instead of being silently returned as HTTP 400 responses.
+- **Dashboard import endpoint**: Fixed provider auto-creation not working in the web dashboard due to dynamic imports not resolving correctly at runtime. All server imports are now static top-level imports.
+- **Trends chart ordering**: Fixed chronological ordering in trends data; reversal moved to presentation layer.
+- **Installer setup**: Replaced `pluginDirs` with marketplace registration and improved setup UX.
+
+### Other
+
+- **Removed local AI agent**: Removed the local LLM agent feature and its `node-llama-cpp` dependency.
+- **Removed reconciliation**: Removed the transaction reconciliation feature in favor of the simpler CSV import flow.

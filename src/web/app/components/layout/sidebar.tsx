@@ -9,8 +9,9 @@ import {
   TrendingUp,
   Tags,
   Languages,
+  Upload,
   Building2,
-  Bot,
+
   Clock,
   Sun,
   Moon,
@@ -137,12 +138,7 @@ export function Sidebar() {
               </Badge>
             ) : null,
         },
-      ],
-    },
-    {
-      title: "AI",
-      items: [
-        { label: "Agent", path: "/agent", icon: Bot },
+        { label: "Import", path: "/import", icon: Upload },
       ],
     },
     {

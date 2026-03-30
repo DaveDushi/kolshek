@@ -12,11 +12,8 @@ import { InsightsPage } from "./pages/insights-page";
 import { CategoriesPage } from "./pages/categories-page";
 import { TranslationsPage } from "./pages/translations-page";
 import { ProvidersPage } from "./pages/providers-page";
-<<<<<<< HEAD
 import { CustomPage } from "./pages/custom-page";
-=======
-import { AgentPage } from "./pages/agent-page";
->>>>>>> origin/master
+import { ImportPage } from "./pages/import-page";
 import { SchedulePage } from "./pages/schedule-page";
 
 const queryClient = new QueryClient({
@@ -48,11 +45,8 @@ export function App() {
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/translations" element={<TranslationsPage />} />
                 <Route path="/providers" element={<ProvidersPage />} />
-<<<<<<< HEAD
                 <Route path="/pages/:pageId" element={<CustomPage />} />
-=======
-                <Route path="/agent" element={<AgentPage />} />
->>>>>>> origin/master
+                <Route path="/import" element={<ImportPage />} />
                 <Route path="/schedule" element={<SchedulePage />} />
               </Routes>
             </ErrorBoundary>

@@ -1,0 +1,6 @@
+date,description,charged_amount,provider,account_number,charged_currency,original_amount,original_currency,processed_date,status,type,memo,category,description_en
+1/15/2025,שופרסל דיל,-249.9,hapoalim,12345,ILS,-249.9,ILS,1/15/2025,completed,normal,סניף 42,Groceries,Shufersal Deal
+1/16/2025,רמי לוי,-180.5,hapoalim,12345,ILS,-180.5,ILS,1/16/2025,completed,normal,,Groceries,Rami Levy
+1/17/2025,Amazon.com,-89.99,isracard,67890,ILS,-24.99,USD,1/18/2025,completed,normal,,Shopping,Amazon.com
+1/20/2025,משכורת ינואר,15000,leumi,11111,ILS,15000,ILS,1/20/2025,completed,normal,,Salary,January Salary
+1/22/2025,HOT טלוויזיה,-199,chase,12345,ILS,-199,ILS,1/22/2025,completed,normal,,Utilities,HOT Television
