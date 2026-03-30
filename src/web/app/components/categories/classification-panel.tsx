@@ -44,7 +44,7 @@ export function ClassificationPanel({ category }: ClassificationPanelProps) {
   // Collect any custom classifications already in use (not in BUILTIN)
   const builtinValues = new Set(BUILTIN.map((b) => b.value));
   const customValues = classMap
-    ? [...new Set(Object.values(classMap))].filter((v) => !builtinValues.has(v)).sort()
+    ? [...new Set(Object.values(classMap))].filter((v) => !builtinValues.has(v)).toSorted()
     : [];
 
   useEffect(() => {

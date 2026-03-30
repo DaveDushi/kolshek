@@ -104,7 +104,7 @@ export function SpendingDonut() {
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return [];
 
-    const sorted = [...data].sort((a, b) => b.amount - a.amount);
+    const sorted = data.toSorted((a, b) => b.amount - a.amount);
     const top5 = sorted.slice(0, 5);
     const rest = sorted.slice(5);
 

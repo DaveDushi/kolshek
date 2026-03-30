@@ -31,9 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/use-theme";
 import { useSync } from "@/hooks/use-sync";
-import { useInsights } from "@/hooks/use-insights";
-import { useCategorySummary } from "@/hooks/use-categories";
-import { useUntranslated } from "@/hooks/use-translations";
+import { useNavBadges } from "@/hooks/use-nav-badges";
 import { cn } from "@/lib/utils";
 import { SyncPanel } from "./sync-panel";
 import { useCustomPages, usePageEvents } from "@/hooks/use-custom-pages";
@@ -66,20 +64,12 @@ export function MobileNav() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { events, isRunning, start, cancel } = useSync();
-  const { data: insights } = useInsights();
-  const { data: categories } = useCategorySummary();
-  const { data: untranslated } = useUntranslated();
+  const { alertCount, uncategorizedCount, untranslatedCount } = useNavBadges();
 
   const [moreOpen, setMoreOpen] = useState(false);
   const [syncPanelOpen, setSyncPanelOpen] = useState(false);
   const { data: customPages } = useCustomPages();
   usePageEvents();
-
-  const alertCount = insights?.filter((i) => i.severity === "alert").length ?? 0;
-  const uncategorizedCount =
-    categories?.find((c) => c.category === "" || c.category === "uncategorized")
-      ?.count ?? 0;
-  const untranslatedCount = untranslated?.length ?? 0;
 
   const isActive = useCallback(
     (path: string) => {

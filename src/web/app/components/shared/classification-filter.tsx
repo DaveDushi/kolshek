@@ -20,8 +20,8 @@ interface ClassificationFilterProps {
 
 function arraysEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
-  const sortedA = [...a].sort();
-  const sortedB = [...b].sort();
+  const sortedA = a.toSorted();
+  const sortedB = b.toSorted();
   return sortedA.every((v, i) => v === sortedB[i]);
 }
 
@@ -31,7 +31,7 @@ export function ClassificationFilter({ excluded, onChange, defaults }: Classific
   // Discover custom classifications from the map
   const builtinValues = new Set(BUILTIN.map((b) => b.value));
   const customValues = classMap
-    ? [...new Set(Object.values(classMap))].filter((v) => !builtinValues.has(v)).sort()
+    ? [...new Set(Object.values(classMap))].filter((v) => !builtinValues.has(v)).toSorted()
     : [];
 
   const excludedSet = new Set(excluded);

@@ -85,7 +85,7 @@ export function RulesTable({ onAddRule }: { onAddRule?: () => void }) {
   }
 
   // Sort by priority descending
-  const sorted = [...rules].sort((a, b) => b.priority - a.priority);
+  const sorted = rules.toSorted((a, b) => b.priority - a.priority);
 
   return (
     <div className="space-y-4">

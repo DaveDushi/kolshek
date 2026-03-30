@@ -13,6 +13,9 @@ export const BUILTIN: { value: BuiltinClassification; label: string; color: stri
   { value: "savings", label: "Savings", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400" },
 ];
 
+// O(1) lookup by classification value — used by classificationColor/Dot/Label
+const BUILTIN_MAP = new Map(BUILTIN.map(b => [b.value, b]));
+
 // Extra color palette for custom classifications — deterministic by name hash
 const CUSTOM_COLORS: { bg: string; text: string; dot: string }[] = [
   { bg: "bg-rose-100 dark:bg-rose-900/30", text: "text-rose-700 dark:text-rose-400", dot: "bg-rose-500" },
@@ -40,20 +43,20 @@ function customColor(name: string): { bg: string; text: string; dot: string } {
 }
 
 export function classificationColor(classification: string): string {
-  const builtin = BUILTIN.find((b) => b.value === classification);
+  const builtin = BUILTIN_MAP.get(classification);
   if (builtin) return builtin.color;
   const c = customColor(classification);
   return `${c.bg} ${c.text}`;
 }
 
 export function classificationDot(classification: string): string {
-  const builtin = BUILTIN.find((b) => b.value === classification);
+  const builtin = BUILTIN_MAP.get(classification);
   if (builtin) return builtin.color.split(" ")[0];
   return customColor(classification).dot;
 }
 
 export function classificationLabel(classification: string): string {
-  return BUILTIN.find((b) => b.value === classification)?.label ?? classification;
+  return BUILTIN_MAP.get(classification)?.label ?? classification;
 }
 
 // Page-specific default exclusion lists (mirrors CLI defaults)
