@@ -1,14 +1,10 @@
-/**
- * kolshek fetch — Fetch transactions from providers.
- */
+// kolshek fetch — Fetch transactions from providers.
 
 import type { Command } from "commander";
 import { listProviders, resolveProviders } from "../../db/repositories/providers.js";
-import { syncProviders } from "../../core/sync-engine.js";
-import { applyCategoryRules } from "../../db/repositories/categories.js";
-import { applyTranslationRules } from "../../db/repositories/translations.js";
+import { fetchAndApplyRules, type FetchResult } from "../../services/sync.js";
 import { loadConfig } from "../../config/loader.js";
-import type { ProviderType, SyncResult } from "../../types/index.js";
+import type { ProviderType } from "../../types/index.js";
 import {
   isJsonMode,
   printJson,
@@ -33,9 +29,7 @@ export interface FetchOptions {
   visible?: boolean;
 }
 
-/**
- * Run the fetch operation. Exported for use by init command.
- */
+// Run the fetch operation. Exported for use by init command.
 export async function runFetch(opts: FetchOptions = {}): Promise<void> {
   const config = await loadConfig();
   const allProviders = listProviders();
@@ -100,15 +94,15 @@ export async function runFetch(opts: FetchOptions = {}): Promise<void> {
     warn("DEBUG env var is set — upstream scrapers may log sensitive data (credentials, account numbers) to stderr.");
   }
 
-  // Run sync
+  // Run sync + auto-apply rules
   const spinner = createSpinner(
     `Fetching from ${targetProviders.length} provider(s)...`,
   );
   spinner.start();
 
-  let result: SyncResult;
+  let result: FetchResult;
   try {
-    result = await syncProviders(
+    result = await fetchAndApplyRules(
       targetProviders,
       {
         fromDate,
@@ -129,16 +123,13 @@ export async function runFetch(opts: FetchOptions = {}): Promise<void> {
 
   spinner.stop();
 
-  // Auto-apply translation rules then category rules after successful sync
-  if (!result.hasErrors || result.totalAdded > 0) {
-    const transResult = applyTranslationRules();
-    if (!isJsonMode() && transResult.applied > 0) {
-      info(`Translated ${transResult.applied} transaction(s).`);
+  // Report post-processing results
+  if (!isJsonMode()) {
+    if (result.postProcessing.translationsApplied > 0) {
+      info(`Translated ${result.postProcessing.translationsApplied} transaction(s).`);
     }
-
-    const catResult = applyCategoryRules();
-    if (!isJsonMode() && catResult.applied > 0) {
-      info(`Categorized ${catResult.applied} transaction(s).`);
+    if (result.postProcessing.categoriesApplied > 0) {
+      info(`Categorized ${result.postProcessing.categoriesApplied} transaction(s).`);
     }
   }
 

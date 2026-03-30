@@ -1,13 +1,11 @@
 // kolshek trends — Multi-month cashflow and category trend analysis.
 
 import type { Command } from "commander";
-import { subMonths } from "date-fns";
 import {
-  getTotalTrends,
-  getCategoryTrends,
-  getFixedVariableTrends,
-} from "../../db/repositories/trends.js";
-import type { DateRange } from "../../db/repositories/reports.js";
+  getTotalTrendData,
+  getCategoryTrendData,
+  getFixedVariableTrendData,
+} from "../../services/trends.js";
 import { addClassificationOptions, parseClassificationFlags } from "../filter-utils.js";
 import {
   isJsonMode,
@@ -22,11 +20,6 @@ import {
 
 type TrendMode = "total" | "category" | "fixed-variable";
 const VALID_MODES = new Set<string>(["total", "category", "fixed-variable"]);
-
-function buildMonthRange(months: number): DateRange {
-  const from = subMonths(new Date(), months);
-  return { from: from.toISOString().slice(0, 10) };
-}
 
 export function registerTrendsCommand(program: Command): void {
   const cmd = program
@@ -58,11 +51,11 @@ export function registerTrendsCommand(program: Command): void {
       process.exit(ExitCode.BadArgs);
     }
 
-    const range = buildMonthRange(monthCount);
     const { excludeClassifications } = parseClassificationFlags(opts);
+    const trendOpts = { months: monthCount, providerType: opts.type, excludeClassifications };
 
     if (mode === "total") {
-      const trends = getTotalTrends(range, opts.type, excludeClassifications);
+      const trends = getTotalTrendData(trendOpts);
       if (isJsonMode()) {
         printJson(jsonSuccess({ mode, months: monthCount, trends }));
         return;
@@ -83,7 +76,7 @@ export function registerTrendsCommand(program: Command): void {
       console.log(table);
       info(`\n${trends.length} month(s) of trends.`);
     } else if (mode === "category") {
-      const trends = getCategoryTrends(range, opts.category, opts.type, excludeClassifications);
+      const trends = getCategoryTrendData(opts.category, trendOpts);
       if (isJsonMode()) {
         printJson(jsonSuccess({ mode, category: opts.category, months: monthCount, trends }));
         return;
@@ -102,7 +95,7 @@ export function registerTrendsCommand(program: Command): void {
       console.log(table);
       info(`\n"${opts.category}" over ${trends.length} month(s).`);
     } else {
-      const trends = getFixedVariableTrends(range, opts.type, excludeClassifications);
+      const trends = getFixedVariableTrendData(trendOpts);
       if (isJsonMode()) {
         printJson(jsonSuccess({ mode, months: monthCount, trends }));
         return;

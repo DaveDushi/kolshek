@@ -1,22 +1,8 @@
 // kolshek insights — AI-free financial alerts and recommendations.
 
 import type { Command } from "commander";
-import { subMonths } from "date-fns";
 import chalk from "chalk";
-import {
-  getCategoryByMonth,
-  getLargeTransactions,
-  getMerchantHistory,
-  getMonthCashflow,
-} from "../../db/repositories/insights.js";
-import {
-  detectCategorySpikes,
-  detectLargeTransactions,
-  detectNewMerchants,
-  detectRecurringChanges,
-  detectTrendWarnings,
-  type Insight,
-} from "../../core/insights.js";
+import { getInsights, type Insight } from "../../services/insights.js";
 import { addClassificationOptions, parseClassificationFlags } from "../filter-utils.js";
 import {
   isJsonMode,
@@ -58,55 +44,23 @@ export function registerInsightsCommand(program: Command): void {
       }
 
       try {
-        const now = new Date();
-        const from = subMonths(now, monthCount).toISOString().slice(0, 10);
-        const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-
         const { excludeClassifications } = parseClassificationFlags(opts);
-        const insightOpts = { from, currentMonthStart, excludeClassifications };
-
-        // Gather all raw data
-        const categoryData = getCategoryByMonth(insightOpts);
-        const currentCategories = categoryData.filter((c) => c.month >= currentMonthStart.slice(0, 7));
-        const priorCategories = categoryData.filter((c) => c.month < currentMonthStart.slice(0, 7));
-
-        const { transactions: largeTxns, avgAmount } = getLargeTransactions(insightOpts);
-        const merchantHistory = getMerchantHistory(insightOpts);
-        const cashflow = getMonthCashflow(insightOpts);
-
-        // Run detectors
-        const insights: Insight[] = [
-          ...detectCategorySpikes(currentCategories, priorCategories),
-          ...detectLargeTransactions(largeTxns, avgAmount),
-          ...detectNewMerchants(merchantHistory),
-          ...detectRecurringChanges(merchantHistory),
-          ...detectTrendWarnings(cashflow),
-        ];
-
-        // Sort by severity
-        const order = { alert: 0, warning: 1, info: 2 };
-        insights.sort((a, b) => order[a.severity] - order[b.severity]);
+        const result = getInsights({ months: monthCount, excludeClassifications });
 
         if (isJsonMode()) {
-          const summary = {
-            total: insights.length,
-            alerts: insights.filter((i) => i.severity === "alert").length,
-            warnings: insights.filter((i) => i.severity === "warning").length,
-            info: insights.filter((i) => i.severity === "info").length,
-          };
-          printJson(jsonSuccess({ period: { from, months: monthCount }, insights, summary }));
+          printJson(jsonSuccess(result));
           return;
         }
 
-        if (insights.length === 0) {
+        if (result.insights.length === 0) {
           info("No insights to report — spending patterns look normal.");
           return;
         }
 
         const noColor = getOutputOptions().noColor;
-        const alerts = insights.filter((i) => i.severity === "alert");
-        const warnings = insights.filter((i) => i.severity === "warning");
-        const infos = insights.filter((i) => i.severity === "info");
+        const alerts = result.insights.filter((i) => i.severity === "alert");
+        const warnings = result.insights.filter((i) => i.severity === "warning");
+        const infos = result.insights.filter((i) => i.severity === "info");
 
         if (alerts.length > 0) {
           console.log(noColor ? "\nAlerts:" : chalk.red.bold("\nAlerts:"));
@@ -121,7 +75,7 @@ export function registerInsightsCommand(program: Command): void {
           for (const i of infos) console.log(formatInsight(i, noColor));
         }
 
-        info(`\n${insights.length} insight(s) from the last ${monthCount} month(s).`);
+        info(`\n${result.summary.total} insight(s) from the last ${monthCount} month(s).`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         printError("DB_ERROR", msg, {

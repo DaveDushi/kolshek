@@ -28,7 +28,7 @@ function rowToRule(row: TranslationRuleRow): TranslationRule {
   };
 }
 
-export function addTranslationRule(englishName: string, pattern: string): TranslationRule {
+export function createTranslationRule(englishName: string, pattern: string): TranslationRule {
   const db = getDatabase();
   const result = db
     .prepare(
@@ -52,7 +52,7 @@ export function listTranslationRules(): TranslationRule[] {
   return rows.map(rowToRule);
 }
 
-export function removeTranslationRule(id: number): boolean {
+export function deleteTranslationRule(id: number): boolean {
   const db = getDatabase();
   const result = db
     .prepare("DELETE FROM translation_rules WHERE id = $id")

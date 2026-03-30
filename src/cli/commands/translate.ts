@@ -2,9 +2,9 @@
 
 import type { Command } from "commander";
 import {
-  addTranslationRule,
+  createTranslationRule,
   listTranslationRules,
-  removeTranslationRule,
+  deleteTranslationRule,
   applyTranslationRules,
   bulkImportTranslationRules,
 } from "../../db/repositories/translations.js";
@@ -42,7 +42,7 @@ export function registerTranslateCommand(program: Command): void {
         process.exit(ExitCode.BadArgs);
       }
 
-      const rule = addTranslationRule(english, pattern);
+      const rule = createTranslationRule(english, pattern);
 
       if (isJsonMode()) {
         printJson(
@@ -99,7 +99,7 @@ export function registerTranslateCommand(program: Command): void {
         process.exit(ExitCode.BadArgs);
       }
 
-      const removed = removeTranslationRule(id);
+      const removed = deleteTranslationRule(id);
 
       if (isJsonMode()) {
         if (removed) {

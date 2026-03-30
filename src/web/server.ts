@@ -32,7 +32,7 @@ import {
 import {
   getAccountsByProvider,
   getAccount,
-  setAccountExcluded,
+  updateAccountExcluded,
 } from "../db/repositories/accounts.js";
 import {
   getLatestCompletedSyncLog,
@@ -55,15 +55,15 @@ import {
 import { computeAuthStatus } from "../core/auth-status.js";
 import {
   listCategoryRules,
-  addCategoryRule,
-  removeCategoryRule,
+  createCategoryRule,
+  deleteCategoryRule,
   applyCategoryRules,
   createCategory,
   deleteCategory,
   renameCategory,
   listAllCategories,
   listCategories,
-  setCategoryClassification,
+  updateCategoryClassification,
   getClassificationMap,
 } from "../db/repositories/categories.js";
 import {
@@ -75,8 +75,8 @@ import {
 } from "../types/classification.js";
 import {
   listTranslationRules,
-  addTranslationRule,
-  removeTranslationRule,
+  createTranslationRule,
+  deleteTranslationRule,
   applyTranslationRules,
   translateByDescription,
   listUntranslatedGrouped,
@@ -87,27 +87,16 @@ import {
   getCategoryReport,
   getBalanceReport,
 } from "../db/repositories/reports.js";
-import { getSpendingReport } from "../db/repositories/spending.js";
-import { getIncomeReport } from "../db/repositories/income.js";
+import { getSpending } from "../services/spending.js";
+import { getIncome } from "../services/income.js";
 import {
-  getTotalTrends,
-  getCategoryTrends,
-  getFixedVariableTrends,
-} from "../db/repositories/trends.js";
-import {
-  getCategoryByMonth,
-  getLargeTransactions,
-  getMerchantHistory,
-  getMonthCashflow,
-} from "../db/repositories/insights.js";
-import {
-  detectCategorySpikes,
-  detectLargeTransactions,
-  detectNewMerchants,
-  detectRecurringChanges,
-  detectTrendWarnings,
-} from "../core/insights.js";
-import { syncProviders, transactionHash } from "../core/sync-engine.js";
+  getTotalTrendData,
+  getCategoryTrendData,
+  getFixedVariableTrendData,
+} from "../services/trends.js";
+import { getInsights } from "../services/insights.js";
+import { syncProviders } from "../services/sync.js";
+import { transactionHash } from "../core/sync-engine.js";
 import { validateCsvImport, buildTransactionInput } from "../core/csv-import.js";
 import { upsertAccount } from "../db/repositories/accounts.js";
 import { upsertTransaction } from "../db/repositories/transactions.js";
@@ -129,7 +118,7 @@ import {
 } from "../db/repositories/budgets.js";
 import { validatePage } from "../core/page-schema.js";
 import { querySchema } from "../core/page-schema.js";
-import { resolveQueryBatch } from "../core/query-resolver.js";
+import { executeQueryBatch } from "../services/query.js";
 
 // SSE listeners for custom page changes (create/update/delete notifications)
 const pageEventListeners = new Set<(event: string) => void>();
@@ -252,7 +241,7 @@ async function parseJsonBody(req: Request): Promise<Record<string, unknown>> {
 
 // Parse ?exclude= and ?include= query params for classification filtering.
 // Falls back to endpoint-specific defaults when neither is provided.
-function parseClassificationParams(
+function resolveExcludedClassifications(
   url: URL,
   defaultExclusions: readonly string[],
 ): readonly string[] {
@@ -590,7 +579,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             if (typeof body.excluded !== "boolean") {
               return jsonError("BAD_REQUEST", "Body must include { excluded: boolean }", 400);
             }
-            setAccountExcluded(id, body.excluded);
+            updateAccountExcluded(id, body.excluded);
             return json({ ...account, excluded: body.excluded });
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -663,7 +652,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           try {
             const from = url.searchParams.get("from") ?? undefined;
             const to = url.searchParams.get("to") ?? undefined;
-            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
+            const excl = resolveExcludedClassifications(url, DEFAULT_REPORT_EXCLUDES);
             return json(getMonthlyReport({ from, to }, undefined, excl));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -676,7 +665,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           try {
             const from = url.searchParams.get("from") ?? undefined;
             const to = url.searchParams.get("to") ?? undefined;
-            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
+            const excl = resolveExcludedClassifications(url, DEFAULT_REPORT_EXCLUDES);
             return json(getCategoryReport({ from, to }, undefined, excl));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -687,7 +676,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         // GET /api/v2/reports/balance
         if (method === "GET" && path === "/api/v2/reports/balance") {
           try {
-            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
+            const excl = resolveExcludedClassifications(url, DEFAULT_REPORT_EXCLUDES);
             return json(getBalanceReport(excl));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -701,16 +690,10 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         if (method === "GET" && path === "/api/v2/spending") {
           try {
             const sp = url.searchParams;
-            const month = sp.get("month") ?? new Date().toISOString().slice(0, 7);
+            const month = sp.get("month") ?? undefined;
             const groupBy = (sp.get("groupBy") ?? "category") as "category" | "merchant" | "provider";
-            const from = month + "-01";
-            // End of month: next month first day minus 1
-            const [year, mon] = month.split("-").map(Number);
-            const lastDay = new Date(year, mon, 0).getDate();
-            const to = `${month}-${String(lastDay).padStart(2, "0")}`;
-
-            const excl = parseClassificationParams(url, DEFAULT_SPENDING_EXCLUDES);
-            return json(getSpendingReport({ from, to, groupBy, excludeClassifications: excl }));
+            const excl = resolveExcludedClassifications(url, DEFAULT_SPENDING_EXCLUDES);
+            return json(getSpending({ month, groupBy, excludeClassifications: excl }));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("SPENDING_REPORT_FAILED", msg, 500);
@@ -722,15 +705,9 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         // GET /api/v2/income?month=
         if (method === "GET" && path === "/api/v2/income") {
           try {
-            const sp = url.searchParams;
-            const month = sp.get("month") ?? new Date().toISOString().slice(0, 7);
-            const from = month + "-01";
-            const [year, mon] = month.split("-").map(Number);
-            const lastDay = new Date(year, mon, 0).getDate();
-            const to = `${month}-${String(lastDay).padStart(2, "0")}`;
-
-            const excl = parseClassificationParams(url, DEFAULT_INCOME_EXCLUDES);
-            return json(getIncomeReport({ from, to, excludeClassifications: excl }));
+            const month = url.searchParams.get("month") ?? undefined;
+            const excl = resolveExcludedClassifications(url, DEFAULT_INCOME_EXCLUDES);
+            return json(getIncome({ month, excludeClassifications: excl }));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("INCOME_REPORT_FAILED", msg, 500);
@@ -743,12 +720,8 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         if (method === "GET" && path === "/api/v2/trends/total") {
           try {
             const months = Number(url.searchParams.get("months") ?? "6");
-            const now = new Date();
-            const from = new Date(now.getFullYear(), now.getMonth() - months, 1)
-              .toISOString()
-              .slice(0, 10);
-            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
-            return json(getTotalTrends({ from }, undefined, excl));
+            const excl = resolveExcludedClassifications(url, DEFAULT_REPORT_EXCLUDES);
+            return json(getTotalTrendData({ months, excludeClassifications: excl }));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("TRENDS_TOTAL_FAILED", msg, 500);
@@ -761,12 +734,8 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             const category = url.searchParams.get("category") ?? "";
             if (!category) return jsonError("MISSING_CATEGORY", "category query param is required.");
             const months = Number(url.searchParams.get("months") ?? "6");
-            const now = new Date();
-            const from = new Date(now.getFullYear(), now.getMonth() - months, 1)
-              .toISOString()
-              .slice(0, 10);
-            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
-            return json(getCategoryTrends({ from }, category, undefined, excl));
+            const excl = resolveExcludedClassifications(url, DEFAULT_REPORT_EXCLUDES);
+            return json(getCategoryTrendData(category, { months, excludeClassifications: excl }));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("TRENDS_CATEGORY_FAILED", msg, 500);
@@ -777,12 +746,8 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         if (method === "GET" && path === "/api/v2/trends/fixed-variable") {
           try {
             const months = Number(url.searchParams.get("months") ?? "6");
-            const now = new Date();
-            const from = new Date(now.getFullYear(), now.getMonth() - months, 1)
-              .toISOString()
-              .slice(0, 10);
-            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
-            return json(getFixedVariableTrends({ from }, undefined, excl));
+            const excl = resolveExcludedClassifications(url, DEFAULT_REPORT_EXCLUDES);
+            return json(getFixedVariableTrendData({ months, excludeClassifications: excl }));
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("TRENDS_FIXED_VAR_FAILED", msg, 500);
@@ -795,36 +760,9 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         if (method === "GET" && path === "/api/v2/insights") {
           try {
             const months = Number(url.searchParams.get("months") ?? "6");
-            const now = new Date();
-            const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-            const from = new Date(now.getFullYear(), now.getMonth() - months, 1)
-              .toISOString()
-              .slice(0, 10);
-
-            const excl = parseClassificationParams(url, DEFAULT_REPORT_EXCLUDES);
-            const opts = { from, currentMonthStart, excludeClassifications: excl };
-
-            // Fetch raw data from repositories
-            const categoryByMonth = getCategoryByMonth(opts);
-            const { transactions: largeTxs, avgAmount } = getLargeTransactions(opts);
-            const merchantHistory = getMerchantHistory(opts);
-            const monthCashflow = getMonthCashflow(opts);
-
-            // Split current month vs prior for category spikes
-            const currentMonthKey = currentMonthStart.slice(0, 7);
-            const currentMonthCategories = categoryByMonth.filter((r) => r.month === currentMonthKey);
-            const priorMonthCategories = categoryByMonth.filter((r) => r.month !== currentMonthKey);
-
-            // Run detectors
-            const insights = [
-              ...detectCategorySpikes(currentMonthCategories, priorMonthCategories),
-              ...detectLargeTransactions(largeTxs, avgAmount),
-              ...detectNewMerchants(merchantHistory),
-              ...detectRecurringChanges(merchantHistory),
-              ...detectTrendWarnings(monthCashflow),
-            ];
-
-            return json(insights);
+            const excl = resolveExcludedClassifications(url, DEFAULT_REPORT_EXCLUDES);
+            const result = getInsights({ months, excludeClassifications: excl });
+            return json(result.insights);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("INSIGHTS_FAILED", msg, 500);
@@ -951,7 +889,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
               }
             }
 
-            const rule = addCategoryRule(category, conditions, priority);
+            const rule = createCategoryRule(category, conditions, priority);
             // Auto-apply all rules so the new rule takes effect immediately
             const applyResult = applyCategoryRules({ scope: "uncategorized" });
             return json({ ...rule, applied: applyResult.applied }, 201);
@@ -966,7 +904,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         if (method === "DELETE" && v2DeleteCatRuleMatch) {
           try {
             const id = Number(v2DeleteCatRuleMatch[1]);
-            const removed = removeCategoryRule(id);
+            const removed = deleteCategoryRule(id);
             if (!removed) return jsonError("NOT_FOUND", "Rule not found.", 404);
             return json({ deleted: true, id });
           } catch (err) {
@@ -1005,7 +943,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             if (!isValidClassification(classification)) {
               return jsonError("INVALID_CLASSIFICATION", "Classification must be lowercase alphanumeric + underscores.");
             }
-            setCategoryClassification(name, classification);
+            updateCategoryClassification(name, classification);
             return json({ name, classification });
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -1078,7 +1016,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
               return jsonError("MISSING_FIELDS", "Both englishName and matchPattern are required.");
             }
 
-            const rule = addTranslationRule(englishName, matchPattern);
+            const rule = createTranslationRule(englishName, matchPattern);
             return json(rule, 201);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -1091,7 +1029,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         if (method === "DELETE" && v2DeleteTransRuleMatch) {
           try {
             const id = Number(v2DeleteTransRuleMatch[1]);
-            const removed = removeTranslationRule(id);
+            const removed = deleteTranslationRule(id);
             if (!removed) return jsonError("NOT_FOUND", "Rule not found.", 404);
             return json({ deleted: true, id });
           } catch (err) {
@@ -1127,7 +1065,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
 
             if (createRule) {
               try {
-                addTranslationRule(english, hebrew);
+                createTranslationRule(english, hebrew);
               } catch {
                 // Rule might already exist — that's fine
               }
@@ -1324,7 +1262,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
               }
               validated.push({ key: item.key, query: parsed.data });
             }
-            const results = resolveQueryBatch(validated as Array<{ key: string; query: any }>);
+            const results = executeQueryBatch(validated as Array<{ key: string; query: any }>);
             return json(results);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -1668,6 +1606,49 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
 
 // --- SSE Helpers ---
 
+const SSE_HEADERS: Record<string, string> = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+  ...SECURITY_HEADERS,
+};
+
+// Build a ReadableStream that replays buffered events then streams new ones.
+// Closes automatically when a "done" or "error" event is received.
+function createSSEStream(
+  events: string[],
+  listeners: Set<(data: string) => void>,
+): ReadableStream {
+  return new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder();
+      let closed = false;
+
+      const listener = (data: string) => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+          const parsed = JSON.parse(data);
+          if (parsed.type === "done" || parsed.type === "error") {
+            closed = true;
+            listeners.delete(listener);
+            controller.close();
+          }
+        } catch {
+          // ignore encoding errors on closed stream
+        }
+      };
+      listeners.add(listener);
+
+      // Replay events that already happened (listener catches any concurrent additions)
+      for (const evt of events) {
+        if (closed) break;
+        controller.enqueue(encoder.encode(`data: ${evt}\n\n`));
+      }
+    },
+  });
+}
+
 function startFetchSSE(visible: boolean, providerIds: number[] | undefined, jsonError: JsonErrorFn): Response {
   const events: string[] = [];
   const listeners: Set<(event: string) => void> = new Set();
@@ -1708,7 +1689,6 @@ function startFetchSSE(visible: boolean, providerIds: number[] | undefined, json
     },
   })
     .then((result) => {
-      // Emit a per-provider "result" event so the UI can show individual completion status
       for (const r of result.results) {
         pushEvent(
           JSON.stringify({
@@ -1744,99 +1724,15 @@ function startFetchSSE(visible: boolean, providerIds: number[] | undefined, json
 
   placeholder.promise = fetchPromise;
 
-  // Return an SSE response that streams events.
-  // Register listener BEFORE replaying to avoid missing events pushed concurrently.
-  const stream = new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder();
-      let closed = false;
-
-      const listener = (data: string) => {
-        if (closed) return;
-        try {
-          controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-          const parsed = JSON.parse(data);
-          if (parsed.type === "done" || parsed.type === "error") {
-            closed = true;
-            listeners.delete(listener);
-            controller.close();
-          }
-        } catch {
-          // ignore encoding errors on closed stream
-        }
-      };
-      listeners.add(listener);
-
-      // Replay events that already happened (listener catches any concurrent additions)
-      for (const evt of events) {
-        if (closed) break;
-        controller.enqueue(encoder.encode(`data: ${evt}\n\n`));
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      ...SECURITY_HEADERS,
-    },
-  });
+  return new Response(createSSEStream(events, listeners), { headers: SSE_HEADERS });
 }
 
 function fetchEventsSSE(): Response {
   if (!activeFetch) {
-    // No active fetch — send an immediate "idle" event
     const body = `data: ${JSON.stringify({ type: "idle" })}\n\n`;
-    return new Response(body, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        ...SECURITY_HEADERS,
-      },
-    });
+    return new Response(body, { headers: SSE_HEADERS });
   }
 
-  // Live stream: replay buffered events then continue streaming new ones.
-  // Uses the same listener pattern as startFetchSSE.
   const { events, listeners } = activeFetch;
-  const stream = new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder();
-      let closed = false;
-
-      const listener = (data: string) => {
-        if (closed) return;
-        try {
-          controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-          const parsed = JSON.parse(data);
-          if (parsed.type === "done" || parsed.type === "error") {
-            closed = true;
-            listeners.delete(listener);
-            controller.close();
-          }
-        } catch {
-          // ignore encoding errors on closed stream
-        }
-      };
-      listeners.add(listener);
-
-      // Replay events that already happened
-      for (const evt of events) {
-        if (closed) break;
-        controller.enqueue(encoder.encode(`data: ${evt}\n\n`));
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      ...SECURITY_HEADERS,
-    },
-  });
+  return new Response(createSSEStream(events, listeners), { headers: SSE_HEADERS });
 }

@@ -35,7 +35,7 @@ import { registerUninstallCommand } from "./commands/uninstall.js";
 import { registerImportCommand } from "./commands/import.js";
 import { getMostRecentSyncTime, listProviders } from "../db/repositories/providers.js";
 import { loadConfig } from "../config/loader.js";
-import { syncProviders } from "../core/sync-engine.js";
+import { syncProviders } from "../services/sync.js";
 import pkg from "../../package.json";
 import { getSplashBanner } from "./splash.js";
 

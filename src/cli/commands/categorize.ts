@@ -5,10 +5,10 @@ import { z } from "zod";
 import type { RuleConditions, CategoryRuleInput } from "../../types/index.js";
 import { BUILTIN_CLASSIFICATIONS, isValidClassification } from "../../types/index.js";
 import {
-  addCategoryRule,
+  createCategoryRule,
   findRuleByConditions,
   listCategoryRules,
-  removeCategoryRule,
+  deleteCategoryRule,
   applyCategoryRules,
   listCategoriesWithSource,
   renameCategory,
@@ -20,7 +20,7 @@ import {
   reassignCategoryDryRun,
   bulkReassignCategories,
   bulkReassignCategoriesDryRun,
-  setCategoryClassification,
+  updateCategoryClassification,
   getCategoryClassification,
   getClassificationMap,
 } from "../../db/repositories/categories.js";
@@ -243,7 +243,7 @@ Examples:
       }
 
       const priority = Number(opts.priority) || 0;
-      const rule = addCategoryRule(category, parsed.data, priority);
+      const rule = createCategoryRule(category, parsed.data, priority);
 
       if (isJsonMode()) {
         printJson(
@@ -305,7 +305,7 @@ Examples:
         process.exit(ExitCode.BadArgs);
       }
 
-      const removed = removeCategoryRule(id);
+      const removed = deleteCategoryRule(id);
 
       if (isJsonMode()) {
         if (removed) {
@@ -859,7 +859,7 @@ Examples:
       }
 
       const previous = getCategoryClassification(category);
-      setCategoryClassification(category, classification);
+      updateCategoryClassification(category, classification);
       const updated = previous !== classification;
 
       if (isJsonMode()) {
@@ -974,7 +974,7 @@ Examples:
       }
 
       for (const c of changes) {
-        setCategoryClassification(c.category, c.to);
+        updateCategoryClassification(c.category, c.to);
       }
 
       success(`Auto-classified ${changes.length} category(s).`);

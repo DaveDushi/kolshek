@@ -2,7 +2,7 @@
 
 import type { Command } from "commander";
 import { parseMonthToRange } from "../date-utils.js";
-import { getIncomeReport } from "../../db/repositories/income.js";
+import { getIncome } from "../../services/income.js";
 import { addClassificationOptions, parseClassificationFlags } from "../filter-utils.js";
 import {
   isJsonMode,
@@ -37,7 +37,7 @@ export function registerIncomeCommand(program: Command): void {
 
       try {
         const { excludeClassifications } = parseClassificationFlags(opts);
-        const result = getIncomeReport({
+        const result = getIncome({
           from: range.from,
           to: range.to,
           salaryOnly: opts.salaryOnly,

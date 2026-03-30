@@ -1,17 +1,6 @@
 // Currency and date formatting utilities
 
-// Map common currency symbols to ISO 4217 codes.
-// israeli-bank-scrapers-core sometimes returns symbols instead of codes.
-const SYMBOL_TO_ISO: Record<string, string> = {
-  "\u20AA": "ILS",
-  "$": "USD",
-  "\u20AC": "EUR",
-  "\u00A3": "GBP",
-};
-
-function normalizeCurrency(raw: string): string {
-  return SYMBOL_TO_ISO[raw] || raw;
-}
+import { normalizeCurrency } from "../../../shared/currency.js";
 
 const ilsFormatter = new Intl.NumberFormat("he-IL", {
   style: "currency",

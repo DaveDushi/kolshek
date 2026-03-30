@@ -107,7 +107,7 @@ export function getAccount(id: number): Account | null {
   return row ? rowToAccount(row) : null;
 }
 
-export function setAccountExcluded(id: number, excluded: boolean): void {
+export function updateAccountExcluded(id: number, excluded: boolean): void {
   const db = getDatabase();
   db.prepare("UPDATE accounts SET excluded = $excluded WHERE id = $id").run({
     $excluded: excluded ? 1 : 0,

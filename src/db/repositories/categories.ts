@@ -59,7 +59,7 @@ export function createCategory(name: string, classification: Classification = "e
   return result.changes > 0;
 }
 
-export function setCategoryClassification(name: string, classification: Classification): void {
+export function updateCategoryClassification(name: string, classification: Classification): void {
   const db = getDatabase();
   db.prepare(
     `INSERT INTO categories (name, classification) VALUES ($name, $classification)
@@ -161,7 +161,7 @@ export function listAllCategories(): string[] {
 // Rule CRUD
 // ---------------------------------------------------------------------------
 
-export function addCategoryRule(
+export function createCategoryRule(
   category: string,
   conditions: RuleConditions,
   priority: number = 0,
@@ -202,7 +202,7 @@ export function findRuleByConditions(conditions: RuleConditions): CategoryRule |
   return row ? rowToRule(row) : null;
 }
 
-export function removeCategoryRule(id: number): boolean {
+export function deleteCategoryRule(id: number): boolean {
   const db = getDatabase();
   const result = db
     .prepare("DELETE FROM category_rules WHERE id = $id")

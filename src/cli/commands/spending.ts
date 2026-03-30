@@ -2,7 +2,7 @@
 
 import type { Command } from "commander";
 import { parseMonthToRange } from "../date-utils.js";
-import { getSpendingReport, type SpendingGroupBy } from "../../db/repositories/spending.js";
+import { getSpending, type SpendingGroupBy } from "../../services/spending.js";
 import { addClassificationOptions, parseClassificationFlags } from "../filter-utils.js";
 import {
   isJsonMode,
@@ -46,7 +46,7 @@ export function registerSpendingCommand(program: Command): void {
 
     const { excludeClassifications } = parseClassificationFlags(opts);
 
-    const result = getSpendingReport({
+    const result = getSpending({
       from: range.from,
       to: range.to,
       groupBy: groupBy as SpendingGroupBy,

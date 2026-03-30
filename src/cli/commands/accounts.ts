@@ -17,7 +17,7 @@ import {
 import { getDatabase } from "../../db/database.js";
 import {
   getAccount,
-  setAccountExcluded,
+  updateAccountExcluded,
 } from "../../db/repositories/accounts.js";
 
 interface AccountWithProviderRow {
@@ -162,7 +162,7 @@ export function registerAccountsCommand(program: Command): void {
         info(`Account ${id} is already excluded.`);
         return;
       }
-      setAccountExcluded(id, true);
+      updateAccountExcluded(id, true);
       if (isJsonMode()) {
         printJson(jsonSuccess({ id, excluded: true }));
       } else {
@@ -189,7 +189,7 @@ export function registerAccountsCommand(program: Command): void {
         info(`Account ${id} is already active.`);
         return;
       }
-      setAccountExcluded(id, false);
+      updateAccountExcluded(id, false);
       if (isJsonMode()) {
         printJson(jsonSuccess({ id, excluded: false }));
       } else {

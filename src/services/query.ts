@@ -1,4 +1,4 @@
-// Query resolver — translates composable query primitives into DB calls.
+// Query executor — translates composable query primitives into DB calls.
 // Each primitive is deeply parameterized; the AI agent varies params to
 // express any financial view without needing new query types.
 
@@ -8,7 +8,7 @@ import { DEFAULT_REPORT_EXCLUDES } from "../types/index.js";
 import { getBalanceReport } from "../db/repositories/reports.js";
 import { getBudgetVsActual } from "../db/repositories/budgets.js";
 import { escapeLike } from "../db/utils.js";
-import type { WidgetQuery } from "./page-schema.js";
+import type { WidgetQuery } from "../core/page-schema.js";
 
 type SqlParams = Record<string, string | number | null>;
 
@@ -61,7 +61,7 @@ interface FilterBuildResult {
   to: string;
 }
 
-function buildQueryFilters(filters?: Record<string, unknown>): FilterBuildResult {
+function buildFilterConditions(filters?: Record<string, unknown>): FilterBuildResult {
   const f = (filters ?? {}) as Record<string, unknown>;
   const { from, to } = parsePeriod(f.period as string | undefined);
   const conditions: string[] = ["t.date >= $from", "t.date <= $to"];
@@ -140,9 +140,9 @@ interface AggregateResult {
   comparison?: { previousValue: number; change: number };
 }
 
-function resolveAggregate(query: Extract<WidgetQuery, { type: "aggregate" }>): AggregateResult {
+function executeAggregateQuery(query: Extract<WidgetQuery, { type: "aggregate" }>): AggregateResult {
   const db = getDatabase();
-  const { conditions, params, from, to } = buildQueryFilters(query.filters);
+  const { conditions, params, from, to } = buildFilterConditions(query.filters);
 
   const metric = query.metric ?? "sum";
   const field = query.field === "originalAmount" ? "t.original_amount" : "t.charged_amount";
@@ -246,9 +246,9 @@ interface TrendResult {
   points: TrendPoint[];
 }
 
-function resolveTrend(query: Extract<WidgetQuery, { type: "trend" }>): TrendResult {
+function executeTrendQuery(query: Extract<WidgetQuery, { type: "trend" }>): TrendResult {
   const db = getDatabase();
-  const { conditions, params } = buildQueryFilters(query.filters);
+  const { conditions, params } = buildFilterConditions(query.filters);
 
   const interval = query.interval ?? "month";
   const metric = query.metric ?? "sum";
@@ -333,9 +333,9 @@ interface TransactionsResult {
   total: number;
 }
 
-function resolveTransactions(query: Extract<WidgetQuery, { type: "transactions" }>): TransactionsResult {
+function executeTransactionsQuery(query: Extract<WidgetQuery, { type: "transactions" }>): TransactionsResult {
   const db = getDatabase();
-  const { conditions, params } = buildQueryFilters(query.filters);
+  const { conditions, params } = buildFilterConditions(query.filters);
 
   const sortMap: Record<string, string> = {
     date_desc: "t.date DESC",
@@ -398,7 +398,7 @@ function resolveTransactions(query: Extract<WidgetQuery, { type: "transactions" 
 // Balances resolver
 // ---------------------------------------------------------------------------
 
-function resolveBalances(query: Extract<WidgetQuery, { type: "balances" }>) {
+function executeBalancesQuery(query: Extract<WidgetQuery, { type: "balances" }>) {
   const accounts = getBalanceReport();
   if (query.account && query.account.length > 0) {
     return { accounts: accounts.filter((a) => query.account!.includes(a.accountNumber)) };
@@ -410,7 +410,7 @@ function resolveBalances(query: Extract<WidgetQuery, { type: "balances" }>) {
 // Budget vs actual resolver
 // ---------------------------------------------------------------------------
 
-function resolveBudgetVsActual(query: Extract<WidgetQuery, { type: "budget_vs_actual" }>) {
+function executeBudgetVsActualQuery(query: Extract<WidgetQuery, { type: "budget_vs_actual" }>) {
   const now = new Date();
   const month = query.month ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   return { items: getBudgetVsActual(month) };
@@ -422,24 +422,24 @@ function resolveBudgetVsActual(query: Extract<WidgetQuery, { type: "budget_vs_ac
 
 export type QueryResult = unknown;
 
-export function resolveQuery(query: WidgetQuery): QueryResult {
+export function executeQuery(query: WidgetQuery): QueryResult {
   switch (query.type) {
-    case "aggregate": return resolveAggregate(query);
-    case "trend": return resolveTrend(query);
-    case "transactions": return resolveTransactions(query);
-    case "balances": return resolveBalances(query);
-    case "budget_vs_actual": return resolveBudgetVsActual(query);
+    case "aggregate": return executeAggregateQuery(query);
+    case "trend": return executeTrendQuery(query);
+    case "transactions": return executeTransactionsQuery(query);
+    case "balances": return executeBalancesQuery(query);
+    case "budget_vs_actual": return executeBudgetVsActualQuery(query);
   }
 }
 
 // Batch resolve multiple queries
-export function resolveQueryBatch(
+export function executeQueryBatch(
   queries: Array<{ key: string; query: WidgetQuery }>,
 ): Record<string, QueryResult> {
   const results: Record<string, QueryResult> = {};
   for (const { key, query } of queries) {
     try {
-      results[key] = resolveQuery(query);
+      results[key] = executeQuery(query);
     } catch (err) {
       results[key] = { error: err instanceof Error ? err.message : String(err) };
     }

@@ -24,7 +24,7 @@ import {
   getLastSuccessfulSync,
 } from "../../src/db/repositories/sync-log.js";
 import {
-  addCategoryRule,
+  createCategoryRule,
   applyCategoryRules,
   renameCategory,
   renameCategoryDryRun,
@@ -522,8 +522,8 @@ describe("category rename and migration", () => {
     db.prepare("UPDATE transactions SET category = 'Delivery' WHERE description = 'Wolt'").run();
 
     // Add a category rule for Food
-    addCategoryRule("Food", { description: { pattern: "שופרסל", mode: "substring" } });
-    addCategoryRule("Telecom", { description: { pattern: "HOT", mode: "substring" } });
+    createCategoryRule("Food", { description: { pattern: "שופרסל", mode: "substring" } });
+    createCategoryRule("Telecom", { description: { pattern: "HOT", mode: "substring" } });
   });
 
   it("dry-run returns correct counts without modifying data", () => {
@@ -723,8 +723,8 @@ describe("applyCategoryRules with scope options", () => {
     db.prepare("UPDATE transactions SET category = 'Miscellaneous' WHERE hash IN ('recat_hash_001', 'recat_hash_002')").run();
 
     // Add rules that should recategorize them
-    addCategoryRule("Charity", { description: { pattern: "OneFamily", mode: "substring" } });
-    addCategoryRule("Charity", { description: { pattern: "Ezer Mizion", mode: "substring" } });
+    createCategoryRule("Charity", { description: { pattern: "OneFamily", mode: "substring" } });
+    createCategoryRule("Charity", { description: { pattern: "Ezer Mizion", mode: "substring" } });
   });
 
   it("default scope only touches uncategorized transactions", () => {
