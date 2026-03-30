@@ -80,6 +80,7 @@ export function RulesTable({ onAddRule }: { onAddRule?: () => void }) {
         icon={<BookOpen />}
         title="No rules"
         description="Create category rules to automatically organize transactions."
+        action={onAddRule ? { label: "Add Rule", onClick: onAddRule } : undefined}
       />
     );
   }

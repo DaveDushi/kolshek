@@ -890,8 +890,8 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
             }
 
             const rule = createCategoryRule(category, conditions, priority);
-            // Auto-apply all rules so the new rule takes effect immediately
-            const applyResult = applyCategoryRules({ scope: "uncategorized" });
+            // Auto-apply rules to all transactions so corrections take effect immediately
+            const applyResult = applyCategoryRules({ scope: "all" });
             return json({ ...rule, applied: applyResult.applied }, 201);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -955,7 +955,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         if (method === "POST" && path === "/api/v2/categories/apply") {
           try {
             const body = await parseJsonBody(req);
-            const scope = (String(body.scope ?? "uncategorized")) as "uncategorized" | "all";
+            const scope = (String(body.scope ?? "all")) as "uncategorized" | "all";
             const dryRun = body.dryRun === true;
 
             const result = applyCategoryRules({ scope, dryRun });
