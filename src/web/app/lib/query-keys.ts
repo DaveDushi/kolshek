@@ -63,4 +63,18 @@ export const queryKeys = {
     list: (months: number, exclude?: string[]) =>
       [...queryKeys.insights.all, "list", months, exclude ?? null] as const,
   },
+  customPages: {
+    all: ["custom-pages"] as const,
+    list: () => [...queryKeys.customPages.all, "list"] as const,
+    detail: (id: string) => [...queryKeys.customPages.all, "detail", id] as const,
+  },
+  widgetQueries: {
+    all: ["widget-queries"] as const,
+    batch: (pageId: string, filters?: unknown) =>
+      [...queryKeys.widgetQueries.all, pageId, filters ?? null] as const,
+  },
+  budgets: {
+    all: ["budgets"] as const,
+    list: (month?: string) => [...queryKeys.budgets.all, "list", month ?? null] as const,
+  },
 };

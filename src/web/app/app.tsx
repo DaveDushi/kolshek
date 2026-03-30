@@ -12,6 +12,7 @@ import { InsightsPage } from "./pages/insights-page";
 import { CategoriesPage } from "./pages/categories-page";
 import { TranslationsPage } from "./pages/translations-page";
 import { ProvidersPage } from "./pages/providers-page";
+import { CustomPage } from "./pages/custom-page";
 import { ImportPage } from "./pages/import-page";
 import { SchedulePage } from "./pages/schedule-page";
 
@@ -44,6 +45,7 @@ export function App() {
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/translations" element={<TranslationsPage />} />
                 <Route path="/providers" element={<ProvidersPage />} />
+                <Route path="/pages/:pageId" element={<CustomPage />} />
                 <Route path="/import" element={<ImportPage />} />
                 <Route path="/schedule" element={<SchedulePage />} />
               </Routes>

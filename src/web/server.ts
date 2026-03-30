@@ -114,6 +114,32 @@ import { upsertTransaction } from "../db/repositories/transactions.js";
 import { getDatabase } from "../db/database.js";
 import type { RuleConditions } from "../types/category-rule.js";
 import type { TransactionFilters } from "../types/transaction.js";
+import {
+  listCustomPages,
+  getCustomPage,
+  createCustomPage,
+  updateCustomPage,
+  deleteCustomPage,
+  reorderCustomPages,
+} from "../db/repositories/custom-pages.js";
+import {
+  listBudgets,
+  setBudget,
+  deleteBudget,
+} from "../db/repositories/budgets.js";
+import { validatePage } from "../core/page-schema.js";
+import { querySchema } from "../core/page-schema.js";
+import { resolveQueryBatch } from "../core/query-resolver.js";
+
+// SSE listeners for custom page changes (create/update/delete notifications)
+const pageEventListeners = new Set<(event: string) => void>();
+
+function notifyPageChange(type: "page_changed" | "page_deleted", id: string): void {
+  const data = JSON.stringify({ type, id });
+  for (const listener of pageEventListeners) {
+    try { listener(data); } catch { /* ignore closed streams */ }
+  }
+}
 
 // Track active fetch so we don't allow concurrent syncs
 let activeFetch: { promise: Promise<void>; events: string[]; listeners: Set<(event: string) => void>; abort: AbortController } | null = null;
@@ -1111,6 +1137,250 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             return jsonError("TRANSLATION_TRANSLATE_FAILED", msg, 500);
+          }
+        }
+
+        // =================================================================
+        // --- Custom Pages API ---
+
+        // GET /api/v2/pages — list all custom pages (metadata only)
+        if (method === "GET" && path === "/api/v2/pages") {
+          try {
+            return json(listCustomPages());
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("PAGES_LIST_FAILED", msg, 500);
+          }
+        }
+
+        // GET /api/v2/pages/events — SSE stream for page change notifications
+        if (method === "GET" && path === "/api/v2/pages/events") {
+          const stream = new ReadableStream({
+            start(controller) {
+              const encoder = new TextEncoder();
+              let closed = false;
+              const listener = (data: string) => {
+                if (closed) return;
+                try {
+                  controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+                } catch {
+                  closed = true;
+                  pageEventListeners.delete(listener);
+                }
+              };
+              pageEventListeners.add(listener);
+              // Send initial ping
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "connected" })}\n\n`));
+            },
+            cancel() {
+              // Cleanup handled by listener closure
+            },
+          });
+          return new Response(stream, {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+              ...SECURITY_HEADERS,
+            },
+          });
+        }
+
+        // GET /api/v2/pages/:id — get full page definition
+        {
+          const pageMatch = method === "GET" && path.match(/^\/api\/v2\/pages\/([a-z0-9][a-z0-9-]*[a-z0-9])$/);
+          if (pageMatch) {
+            try {
+              const page = getCustomPage(pageMatch[1]);
+              if (!page) return jsonError("PAGE_NOT_FOUND", "Page not found", 404);
+              return json(page);
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              return jsonError("PAGE_GET_FAILED", msg, 500);
+            }
+          }
+        }
+
+        // POST /api/v2/pages — create a custom page
+        if (method === "POST" && path === "/api/v2/pages") {
+          try {
+            const body = await parseJsonBody(req);
+            const result = validatePage(body);
+            if (!result.success) {
+              return jsonError("PAGE_VALIDATION_FAILED", result.error, 400);
+            }
+            const page = createCustomPage({
+              id: result.data.id,
+              title: result.data.title,
+              icon: result.data.icon,
+              description: result.data.description,
+              definition: result.data.layout as Record<string, unknown>,
+            });
+            notifyPageChange("page_changed", page.id);
+            return json(page, 201);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (msg.includes("UNIQUE constraint")) {
+              return jsonError("PAGE_EXISTS", "A page with this ID already exists", 409);
+            }
+            return jsonError("PAGE_CREATE_FAILED", msg, 500);
+          }
+        }
+
+        // PUT /api/v2/pages/:id — update a custom page
+        {
+          const pageUpdateMatch = method === "PUT" && path.match(/^\/api\/v2\/pages\/([a-z0-9][a-z0-9-]*[a-z0-9])$/);
+          if (pageUpdateMatch) {
+            try {
+              const body = await parseJsonBody(req);
+              const updates: Record<string, unknown> = {};
+              if (body.title !== undefined) updates.title = body.title;
+              if (body.icon !== undefined) updates.icon = body.icon;
+              if (body.description !== undefined) updates.description = body.description;
+              if (body.layout !== undefined) {
+                // Validate the new layout if provided
+                const existing = getCustomPage(pageUpdateMatch[1]);
+                if (!existing) return jsonError("PAGE_NOT_FOUND", "Page not found", 404);
+                const validationInput = {
+                  id: existing.id,
+                  title: (body.title as string) ?? existing.title,
+                  icon: (body.icon as string) ?? existing.icon,
+                  description: body.description !== undefined ? body.description : existing.description,
+                  layout: body.layout,
+                };
+                const result = validatePage(validationInput);
+                if (!result.success) {
+                  return jsonError("PAGE_VALIDATION_FAILED", result.error, 400);
+                }
+                updates.definition = body.layout;
+              }
+              const page = updateCustomPage(pageUpdateMatch[1], updates);
+              if (!page) return jsonError("PAGE_NOT_FOUND", "Page not found", 404);
+              notifyPageChange("page_changed", page.id);
+              return json(page);
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              return jsonError("PAGE_UPDATE_FAILED", msg, 500);
+            }
+          }
+        }
+
+        // DELETE /api/v2/pages/:id — delete a custom page
+        {
+          const pageDeleteMatch = method === "DELETE" && path.match(/^\/api\/v2\/pages\/([a-z0-9][a-z0-9-]*[a-z0-9])$/);
+          if (pageDeleteMatch) {
+            try {
+              const deleted = deleteCustomPage(pageDeleteMatch[1]);
+              if (!deleted) return jsonError("PAGE_NOT_FOUND", "Page not found", 404);
+              notifyPageChange("page_deleted", pageDeleteMatch[1]);
+              return json({ deleted: true });
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              return jsonError("PAGE_DELETE_FAILED", msg, 500);
+            }
+          }
+        }
+
+        // POST /api/v2/pages/reorder — reorder custom pages
+        if (method === "POST" && path === "/api/v2/pages/reorder") {
+          try {
+            const body = await parseJsonBody(req);
+            const ids = body.ids;
+            if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string")) {
+              return jsonError("INVALID_INPUT", "ids must be an array of strings", 400);
+            }
+            reorderCustomPages(ids as string[]);
+            return json({ success: true });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("PAGES_REORDER_FAILED", msg, 500);
+          }
+        }
+
+        // =================================================================
+        // --- Query Resolution API ---
+
+        // POST /api/v2/query — resolve one or more queries in a single request
+        if (method === "POST" && path === "/api/v2/query") {
+          try {
+            const body = await parseJsonBody(req);
+            const queries = body.queries;
+            if (!Array.isArray(queries)) {
+              return jsonError("INVALID_INPUT", "queries must be an array", 400);
+            }
+            if (queries.length > 20) {
+              return jsonError("TOO_MANY_QUERIES", "Max 20 queries per batch", 400);
+            }
+            const validated: Array<{ key: string; query: unknown }> = [];
+            for (const q of queries) {
+              const item = q as Record<string, unknown>;
+              if (typeof item.key !== "string") {
+                return jsonError("INVALID_INPUT", "Each query must have a string key", 400);
+              }
+              const parsed = querySchema.safeParse(item.query);
+              if (!parsed.success) {
+                const msg = parsed.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ");
+                return jsonError("QUERY_VALIDATION_FAILED", `Query "${item.key}": ${msg}`, 400);
+              }
+              validated.push({ key: item.key, query: parsed.data });
+            }
+            const results = resolveQueryBatch(validated as Array<{ key: string; query: any }>);
+            return json(results);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("QUERY_BATCH_FAILED", sanitizeError(msg), 500);
+          }
+        }
+
+        // =================================================================
+        // --- Budgets API ---
+
+        // GET /api/v2/budgets — list budgets
+        if (method === "GET" && path === "/api/v2/budgets") {
+          try {
+            const month = url.searchParams.get("month") ?? undefined;
+            return json(listBudgets(month));
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("BUDGETS_LIST_FAILED", msg, 500);
+          }
+        }
+
+        // PUT /api/v2/budgets — set a budget
+        if (method === "PUT" && path === "/api/v2/budgets") {
+          try {
+            const body = await parseJsonBody(req);
+            const category = body.category;
+            const targetAmount = body.targetAmount;
+            const month = body.month;
+            if (typeof category !== "string" || !category) {
+              return jsonError("INVALID_INPUT", "category is required", 400);
+            }
+            if (typeof targetAmount !== "number" || targetAmount <= 0) {
+              return jsonError("INVALID_INPUT", "targetAmount must be a positive number", 400);
+            }
+            const budget = setBudget(category, targetAmount, typeof month === "string" ? month : undefined);
+            return json(budget);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return jsonError("BUDGET_SET_FAILED", msg, 500);
+          }
+        }
+
+        // DELETE /api/v2/budgets/:category — delete a budget
+        {
+          const budgetDeleteMatch = method === "DELETE" && path.match(/^\/api\/v2\/budgets\/(.+)$/);
+          if (budgetDeleteMatch) {
+            try {
+              const category = decodeURIComponent(budgetDeleteMatch[1]);
+              const month = url.searchParams.get("month") ?? undefined;
+              const deleted = deleteBudget(category, month);
+              if (!deleted) return jsonError("BUDGET_NOT_FOUND", "Budget not found", 404);
+              return json({ deleted: true });
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              return jsonError("BUDGET_DELETE_FAILED", msg, 500);
+            }
           }
         }
 

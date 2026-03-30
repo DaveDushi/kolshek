@@ -40,6 +40,8 @@ import { useUntranslated } from "@/hooks/use-translations";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { SyncPanel } from "./sync-panel";
+import { useCustomPages, usePageEvents } from "@/hooks/use-custom-pages";
+import { getIcon } from "@/lib/icon-map";
 
 // Navigation item definition
 interface NavItem {
@@ -79,6 +81,8 @@ export function Sidebar() {
   const { events, isRunning, start, cancel } = useSync();
   const { alertCount, uncategorizedCount, untranslatedCount } = useNavBadges();
   const [syncPanelOpen, setSyncPanelOpen] = useState(false);
+  const { data: customPages } = useCustomPages();
+  usePageEvents();
 
   // Build navigation groups with live badge data
   const navGroups: NavGroup[] = [
@@ -144,6 +148,19 @@ export function Sidebar() {
         { label: "Schedule", path: "/schedule", icon: Clock },
       ],
     },
+    // Dynamic custom pages section
+    ...(customPages && customPages.length > 0
+      ? [
+          {
+            title: "My Pages",
+            items: customPages.map((page) => ({
+              label: page.title,
+              path: `/pages/${page.id}`,
+              icon: getIcon(page.icon),
+            })),
+          },
+        ]
+      : []),
   ];
 
   const isActive = useCallback(

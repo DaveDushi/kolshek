@@ -36,6 +36,8 @@ import { useCategorySummary } from "@/hooks/use-categories";
 import { useUntranslated } from "@/hooks/use-translations";
 import { cn } from "@/lib/utils";
 import { SyncPanel } from "./sync-panel";
+import { useCustomPages, usePageEvents } from "@/hooks/use-custom-pages";
+import { getIcon } from "@/lib/icon-map";
 
 // Bottom tab items -- the 4 visible tabs + More
 interface TabItem {
@@ -70,6 +72,8 @@ export function MobileNav() {
 
   const [moreOpen, setMoreOpen] = useState(false);
   const [syncPanelOpen, setSyncPanelOpen] = useState(false);
+  const { data: customPages } = useCustomPages();
+  usePageEvents();
 
   const alertCount = insights?.filter((i) => i.severity === "alert").length ?? 0;
   const uncategorizedCount =
@@ -88,7 +92,8 @@ export function MobileNav() {
   // Check if current page is one NOT in the bottom tabs (meaning "More" should be highlighted)
   const isMoreActive =
     !TABS.some((tab) => isActive(tab.path)) &&
-    location.pathname !== "/";
+    location.pathname !== "/" &&
+    (location.pathname.startsWith("/pages/") || !TABS.some((tab) => isActive(tab.path)));
 
   const moreNavItems: MoreNavItem[] = [
     {
@@ -157,6 +162,12 @@ export function MobileNav() {
       path: "/schedule",
       icon: Clock,
     },
+    // Dynamic custom pages
+    ...(customPages ?? []).map((page) => ({
+      label: page.title,
+      path: `/pages/${page.id}`,
+      icon: getIcon(page.icon),
+    })),
   ];
 
   const handleMoreNav = useCallback(
