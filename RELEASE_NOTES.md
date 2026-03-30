@@ -1,20 +1,23 @@
-## v0.4.5
-
-### Features
-
-- **CSV import: auto-create providers**: Uploading a CSV with an unknown provider (e.g., `chase`, `bofa`, `wells-fargo`) now automatically creates the provider instead of failing. This is the core use case for CSV import -- users importing from banks not supported by the scraper no longer need to manually run `kolshek providers add` first.
-- **CSV import: `provider_type` column**: Optional column in imported CSVs to specify whether an auto-created provider is a `bank` or `credit_card` (defaults to `bank` if omitted).
-- **Upload CSV skill**: New `/kolshek:upload-csv` skill that guides users through importing transactions from any bank's CSV export (Chase, Bank of America, Wells Fargo, Amex, Capital One, etc.) by auto-mapping columns to KolShek format.
-- **Account exclusion during setup**: Users can now exclude specific accounts from syncing during `kolshek providers add`.
-- **Account exclusion in dashboard**: Account exclusion toggles moved to provider cards in the dashboard for easier access.
+## v0.4.6
 
 ### Bug Fixes
 
-- **Dashboard import endpoint**: Fixed provider auto-creation not working in the web dashboard due to dynamic imports not resolving correctly at runtime. All server imports are now static top-level imports.
-- **Trends chart ordering**: Fixed chronological ordering in trends data; reversal moved to presentation layer.
-- **Installer setup**: Replaced `pluginDirs` with marketplace registration and improved setup UX.
+- **Category rules now apply to all transactions**: Creating a rule or clicking "Apply Rules" now re-categorizes all transactions (not just uncategorized ones), so miscategorized transactions can be corrected.
+- **"Add Rule" button in empty state**: The Categories page now shows a create button when no rules exist.
 
-### Other
+### Performance
 
-- **Removed local AI agent**: Removed the local LLM agent feature and its `node-llama-cpp` dependency.
-- **Removed reconciliation**: Removed the transaction reconciliation feature in favor of the simpler CSV import flow.
+- **Route-level code splitting**: Dashboard pages are lazy-loaded with `React.lazy()` and `Suspense`, reducing initial bundle size.
+- **Vendor chunk splitting**: React, Recharts, and React Query are split into separate cached chunks for faster repeat loads.
+- **Babel replaced with SWC**: Switched Vite's React plugin to SWC for faster HMR and builds.
+
+### Code Quality
+
+- **Shared service layer**: Extracted duplicated business logic between CLI and dashboard into `src/services/` and `src/shared/`.
+- **Consistent function naming**: Standardized repository functions to CRUD verbs (`create/list/get/update/delete`), query functions from `resolve*` to `execute*`.
+- **Eliminated dynamic imports**: Converted unnecessary `await import()` / `require()` calls to static top-level imports.
+- **Extracted SSE stream helper**: Deduplicated SSE stream construction in the dashboard server.
+- **Shared `useNavBadges` hook**: Deduplicated badge computation between sidebar and mobile nav.
+- **O(1) classification lookups**: Classification functions use `Map` instead of `Array.find()`.
+- **Modern array sorting**: `.toSorted()` across dashboard components.
+- **Default page exports**: Cleaner `React.lazy()` integration.
