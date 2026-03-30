@@ -20,7 +20,7 @@ import { useProviders, useDeleteProvider } from "@/hooks/use-providers";
 import { useSync } from "@/hooks/use-sync";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export function ProvidersPage() {
+export default function ProvidersPage() {
   useDocumentTitle("Providers");
   const { data: providers, isLoading, isError, error } = useProviders();
   const deleteProvider = useDeleteProvider();

@@ -39,7 +39,7 @@ import { cn } from "@/lib/utils";
 
 type Period = "3" | "6" | "12";
 
-export function TrendsPage() {
+export default function TrendsPage() {
   useDocumentTitle("Trends");
   const [months, setMonths] = useState<Period>("6");
   const [selectedCategory, setSelectedCategory] = useState("");

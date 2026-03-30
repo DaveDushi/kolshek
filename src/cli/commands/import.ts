@@ -3,6 +3,7 @@
 import type { Command } from "commander";
 import { resolve } from "path";
 import { existsSync } from "fs";
+import { confirm } from "@inquirer/prompts";
 import {
   validateCsvImport,
   buildTransactionInput,
@@ -209,7 +210,6 @@ export function registerImportCommand(program: Command): void {
 
       // Confirm if interactive
       if (isInteractive()) {
-        const { confirm } = await import("@inquirer/prompts");
         const proceed = await confirm({
           message: `Import ${validation.transactions.length} transactions?`,
           default: true,

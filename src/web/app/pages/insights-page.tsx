@@ -70,7 +70,7 @@ function SeveritySection({ label, description, insights }: SeveritySectionProps)
   );
 }
 
-export function InsightsPage() {
+export default function InsightsPage() {
   useDocumentTitle("Insights");
   const [excluded, setExcluded] = useState<string[]>([...REPORT_DEFAULT_EXCLUDES]);
   const { data, isLoading, isError } = useInsights(undefined, excluded);

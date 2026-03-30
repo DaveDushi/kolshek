@@ -22,7 +22,7 @@ import type { CsvImportPreview, CsvImportResult } from "@/types/api";
 
 type Step = "upload" | "preview" | "result";
 
-export function ImportPage() {
+export default function ImportPage() {
   useDocumentTitle("Import");
   const [step, setStep] = useState<Step>("upload");
   const [file, setFile] = useState<File | null>(null);

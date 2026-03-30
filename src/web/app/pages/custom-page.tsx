@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { CustomPageRenderer } from "@/components/custom-page/custom-page-renderer";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export function CustomPage() {
+export default function CustomPage() {
   const { pageId } = useParams<{ pageId: string }>();
   const { data: page, isLoading, isError, error } = useCustomPage(pageId ?? "");
 

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-export function TranslationsPage() {
+export default function TranslationsPage() {
   useDocumentTitle("Translations");
   const applyAllRules = useApplyTranslationRules();
   const [translatedOpen, setTranslatedOpen] = useState(false);

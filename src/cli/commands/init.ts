@@ -24,6 +24,8 @@ import {
 } from "../../security/keychain.js";
 import { createExcludedAccount } from "../../db/repositories/accounts.js";
 import { scrapeProvider, findChromePath } from "../../core/scraper.js";
+import { runFetch } from "./fetch.js";
+import { installPlugin, registerClaudeCodePlugin } from "./plugin.js";
 import {
   isJsonMode,
   isInteractive,
@@ -371,8 +373,6 @@ export function registerInitCommand(program: Command): void {
 
       if (fetchNow) {
         info('Running "kolshek fetch"...\n');
-        // Import dynamically to avoid circular deps at startup
-        const { runFetch } = await import("./fetch.js");
         await runFetch({ providers: configuredProviders });
       }
 
@@ -390,7 +390,6 @@ export function registerInitCommand(program: Command): void {
       });
 
       if (aiTool !== "skip") {
-        const { installPlugin, registerClaudeCodePlugin } = await import("./plugin.js");
         const result = installPlugin(aiTool);
         if (result.success) {
           success(`Installed ${result.count} files for ${result.description}`);

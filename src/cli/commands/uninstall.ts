@@ -1,6 +1,6 @@
 // kolshek uninstall — Remove kolshek from this machine.
 
-import { existsSync, unlinkSync, readFileSync, writeFileSync, readdirSync, rmdirSync } from "fs";
+import { existsSync, unlinkSync, renameSync, readFileSync, writeFileSync, readdirSync, rmdirSync } from "fs";
 import { join } from "path";
 import type { Command } from "commander";
 import {
@@ -143,7 +143,6 @@ export function registerUninstallCommand(program: Command): void {
             } catch {
               // If direct delete fails (binary is running), rename it
               // The .bak will be orphaned but harmless
-              const { renameSync } = require("fs");
               renameSync(binaryPath, bakPath);
               info("Binary renamed to .bak (will be cleaned up).");
             }

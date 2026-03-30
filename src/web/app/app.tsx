@@ -8,17 +8,17 @@ import { ErrorBoundary } from "./components/shared/error-boundary";
 import { Skeleton } from "./components/ui/skeleton";
 
 // Route-level code splitting — each page loads its own chunk on navigation
-const DashboardPage = lazy(() => import("./pages/dashboard-page").then(m => ({ default: m.DashboardPage })));
-const TransactionsPage = lazy(() => import("./pages/transactions-page").then(m => ({ default: m.TransactionsPage })));
-const SpendingPage = lazy(() => import("./pages/spending-page").then(m => ({ default: m.SpendingPage })));
-const TrendsPage = lazy(() => import("./pages/trends-page").then(m => ({ default: m.TrendsPage })));
-const InsightsPage = lazy(() => import("./pages/insights-page").then(m => ({ default: m.InsightsPage })));
-const CategoriesPage = lazy(() => import("./pages/categories-page").then(m => ({ default: m.CategoriesPage })));
-const TranslationsPage = lazy(() => import("./pages/translations-page").then(m => ({ default: m.TranslationsPage })));
-const ProvidersPage = lazy(() => import("./pages/providers-page").then(m => ({ default: m.ProvidersPage })));
-const CustomPage = lazy(() => import("./pages/custom-page").then(m => ({ default: m.CustomPage })));
-const ImportPage = lazy(() => import("./pages/import-page").then(m => ({ default: m.ImportPage })));
-const SchedulePage = lazy(() => import("./pages/schedule-page").then(m => ({ default: m.SchedulePage })));
+const DashboardPage = lazy(() => import("./pages/dashboard-page"));
+const TransactionsPage = lazy(() => import("./pages/transactions-page"));
+const SpendingPage = lazy(() => import("./pages/spending-page"));
+const TrendsPage = lazy(() => import("./pages/trends-page"));
+const InsightsPage = lazy(() => import("./pages/insights-page"));
+const CategoriesPage = lazy(() => import("./pages/categories-page"));
+const TranslationsPage = lazy(() => import("./pages/translations-page"));
+const ProvidersPage = lazy(() => import("./pages/providers-page"));
+const CustomPage = lazy(() => import("./pages/custom-page"));
+const ImportPage = lazy(() => import("./pages/import-page"));
+const SchedulePage = lazy(() => import("./pages/schedule-page"));
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -18,7 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export function CategoriesPage() {
+export default function CategoriesPage() {
   useDocumentTitle("Categories");
   const [searchParams, setSearchParams] = useSearchParams();
   const activeCategory = searchParams.get("cat");

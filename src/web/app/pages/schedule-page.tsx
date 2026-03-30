@@ -151,7 +151,7 @@ function SyncHistoryRow({ entry }: { entry: SyncLogEntry }) {
   );
 }
 
-export function SchedulePage() {
+export default function SchedulePage() {
   useDocumentTitle("Sync Schedule");
 
   const { data, isLoading, isError, error } = useSchedule();

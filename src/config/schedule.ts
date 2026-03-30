@@ -2,8 +2,10 @@
 // Reads/writes {dataDir}/schedule.json alongside the OS task scheduler.
 
 import { join } from "node:path";
+import { unlink } from "node:fs/promises";
 import type { ScheduleConfig } from "../types/index.js";
 import { getAppPaths } from "./loader.js";
+import { run } from "../core/scheduler/index.js";
 
 export function scheduleJsonPath(): string {
   const paths = getAppPaths();
@@ -25,7 +27,6 @@ export async function writeScheduleConfig(config: ScheduleConfig): Promise<void>
 }
 
 export async function deleteScheduleConfig(): Promise<void> {
-  const { unlink } = await import("node:fs/promises");
   try {
     await unlink(scheduleJsonPath());
   } catch { /* ignore if not exists */ }
@@ -42,7 +43,6 @@ export function parseInterval(value: string): number | null {
 
 // Resolve the kolshek binary path for OS scheduler registration
 export async function resolveBinaryPath(): Promise<string> {
-  const { run } = await import("../core/scheduler/index.js");
 
   // If running compiled (not .ts source), use the executable
   const scriptPath = process.argv[1];

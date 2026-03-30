@@ -39,7 +39,7 @@ function shiftMonth(month: string, delta: number): string {
 
 type GroupBy = "category" | "merchant" | "provider";
 
-export function SpendingPage() {
+export default function SpendingPage() {
   useDocumentTitle("Spending");
   const [month, setMonth] = useState(getCurrentMonth);
   const [groupBy, setGroupBy] = useState<GroupBy>("category");

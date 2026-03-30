@@ -21,7 +21,7 @@ import type { TransactionFilters, TransactionWithContext } from "@/types/api";
 
 const DEFAULT_PAGE_SIZE = 50;
 
-export function TransactionsPage() {
+export default function TransactionsPage() {
   useDocumentTitle("Transactions");
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [filters, setFilters] = useState<TransactionFilters>({

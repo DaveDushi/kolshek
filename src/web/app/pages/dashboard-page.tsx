@@ -11,7 +11,7 @@ import { SpendingDonut } from "@/components/dashboard/spending-donut";
 import { InsightsCard } from "@/components/dashboard/insights-card";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 
-export function DashboardPage() {
+export default function DashboardPage() {
   useDocumentTitle("Dashboard");
   const navigate = useNavigate();
   const { data: balanceData, isLoading } = useBalanceReport();
