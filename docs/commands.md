@@ -488,6 +488,32 @@ See [`docs/example-import.csv`](example-import.csv) for a ready-to-use template.
 
 ---
 
+### `page`
+
+Manage custom dashboard pages.
+
+#### `page list`
+
+List all custom pages.
+
+#### `page get <id>`
+
+Export a custom page definition as JSON.
+
+#### `page create`
+
+Create a custom page from a JSON definition.
+
+| Option | Description |
+|--------|-------------|
+| `-f, --file <path>` | Path to JSON file (reads stdin if omitted) |
+
+#### `page delete <id>`
+
+Delete a custom page.
+
+---
+
 ### `dashboard`
 
 Open the settings dashboard in your browser.

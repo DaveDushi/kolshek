@@ -155,6 +155,14 @@ kolshek plugin install <tool>      # install AI agent plugin (claude-code, openc
 kolshek plugin list                # list available integrations and install status
 ```
 
+### Custom Pages
+```
+kolshek page list [--json]             # list all custom pages
+kolshek page get <id> [--json]         # export a custom page definition as JSON
+kolshek page create [-f, --file <path>] [--json]   # create page from JSON file (stdin if omitted)
+kolshek page delete <id> [--json]      # delete a custom page
+```
+
 ### Setup
 ```
 kolshek init [--setup-only] [--json]   # interactive wizard; --setup-only skips wizard (DB/dir init only)

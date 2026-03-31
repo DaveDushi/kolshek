@@ -90,6 +90,7 @@
           <a href="#trends" class="docs-sidebar-link">trends</a>
           <a href="#insights" class="docs-sidebar-link">insights</a>
           <a href="#import" class="docs-sidebar-link">import</a>
+          <a href="#page" class="docs-sidebar-link">page</a>
           <a href="#update" class="docs-sidebar-link">update</a>
           <a href="#uninstall" class="docs-sidebar-link">uninstall</a>
         </div>
@@ -698,6 +699,32 @@ kolshek spending -m 3         # 3 months ago</code></pre></div>
         </div>
       </section>
 
+      <!-- ── page ────────────────────────────────────────────── -->
+      <section id="page" class="docs-section">
+        <h2 class="docs-h2">page</h2>
+        <p class="docs-p">Manage custom dashboard pages.</p>
+
+        <h3 class="docs-h3">page list</h3>
+        <p class="docs-p">List all custom pages.</p>
+
+        <h3 class="docs-h3">page get &lt;id&gt;</h3>
+        <p class="docs-p">Export a custom page definition as JSON.</p>
+
+        <h3 class="docs-h3">page create</h3>
+        <p class="docs-p">Create a custom page from a JSON definition.</p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Option</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>-f, --file &lt;path&gt;</code></td><td>Path to JSON file (reads stdin if omitted)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="docs-h3">page delete &lt;id&gt;</h3>
+        <p class="docs-p">Delete a custom page.</p>
+      </section>
+
       <!-- ── uninstall ─────────────────────────────────────────── -->
       <section id="uninstall" class="docs-section">
         <h2 class="docs-h2">uninstall</h2>
@@ -865,6 +892,55 @@ kolshek db schema transactions --json</code></pre></div>
       <!-- ── Changelog ──────────────────────────────────────────── -->
       <section id="changelog" class="docs-section">
         <h1 class="docs-h1">Changelog</h1>
+
+        <h2 class="docs-h2">v0.4.6</h2>
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li><strong>Category rules now apply to all transactions</strong> &mdash; Creating a rule or clicking &ldquo;Apply Rules&rdquo; now re-categorizes all transactions (not just uncategorized ones), so miscategorized transactions can be corrected.</li>
+          <li><strong>&ldquo;Add Rule&rdquo; button in empty state</strong> &mdash; The Categories page now shows a create button when no rules exist.</li>
+        </ul>
+        <h3 class="docs-h3">Performance</h3>
+        <ul class="docs-ul">
+          <li><strong>Route-level code splitting</strong> &mdash; Dashboard pages are lazy-loaded with <code class="docs-code">React.lazy()</code> and <code class="docs-code">Suspense</code>, reducing initial bundle size.</li>
+          <li><strong>Vendor chunk splitting</strong> &mdash; React, Recharts, and React Query are split into separate cached chunks for faster repeat loads.</li>
+          <li><strong>Babel replaced with SWC</strong> &mdash; Switched Vite&rsquo;s React plugin to SWC for faster HMR and builds.</li>
+        </ul>
+        <h3 class="docs-h3">Code Quality</h3>
+        <ul class="docs-ul">
+          <li><strong>Shared service layer</strong> &mdash; Extracted duplicated business logic between CLI and dashboard into <code class="docs-code">src/services/</code> and <code class="docs-code">src/shared/</code>.</li>
+          <li><strong>Consistent function naming</strong> &mdash; Standardized repository functions to CRUD verbs, query functions from <code class="docs-code">resolve*</code> to <code class="docs-code">execute*</code>.</li>
+          <li><strong>Eliminated dynamic imports</strong> &mdash; Converted unnecessary <code class="docs-code">await import()</code> / <code class="docs-code">require()</code> calls to static top-level imports.</li>
+          <li><strong>Extracted SSE stream helper</strong> &mdash; Deduplicated SSE stream construction in the dashboard server.</li>
+          <li><strong>Shared useNavBadges hook</strong> &mdash; Deduplicated badge computation between sidebar and mobile nav.</li>
+          <li><strong>O(1) classification lookups</strong> &mdash; Classification functions use <code class="docs-code">Map</code> instead of <code class="docs-code">Array.find()</code>.</li>
+          <li><strong>Modern array sorting</strong> &mdash; <code class="docs-code">.toSorted()</code> across dashboard components.</li>
+          <li><strong>Default page exports</strong> &mdash; Cleaner <code class="docs-code">React.lazy()</code> integration.</li>
+        </ul>
+
+        <div class="docs-divider"></div>
+
+        <h2 class="docs-h2">v0.4.5</h2>
+        <h3 class="docs-h3">Features</h3>
+        <ul class="docs-ul">
+          <li><strong>CSV import: auto-create providers</strong> &mdash; Uploading a CSV with an unknown provider now automatically creates the provider instead of failing.</li>
+          <li><strong>CSV import: provider_type column</strong> &mdash; Optional column in imported CSVs to specify whether an auto-created provider is a <code class="docs-code">bank</code> or <code class="docs-code">credit_card</code> (defaults to <code class="docs-code">bank</code>).</li>
+          <li><strong>Upload CSV skill</strong> &mdash; New <code class="docs-code">/kolshek:upload-csv</code> skill that guides users through importing transactions from any bank&rsquo;s CSV export.</li>
+          <li><strong>Account exclusion during setup</strong> &mdash; Users can now exclude specific accounts from syncing during <code class="docs-code">kolshek providers add</code>.</li>
+          <li><strong>Account exclusion in dashboard</strong> &mdash; Account exclusion toggles moved to provider cards in the dashboard.</li>
+        </ul>
+        <h3 class="docs-h3">Bug Fixes</h3>
+        <ul class="docs-ul">
+          <li><strong>Dashboard import endpoint</strong> &mdash; Fixed provider auto-creation not working in the web dashboard due to dynamic imports not resolving correctly at runtime.</li>
+          <li><strong>Trends chart ordering</strong> &mdash; Fixed chronological ordering in trends data; reversal moved to presentation layer.</li>
+          <li><strong>Installer setup</strong> &mdash; Replaced <code class="docs-code">pluginDirs</code> with marketplace registration and improved setup UX.</li>
+        </ul>
+        <h3 class="docs-h3">Other</h3>
+        <ul class="docs-ul">
+          <li><strong>Removed local AI agent</strong> &mdash; Removed the local LLM agent feature and its <code class="docs-code">node-llama-cpp</code> dependency.</li>
+          <li><strong>Removed reconciliation</strong> &mdash; Removed the transaction reconciliation feature in favor of the simpler CSV import flow.</li>
+        </ul>
+
+        <div class="docs-divider"></div>
 
         <h2 class="docs-h2">v0.4.4</h2>
         <h3 class="docs-h3">Bug Fixes</h3>
