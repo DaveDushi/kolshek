@@ -1683,6 +1683,7 @@ function startFetchSSE(visible: boolean, providerIds: number[] | undefined, json
 
   const fetchPromise = syncProviders(providers, {
     visible,
+    triggerType: "api",
     signal: abortController.signal,
     onProgress: (alias, stage) => {
       pushEvent(JSON.stringify({ type: "progress", provider: alias, stage }));

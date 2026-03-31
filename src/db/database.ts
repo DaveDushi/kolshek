@@ -303,6 +303,16 @@ CREATE TABLE IF NOT EXISTS budgets (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(category, month)
 );`],
+
+  ["016_sync_log_audit.sql", `-- Scraper audit trail: duration, error type, and trigger source.
+ALTER TABLE sync_log ADD COLUMN duration_ms INTEGER;
+ALTER TABLE sync_log ADD COLUMN error_type TEXT;
+ALTER TABLE sync_log ADD COLUMN trigger_type TEXT NOT NULL DEFAULT 'manual';
+
+-- Backfill duration from timestamps for existing completed rows
+UPDATE sync_log SET duration_ms = CAST(
+  (julianday(completed_at) - julianday(started_at)) * 86400000 AS INTEGER
+) WHERE completed_at IS NOT NULL AND duration_ms IS NULL;`],
 ];
 
 // Run all pending SQL migrations.

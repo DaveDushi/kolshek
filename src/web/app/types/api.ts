@@ -251,6 +251,9 @@ export interface SyncLogEntry {
   errorMessage: string | null;
   scrapeStartDate: string;
   scrapeEndDate: string | null;
+  durationMs: number | null;
+  errorType: string | null;
+  triggerType: string;
 }
 
 export interface ScheduleData {

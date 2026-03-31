@@ -12,6 +12,9 @@ interface SyncLogRow {
   error_message: string | null;
   scrape_start_date: string;
   scrape_end_date: string | null;
+  duration_ms: number | null;
+  error_type: string | null;
+  trigger_type: string;
 }
 
 function rowToSyncLog(row: SyncLogRow): SyncLog {
@@ -26,6 +29,9 @@ function rowToSyncLog(row: SyncLogRow): SyncLog {
     errorMessage: row.error_message,
     scrapeStartDate: row.scrape_start_date,
     scrapeEndDate: row.scrape_end_date,
+    durationMs: row.duration_ms,
+    errorType: row.error_type,
+    triggerType: row.trigger_type ?? "manual",
   };
 }
 
@@ -33,18 +39,20 @@ export function createSyncLog(
   providerId: number,
   scrapeStartDate: string,
   scrapeEndDate: string,
+  triggerType: string = "manual",
 ): SyncLog {
   const db = getDatabase();
   const row = db
     .prepare(
-      `INSERT INTO sync_log (provider_id, status, scrape_start_date, scrape_end_date)
-       VALUES ($providerId, 'running', $scrapeStartDate, $scrapeEndDate)
+      `INSERT INTO sync_log (provider_id, status, scrape_start_date, scrape_end_date, trigger_type)
+       VALUES ($providerId, 'running', $scrapeStartDate, $scrapeEndDate, $triggerType)
        RETURNING *`,
     )
     .get({
       $providerId: providerId,
       $scrapeStartDate: scrapeStartDate,
       $scrapeEndDate: scrapeEndDate,
+      $triggerType: triggerType,
     }) as SyncLogRow;
 
   return rowToSyncLog(row);
@@ -56,6 +64,8 @@ export function completeSyncLog(
   transactionsAdded: number,
   transactionsUpdated: number,
   errorMessage?: string,
+  durationMs?: number,
+  errorType?: string,
 ): void {
   const db = getDatabase();
   db.prepare(
@@ -64,7 +74,9 @@ export function completeSyncLog(
        status = $status,
        transactions_added = $transactionsAdded,
        transactions_updated = $transactionsUpdated,
-       error_message = $errorMessage
+       error_message = $errorMessage,
+       duration_ms = $durationMs,
+       error_type = $errorType
      WHERE id = $id`,
   ).run({
     $id: id,
@@ -72,6 +84,8 @@ export function completeSyncLog(
     $transactionsAdded: transactionsAdded,
     $transactionsUpdated: transactionsUpdated,
     $errorMessage: errorMessage ?? null,
+    $durationMs: durationMs ?? null,
+    $errorType: errorType ?? null,
   });
 }
 
@@ -177,4 +191,44 @@ export function hasSuccessfulSync(providerId: number): boolean {
     .get({ $providerId: providerId });
 
   return row != null;
+}
+
+// Filtered sync log query for the sync-history CLI command
+export function listSyncLogs(options: {
+  limit?: number;
+  providerAlias?: string;
+  status?: "success" | "error";
+}): SyncLogWithProvider[] {
+  const db = getDatabase();
+  const conditions = ["sl.status != 'running'"];
+  const limit = options.limit ?? 20;
+
+  if (options.providerAlias) {
+    conditions.push("(p.alias = $alias OR p.company_id = $alias)");
+  }
+  if (options.status) {
+    conditions.push("sl.status = $filterStatus");
+  }
+
+  const where = conditions.join(" AND ");
+  const stmt = db.prepare(
+    `SELECT sl.*, p.alias AS provider_alias, p.display_name AS provider_display_name
+     FROM sync_log sl
+     LEFT JOIN providers p ON p.id = sl.provider_id
+     WHERE ${where}
+     ORDER BY sl.started_at DESC
+     LIMIT $limit`,
+  );
+
+  const rows = stmt.all({
+    $limit: limit,
+    $alias: options.providerAlias ?? null,
+    $filterStatus: options.status ?? null,
+  }) as SyncLogWithProviderRow[];
+
+  return rows.map((row) => ({
+    ...rowToSyncLog(row),
+    providerAlias: row.provider_alias ?? "unknown",
+    providerDisplayName: row.provider_display_name ?? "Unknown",
+  }));
 }
