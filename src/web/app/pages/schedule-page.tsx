@@ -87,8 +87,16 @@ function formatDuration(startedAt: string, completedAt: string | null): string {
   return remainSec > 0 ? `${minutes}m ${remainSec}s` : `${minutes}m`;
 }
 
+const TRIGGER_LABELS: Record<string, string> = {
+  manual: "Manual",
+  auto: "Auto",
+  api: "Dashboard",
+  scheduled: "Scheduled",
+};
+
 function SyncHistoryRow({ entry }: { entry: SyncLogEntry }) {
   const isError = entry.status === "error";
+  const triggerLabel = TRIGGER_LABELS[entry.triggerType] ?? entry.triggerType;
 
   return (
     <TableRow>
@@ -113,6 +121,9 @@ function SyncHistoryRow({ entry }: { entry: SyncLogEntry }) {
         </div>
       </TableCell>
       <TableCell>
+        <span className="text-[10px] text-muted-foreground/60">{triggerLabel}</span>
+      </TableCell>
+      <TableCell>
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="text-xs text-muted-foreground cursor-default">
@@ -130,10 +141,11 @@ function SyncHistoryRow({ entry }: { entry: SyncLogEntry }) {
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="text-destructive cursor-default truncate max-w-[200px] inline-block">
-                {entry.errorMessage || "Unknown error"}
+                {entry.errorType ? `[${entry.errorType}] ` : ""}{entry.errorMessage || "Unknown error"}
               </span>
             </TooltipTrigger>
             <TooltipContent className="max-w-sm">
+              {entry.errorType && <div className="font-medium mb-1">{entry.errorType}</div>}
               {entry.errorMessage || "Unknown error"}
             </TooltipContent>
           </Tooltip>
@@ -449,6 +461,7 @@ export default function SchedulePage() {
                     <TableRow>
                       <TableHead className="text-xs">Provider</TableHead>
                       <TableHead className="text-xs">Status</TableHead>
+                      <TableHead className="text-xs">Trigger</TableHead>
                       <TableHead className="text-xs">Time</TableHead>
                       <TableHead className="text-xs">Duration</TableHead>
                       <TableHead className="text-xs">Result</TableHead>

@@ -59,6 +59,7 @@ export interface SyncOptions {
   stealth?: boolean;
   visible?: boolean;
   signal?: AbortSignal;
+  triggerType?: "manual" | "scheduled" | "api" | "auto";
 }
 
 export interface FetchResult extends SyncResult {
@@ -231,7 +232,7 @@ async function syncSingleProvider(
     const endDateStr = formatISO(endDate, { representation: "date" });
 
     // Create sync log entry
-    const syncLog = createSyncLog(provider.id, startDateStr, endDateStr);
+    const syncLog = createSyncLog(provider.id, startDateStr, endDateStr, syncOptions?.triggerType);
 
     onProgress?.(alias, "scraping");
 
@@ -257,7 +258,8 @@ async function syncSingleProvider(
         err instanceof Error ? err.message : String(err),
         credentials,
       );
-      completeSyncLog(syncLog.id, "error", 0, 0, errMsg);
+      const elapsed = Date.now() - startTime;
+      completeSyncLog(syncLog.id, "error", 0, 0, errMsg, elapsed, "GENERAL_ERROR");
       return {
         companyId,
         alias,
@@ -266,7 +268,8 @@ async function syncSingleProvider(
         transactionsAdded: 0,
         transactionsUpdated: 0,
         error: errMsg,
-        durationMs: Date.now() - startTime,
+        errorType: "GENERAL_ERROR",
+        durationMs: elapsed,
         scrapeStartDate: startDateStr,
         scrapeEndDate: endDateStr,
       };
@@ -277,7 +280,8 @@ async function syncSingleProvider(
         scrapeResult.error ?? "",
         credentials,
       );
-      completeSyncLog(syncLog.id, "error", 0, 0, safeError);
+      const elapsed = Date.now() - startTime;
+      completeSyncLog(syncLog.id, "error", 0, 0, safeError, elapsed, scrapeResult.errorType);
       return {
         companyId,
         alias,
@@ -286,7 +290,8 @@ async function syncSingleProvider(
         transactionsAdded: 0,
         transactionsUpdated: 0,
         error: safeError,
-        durationMs: Date.now() - startTime,
+        errorType: scrapeResult.errorType,
+        durationMs: elapsed,
         scrapeStartDate: startDateStr,
         scrapeEndDate: endDateStr,
       };
@@ -359,7 +364,8 @@ async function syncSingleProvider(
       updateLastSynced(provider.id, new Date().toISOString());
 
       // Complete sync log
-      completeSyncLog(syncLog.id, "success", totalAdded, totalUpdated);
+      const elapsed = Date.now() - startTime;
+      completeSyncLog(syncLog.id, "success", totalAdded, totalUpdated, undefined, elapsed);
 
       db.run("COMMIT");
     } catch (err) {

@@ -42,6 +42,7 @@ export interface ProviderSyncResult {
   transactionsAdded: number;
   transactionsUpdated: number;
   error?: string;
+  errorType?: string;
   durationMs: number;
   /** The start date of the scrape range (YYYY-MM-DD) */
   scrapeStartDate?: string;
@@ -69,4 +70,7 @@ export interface SyncLog {
   errorMessage: string | null;
   scrapeStartDate: string;
   scrapeEndDate: string | null;
+  durationMs: number | null;
+  errorType: string | null;
+  triggerType: string;
 }

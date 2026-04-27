@@ -33,6 +33,7 @@ import { registerPageCommand } from "./commands/page.js";
 import { registerUpdateCommand } from "./commands/update.js";
 import { registerUninstallCommand } from "./commands/uninstall.js";
 import { registerImportCommand } from "./commands/import.js";
+import { registerSyncHistoryCommand } from "./commands/sync-history.js";
 import { getMostRecentSyncTime, listProviders } from "../db/repositories/providers.js";
 import { loadConfig } from "../config/loader.js";
 import { syncProviders } from "../services/sync.js";
@@ -122,7 +123,7 @@ program
                 // Run sync directly instead of runFetch() which calls process.exit()
                 const providers = listProviders();
                 if (providers.length > 0) {
-                  const result = await syncProviders(providers, { config });
+                  const result = await syncProviders(providers, { config, triggerType: "auto" });
                   if (result.hasErrors) {
                     spinner.fail("Auto-fetch had errors (continuing with cached data).");
                   } else {
@@ -164,6 +165,7 @@ registerInsightsCommand(program);
 registerDashboardCommand(program);
 registerPageCommand(program);
 registerImportCommand(program);
+registerSyncHistoryCommand(program);
 registerUpdateCommand(program);
 registerUninstallCommand(program);
 
