@@ -22,6 +22,7 @@ export type CompanyId =
   | "yahav"
   | "oneZero"
   | "pagi"
+  | "external_deposit"
   // Credit cards
   | "visaCal"
   | "max"
@@ -123,6 +124,12 @@ export const PROVIDERS: Record<CompanyId, ProviderInfo> = {
     type: "bank",
     loginFields: ["username", "password"],
   },
+  external_deposit: {
+    companyId: "external_deposit",
+    displayName: "External Deposit",
+    type: "bank",
+    loginFields: []
+  },
   // Credit cards
   visaCal: {
     companyId: "visaCal",
@@ -181,6 +188,7 @@ export const SCRAPER_MAX_DAYS: Record<CompanyId, number> = {
   yahav: 180, // 6 months
   oneZero: 365,
   pagi: 365,
+  external_deposit: 0, // no scraping
   // Credit cards
   visaCal: 365,
   max: 365,

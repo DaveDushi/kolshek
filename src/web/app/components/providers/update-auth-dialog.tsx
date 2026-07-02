@@ -46,8 +46,11 @@ export function UpdateAuthDialog({
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [otpCode, setOtpCode] = useState("");
   const [awaitingOtp, setAwaitingOtp] = useState(false);
+  const [depositAmount, setDepositAmount] = useState("");
+  const [depositDate, setDepositDate] = useState("");
   const updateAuth = useUpdateAuth();
   const isTwoFactor = provider?.companyId === "oneZero";
+  const isExternal = provider?.companyId === "external_deposit";
 
   const { data: fieldsData, isLoading: fieldsLoading } = useProviderFields(
     provider?.companyId ?? ""
@@ -58,6 +61,7 @@ export function UpdateAuthDialog({
     (f) => credentials[f] && credentials[f].trim() !== ""
   );
   const otpFilled = otpCode.trim() !== "";
+  const depositValid = depositAmount.trim() !== "" && !isNaN(Number(depositAmount));
 
   const resetMutation = updateAuth.reset;
   const handleOpenChange = useCallback(
@@ -77,6 +81,15 @@ export function UpdateAuthDialog({
 
   const handleSubmit = useCallback(() => {
     if (!provider) return;
+
+    if (isExternal) {
+      if (!depositValid) return;
+      updateAuth.mutate(
+        { id: provider.id, credentials: { amount: depositAmount, date: depositDate } },
+        { onSuccess: () => handleOpenChange(false) }
+      );
+      return;
+    }
 
     if (awaitingOtp) {
       if (!otpFilled) return;
@@ -112,6 +125,10 @@ export function UpdateAuthDialog({
     isTwoFactor,
     updateAuth,
     handleOpenChange,
+    isExternal,
+    depositAmount,
+    depositDate,
+    depositValid,
   ]);
 
   return (
@@ -146,6 +163,29 @@ export function UpdateAuthDialog({
           {fieldsLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : isExternal ? (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="deposit-amount">Amount</Label>
+                <Input
+                  id="deposit-amount"
+                  type="number"
+                  inputMode="decimal"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="deposit-date">Date</Label>
+                <Input
+                  id="deposit-date"
+                  type="date"
+                  value={depositDate}
+                  onChange={(e) => setDepositDate(e.target.value)}
+                />
+              </div>
             </div>
           ) : awaitingOtp ? (
             <div className="space-y-4">
@@ -204,15 +244,15 @@ export function UpdateAuthDialog({
           </DialogClose>
           <Button
             onClick={handleSubmit}
-            disabled={awaitingOtp ? !otpFilled || updateAuth.isPending : !allFilled || updateAuth.isPending}
+            disabled={isExternal ? !depositValid || updateAuth.isPending : awaitingOtp ? !otpFilled || updateAuth.isPending : !allFilled || updateAuth.isPending}
           >
             {updateAuth.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {awaitingOtp ? "Verifying..." : "Saving..."}
+                {isExternal ? "Saving..." : awaitingOtp ? "Verifying..." : "Saving..."}
               </>
             ) : (
-              awaitingOtp ? "Verify OTP" : "Save Credentials"
+              isExternal ? "Save" : awaitingOtp ? "Verify OTP" : "Save Credentials"
             )}
           </Button>
         </DialogFooter>

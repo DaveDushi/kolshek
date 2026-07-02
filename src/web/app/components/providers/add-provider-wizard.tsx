@@ -56,6 +56,7 @@ const PROVIDER_LIST = [
   { companyId: "isracard", displayName: "Isracard", type: "credit-card" },
   { companyId: "amex", displayName: "Amex", type: "credit-card" },
   { companyId: "behatsdaa", displayName: "Behatsdaa", type: "credit-card" },
+  { companyId: "external_deposit", displayName: "External Deposit", type: "bank" },
 ] as const;
 
 type ProviderType = "bank" | "credit-card";
@@ -79,6 +80,9 @@ export function AddProviderWizard({
   const [otpCode, setOtpCode] = useState("");
   const [pendingProviderId, setPendingProviderId] = useState<number | null>(null);
   const [awaitingOtp, setAwaitingOtp] = useState(false);
+  // External deposit fields
+  const [depositAmount, setDepositAmount] = useState("");
+  const [depositDate, setDepositDate] = useState("");
 
   const createProvider = useCreateProvider();
   const updateAuth = useUpdateAuth();
@@ -128,6 +132,10 @@ export function AddProviderWizard({
       case 2:
         return selectedCompanyId !== "";
       case 3:
+        // External deposit uses amount field instead of login fields
+        if (selectedCompanyId === "external_deposit") {
+          return depositAmount.trim() !== "" && !isNaN(Number(depositAmount));
+        }
         // All login fields must be filled
         return loginFields.every(
           (f) => credentials[f] && credentials[f].trim() !== ""
@@ -160,11 +168,15 @@ export function AddProviderWizard({
       (p) => p.companyId === selectedCompanyId
     );
 
+    const bodyCredentials = selectedCompanyId === "external_deposit"
+      ? { amount: depositAmount, date: depositDate }
+      : credentials;
+
     createProvider.mutate(
       {
         companyId: selectedCompanyId,
         alias: alias || selectedProvider?.displayName || selectedCompanyId,
-        credentials,
+        credentials: bodyCredentials,
       },
       {
         onSuccess: (res) => {
@@ -329,42 +341,75 @@ export function AddProviderWizard({
             </div>
           )}
 
-          {/* Step 3: Credentials */}
+          {/* Step 3: Credentials or External Deposit */}
           {step === 3 && (
             <div className="space-y-4">
-              <Alert className="flex items-start gap-2 border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
-                <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                <p className="text-xs">
-                  Credentials are stored securely in your system keychain and
-                  are never transmitted to external servers.
-                </p>
-              </Alert>
-
-              {fieldsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : loginFields.length === 0 ? (
-                <p className="py-4 text-center text-sm text-muted-foreground">
-                  No credential fields found for this provider.
-                </p>
-              ) : (
-                loginFields.map((field) => (
-                  <div key={field} className="space-y-1.5">
-                    <Label htmlFor={`cred-${field}`}>
-                      {fieldLabel(field)}
-                    </Label>
+              {selectedCompanyId === "external_deposit" ? (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="deposit-amount">Amount</Label>
                     <Input
-                      id={`cred-${field}`}
-                      type={isPasswordField(field) ? "password" : "text"}
-                      value={credentials[field] || ""}
-                      onChange={(e) =>
-                        setCredentialField(field, e.target.value)
-                      }
-                      autoComplete="off"
+                      id="deposit-amount"
+                      type="number"
+                      inputMode="decimal"
+                      value={depositAmount}
+                      onChange={(e) => setDepositAmount(e.target.value)}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the fixed amount to add as an external deposit.
+                    </p>
                   </div>
-                ))
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="deposit-date">Date</Label>
+                    <Input
+                      id="deposit-date"
+                      type="date"
+                      value={depositDate}
+                      onChange={(e) => setDepositDate(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The date of the deposit. Leave blank to use today.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Alert className="flex items-start gap-2 border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
+                    <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                    <p className="text-xs">
+                      Credentials are stored securely in your system keychain and
+                      are never transmitted to external servers.
+                    </p>
+                  </Alert>
+
+                  {fieldsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : loginFields.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-muted-foreground">
+                      No credential fields found for this provider.
+                    </p>
+                  ) : (
+                    loginFields.map((field) => (
+                      <div key={field} className="space-y-1.5">
+                        <Label htmlFor={`cred-${field}`}>
+                          {fieldLabel(field)}
+                        </Label>
+                        <Input
+                          id={`cred-${field}`}
+                          type={isPasswordField(field) ? "password" : "text"}
+                          value={credentials[field] || ""}
+                          onChange={(e) =>
+                            setCredentialField(field, e.target.value)
+                          }
+                          autoComplete="off"
+                        />
+                      </div>
+                    ))
+                  )}
+                </>
               )}
             </div>
           )}

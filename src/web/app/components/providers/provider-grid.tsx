@@ -220,8 +220,9 @@ function ProviderCardItem({
   onDeleteRequest: (provider: ProviderCardType) => void;
   onSync: (options?: { providerId?: number; visible?: boolean }) => void;
 }) {
-  const Icon = provider.type === "bank" ? Building2 : CreditCard;
-  const authStatus = provider.authStatus ?? (provider.hasCredentials ? "pending" : "no");
+    const Icon = provider.type === "bank" ? Building2 : CreditCard;
+    const authStatus = provider.authStatus ?? (provider.hasCredentials ? "pending" : "no");
+    const isExternal = provider.companyId === "external_deposit";
 
   return (
     <Card>
@@ -277,7 +278,7 @@ function ProviderCardItem({
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onAuth(provider.id)}>
                 <KeyRound className="h-4 w-4" />
-                Update Auth
+                {isExternal ? "Update" : "Update Auth"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -314,10 +315,21 @@ function ProviderCardItem({
             </>
           )}
           {authStatus === "no" && (
-            <>
-              <XCircle className="h-4 w-4 text-destructive" />
-              <span className="text-destructive">No credentials</span>
-            </>
+            isExternal ? (
+                <>
+                    <XCircle className="h-4 w-4 text-muted-foreground"/>
+                    <span className="text-muted-foreground">
+                        No auth required
+                    </span>
+                </>
+            ) : (
+                <>
+                    <XCircle className="h-4 w-4 text-destructive"/>
+                    <span className="text-destructive">
+                        No credentials
+                    </span>
+                </>
+            )
           )}
         </div>
 

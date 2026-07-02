@@ -192,6 +192,19 @@ async function syncSingleProvider(
     };
   }
 
+  // External/manual providers don't participate in scraping
+  if (companyId === "external_deposit") {
+    return {
+      companyId,
+      alias,
+      success: true,
+      accountsFound: 0,
+      transactionsAdded: 0,
+      transactionsUpdated: 0,
+      durationMs: Date.now() - startTime,
+    };
+  }
+
   // Check for cancellation before starting
   if (syncOptions?.signal?.aborted) {
     return {

@@ -31,8 +31,13 @@ export async function startTwoFactorAuth(
   phoneNumber: string,
 ): Promise<{ success: boolean }> {
   try {
+    const scraperCheck = (CompanyTypes as Record<string, any>)[companyId];
+    if (!scraperCheck) {
+      throw new Error(`Two-factor authentication is not supported for provider: ${companyId}`);
+    }
+
     const scraper = createScraper({
-      companyId: CompanyTypes[companyId],
+      companyId: scraperCheck,
       startDate: new Date(), // Not directly used for OTP, but required by interface
       verbose: true, // Enable for debugging
     });

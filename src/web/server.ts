@@ -19,6 +19,7 @@ import {
   getMostRecentSyncTime,
   getProviderByAlias,
 } from "../db/repositories/providers.js";
+import { upsertAccount } from "../db/repositories/accounts.js"
 import {
   listCategoryRules, applyCategoryRules, createCategoryRule, deleteCategoryRule,
   findRuleByConditions, listCategories, listAllCategories, getClassificationMap,
@@ -34,7 +35,7 @@ import {
   listCustomPages, getCustomPage, createCustomPage, updateCustomPage, deleteCustomPage,
 } from "../db/repositories/custom-pages.js";
 import {
-  listTransactions, updateTransactionCategory, countTransactions,
+  listTransactions, updateTransactionCategory, countTransactions, upsertTransaction
 } from "../db/repositories/transactions.js";
 import { getMonthlyReport, getBalanceReport } from "../db/repositories/reports.js";
 import { listBudgets, setBudget } from "../db/repositories/budgets.js";
@@ -47,6 +48,7 @@ import {
 import {
   registerSchedule, unregisterSchedule, checkScheduleRegistered, currentPlatform,
 } from "../core/scheduler/index.js";
+import { transactionHash, transactionUniqueId } from "../core/sync-engine.js"
 import { fetchAndApplyRules } from "../services/sync.js";
 import { executeQueryBatch } from "../services/query.js";
 import { getSpending } from "../services/spending.js";
@@ -502,10 +504,51 @@ export function startDashboard(port: number) {
       }
 
       const provider = createProvider(companyId, displayName || companyId, type, effectiveAlias);
+      if (provider.companyId === "external_deposit") { // Accept amount/date via credentials for consistency with the UI
+        const amtRaw = credentials?.amount ?? req.body?. amount;
+        const dateRaw = credentials?.date ?? req.body?.date;
+        const amount = typeof amtRaw === "string"? Number(amtRaw) : Number (amtRaw ?? NaN);
+        if (!Number.isFinite (amount)) { // Clean up provider record
+            deleteProvider(provider.id);
+            return res.status(400).json({success: false,  error: { code: "INVALID_AMOUNT", message: "Invalid deposit amount" },  });
+        }
+        // Create an account and a completed transaction
+        const account = upsertAccount (provider.id, "external", provider.companyId, amount, "ILS");
+        const dateIso = dateRaw ? new Date(dateRaw).toISOString(): new Date().toISOString();
+        const desc = "External deposit";
+        const hash = transactionHash({ date: dateIso, chargedAmount: amount, description: desc}, provider.companyId, account.accountNumber);
+        const uniqueId = transactionUniqueId({ date: dateIso, chargedAmount: amount, description: desc}, provider.companyId, account.accountNumber);
+        upsertTransaction({
+          accountId: account.id,
+          type:"normal",
+          date: dateIso,
+          processedDate: dateIso,
+          originalAmount: amount,
+          originalCurrency: "ILS",
+          chargedAmount: amount,
+          chargedCurrency: "ILS",
+          description: desc,
+          status: "completed",
+          hash,
+          uniqueId,
+        });
+        return res.json({
+          success: true,
+          data: {
+            ...provider,
+            hasCredentials: false,
+            authStatus: "connected",
+            accounts: [account],
+            accountCount: 1,
+            transactionCount: 1,
+            requiresOtp: false,
+          },
+        });
+      }
+
       let requiresOtp = false;
       let hasCredentials = false;
       let authStatus = "no";
-      // TODO: update 2FA handling
       if (credentials) {
         if (provider.companyId === "oneZero" && parseTwoFactorAuthInput(credentials) && !credentials.otpLongTermToken) {
           try {
@@ -620,6 +663,48 @@ export function startDashboard(port: number) {
           error: {
             code: "MISSING_CREDENTIALS",
             message: "Missing credentials",
+          },
+        });
+      }
+
+      if (provider.companyId === "external_deposit") { // Accept amount/date via credentials for consistency with the UI
+        const amtRaw = credentials?.amount ?? req.body?. amount;
+        const dateRaw = credentials?.date ?? req.body?.date;
+        const amount = typeof amtRaw === "string"? Number(amtRaw) : Number (amtRaw ?? NaN);
+        if (!Number.isFinite (amount)) { // Clean up provider record
+            deleteProvider(provider.id);
+            return res.status(400).json({success: false,  error: { code: "INVALID_AMOUNT", message: "Invalid deposit amount" },  });
+        }
+        // Create an account and a completed transaction
+        const account = upsertAccount (provider.id, "external", provider.companyId, amount, "ILS");
+        const dateIso = dateRaw ? new Date(dateRaw).toISOString(): new Date().toISOString();
+        const desc = "External deposit";
+        const hash = transactionHash({ date: dateIso, chargedAmount: amount, description: desc}, provider.companyId, account.accountNumber);
+        const uniqueId = transactionUniqueId({ date: dateIso, chargedAmount: amount, description: desc}, provider.companyId, account.accountNumber);
+        upsertTransaction({
+          accountId: account.id,
+          type:"normal",
+          date: dateIso,
+          processedDate: dateIso,
+          originalAmount: amount,
+          originalCurrency: "ILS",
+          chargedAmount: amount,
+          chargedCurrency: "ILS",
+          description: desc,
+          status: "completed",
+          hash,
+          uniqueId,
+        });
+        return res.json({
+          success: true,
+          data: {
+            ...provider,
+            hasCredentials: false,
+            authStatus: "connected",
+            accounts: [account],
+            accountCount: 1,
+            transactionCount: 1,
+            requiresOtp: false,
           },
         });
       }
