@@ -3,7 +3,8 @@
 // Authentication: single-use token in URL → HttpOnly session cookie.
 
 import { resolve } from "node:path";
-import { randomBytes } from "node:crypto";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { WEB_FILES } from "./web-files.js";
 import {
   listProviders,
@@ -147,31 +148,47 @@ function serveEmbedded(key: string, cacheControl: string, extraHeaders?: Record<
 
 // --- JSON API helpers ---
 
-// Allowed origins for CORS (Vite dev on :5173, server on :3000)
-function getAllowedOrigins(port: number): string[] {
-  return [
-    `http://localhost:${port}`,
-    `http://127.0.0.1:${port}`,
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-  ];
+// Dev mode - enablss the Vite proxy integration.
+export function isDevMode(): boolean {
+  return process.env.KOLSHEK_DEV === "1";
 }
 
-function corsHeaders(origin: string | null, allowedOrigins: string[]): Record<string, string> {
-  // Only reflect the origin if it's in our allowlist
-  const allowed = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+// Allowed origins for CORS
+export function getAllowedOrigins(port: number): string[] {
+  const origins = [
+    `http://localhost:${port}`,
+    `http://127.0.0.1:${port}`,
+  ];
+  if (isDevMode()) {
+    origins.push("http://localhost:5173", "http://127.0.0.1:5173");
+  }
+  return origins;
+}
+
+export function corsHeaders(origin: string | null, allowedOrigins: string[]): Record<string, string> {
   const headers: Record<string, string> = {
-    "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     Vary: "Origin",
   };
-  // Allow credentials (cookies) for cross-origin Vite dev server requests.
-  // Only set when the origin is an actual allowed origin (never for the fallback).
+  // Unknown origins get no ACAO at all - same-origin requests don't need it.
   if (origin && allowedOrigins.includes(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
     headers["Access-Control-Allow-Credentials"] = "true";
   }
   return headers;
+}
+
+// Defense against DNS rebinding - Bun already binds 127.0.0.1.
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+
+export function isLoopbackHost(hostHeader: string | null): boolean {
+  if (!hostHeader) return false;
+  // "localhost:45091" → "localhost", "[::1]:45091" → "[::1]"
+  const host = hostHeader.startsWith("[")
+    ? hostHeader.slice(0, hostHeader.indexOf("]") + 1)
+    : hostHeader.split(":")[0];
+  return LOOPBACK_HOSTS.has(host.toLowerCase());
 }
 
 // Security headers applied to all responses
@@ -185,12 +202,26 @@ const SECURITY_HEADERS: Record<string, string> = {
 // MAX_PAGINATION_LIMIT prevents dumping entire DB via ?limit=999999999
 const MAX_PAGINATION_LIMIT = 500;
 
-// Validate that a user-supplied regex isn't pathologically complex (ReDoS)
-function isSafeRegex(pattern: string): boolean {
+// Constant-time string comparison to prevent timing attacks on tokens.
+export function safeEqual(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+// Best effort ReDoS heuristic
+// Patterns come from the authenticated local user, so worst case is their own CPU.
+export function isSafeRegex(pattern: string): boolean {
   // Reject patterns longer than 200 chars
   if (pattern.length > 200) return false;
   // Reject nested quantifiers like (a+)+ or (a*)*
   if (/(\+|\*|\{)\)?(\+|\*|\{)/.test(pattern)) return false;
+  // Quantified alternation: (a|a)+ , (?:ab|ab)*
+  if (/\([^)]*\|[^)]*\)\s*(\*|\+|\{\d+(,\d*)?\})/.test(pattern)) return false;
+  // Quantified group with a quantified body: (?:a{10}){10}
+  if (/\([^)]*\{\d+(,\d*)?\}[^)]*\)\s*(\*|\+|\{\d+(,\d*)?\})/.test(pattern)) return false;
   // Reject excessive alternation groups
   if ((pattern.match(/\|/g) || []).length > 20) return false;
   // Try constructing — reject invalid
@@ -203,10 +234,10 @@ function isSafeRegex(pattern: string): boolean {
 }
 
 // Sanitize error messages — strip file paths and internal details
-function sanitizeError(msg: string): string {
-  // Remove Windows/Unix file paths
-  return msg.replace(/[A-Z]:\\[^\s:]+/gi, "[path]")
-    .replace(/\/[^\s:]*\/[^\s:]*/g, "[path]")
+export function sanitizeError(msg: string): string {
+  return msg
+    .replace(/[A-Za-z]:\\[^\s:*?"<>|]+/g, "[path]")
+    .replace(/(?<![\w/])(?:\/[\w.@-]+){2,}\/?/g, "[path]")
     .replace(/at\s+.+\(.+\)/g, "")
     .trim();
 }
@@ -270,17 +301,27 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
   let allowedOrigins: string[] = [];
 
   // Generate a one-time session token — only the CLI user sees this in the terminal.
-  // The token is exchanged for an HttpOnly cookie on first visit.
+  // Single-use: consumed on first visit, so replay from history is rejected.
   const sessionToken = randomBytes(32).toString("hex");
+  let urlTokenConsumed = false;
   const cookieName = "kolshek_session";
 
   // Write session token to .dev-session so the Vite dev proxy can inject it.
-  // This file is gitignored and only used for local development.
-  try {
-    const devSessionPath = resolve(import.meta.dir, "../../.dev-session");
-    Bun.write(devSessionPath, `${cookieName}=${sessionToken}`).catch(() => {});
-  } catch {
-    // Non-fatal — only needed for Vite dev mode
+  // A live credential in plaintext — dev-only, owner-only, removed on exit.
+  if (isDevMode()) {
+    try {
+      const devSessionPath = resolve(import.meta.dir, "../../.dev-session");
+      // Not Bun.write — it silently ignores { mode } - oven-sh/bun#32885,
+      writeFileSync(devSessionPath, `${cookieName}=${sessionToken}`, { mode: 0o600 });
+      const cleanup = () => {
+        try { unlinkSync(devSessionPath); } catch { /* already gone */ }
+      };
+      process.once("exit", cleanup);
+      process.once("SIGINT", () => { cleanup(); process.exit(130); });
+      process.once("SIGTERM", () => { cleanup(); process.exit(143); });
+    } catch {
+      // Non-fatal — only needed for Vite dev mode
+    }
   }
 
   // Parse the session cookie from a Cookie header
@@ -293,18 +334,17 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
     return null;
   }
 
-  // Check if a request is authenticated (has valid cookie OR valid token query param)
-  function isAuthenticated(req: Request, url: URL): boolean {
-    // Check cookie first (most requests)
-    if (getSessionCookie(req) === sessionToken) return true;
-    // Check query param (initial browser open)
-    if (url.searchParams.get("token") === sessionToken) return true;
-    return false;
+  // Check if a request is authenticated. Cookie only - the URL token is not
+  // accepted, it is exchanged for a cookie once and
+  // then invalidated (see the ?token= branch below).
+  function isAuthenticated(req: Request): boolean {
+    const cookie = getSessionCookie(req);
+    return cookie !== null && safeEqual(cookie, sessionToken);
   }
 
-  // Build a Set-Cookie header that persists the session
+  // Build a Set-Cookie header that persists the session.
   function sessionCookieHeader(): string {
-    return `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400`;
+    return `${cookieName}=${sessionToken}; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=86400`;
   }
 
   const server = Bun.serve({
@@ -324,6 +364,11 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       const json = makeJsonFn(cors);
       const jsonError = makeJsonErrorFn(cors);
 
+      // Reject non-loopback Host headers before anything else (DNS rebinding).
+      if (!isLoopbackHost(req.headers.get("host"))) {
+        return new Response("Forbidden: invalid Host header", { status: 403 });
+      }
+
       // CORS preflight (no auth needed)
       if (method === "OPTIONS") {
         return new Response(null, { status: 204, headers: cors });
@@ -337,7 +382,7 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       if (method === "POST" && path === "/api/v2/auth/token") {
         const body = await parseJsonBody(req);
         const token = typeof body.token === "string" ? body.token : "";
-        if (token !== sessionToken) {
+        if (!safeEqual(token, sessionToken)) {
           return jsonError("UNAUTHORIZED", "Invalid token.", 401);
         }
         return new Response(JSON.stringify({ success: true, data: null }), {
@@ -352,13 +397,18 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
       }
 
       // If the request has ?token= in the URL, validate it and set a cookie.
-      // This is the initial browser open from the CLI.
+      // This is the initial browser open from the CLI. 
       if (url.searchParams.has("token")) {
-        if (url.searchParams.get("token") !== sessionToken) {
-          return new Response("Unauthorized: invalid token", { status: 401 });
+        const urlToken = url.searchParams.get("token") ?? "";
+        if (urlTokenConsumed || !safeEqual(urlToken, sessionToken)) {
+          return new Response(
+            "Unauthorized: token already used or invalid. Relaunch the dashboard.",
+            { status: 401 },
+          );
         }
-        // Valid token — redirect to the same URL without the token param
-        // and set the session cookie so future requests are authenticated.
+        urlTokenConsumed = true;
+        // Redirect to the same URL without the token param and set the session
+        // cookie so future requests are authenticated.
         url.searchParams.delete("token");
         const cleanUrl = url.pathname + (url.search || "");
         return new Response(null, {
@@ -366,12 +416,13 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
           headers: {
             Location: cleanUrl || "/",
             "Set-Cookie": sessionCookieHeader(),
+            "Cache-Control": "no-store",
           },
         });
       }
 
       // All other requests must have the session cookie
-      if (!isAuthenticated(req, url)) {
+      if (!isAuthenticated(req)) {
         if (path.startsWith("/api/")) {
           return jsonError("UNAUTHORIZED", "Session expired. Relaunch the dashboard.", 401);
         }
@@ -381,16 +432,11 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
         );
       }
 
-      // CSRF protection: block cross-origin mutations using exact origin match.
-      // Reject if origin is missing (non-browser clients must not mutate via API)
-      // or if origin is not in the allowlist.
-      if (method !== "GET" && method !== "HEAD") {
-        if (!reqOrigin || !allowedOrigins.includes(reqOrigin)) {
-          return new Response("Forbidden: cross-origin request", {
-            status: 403,
-            headers: cors,
-          });
-        }
+      // CSRF: a present Origin must be allowlisted. Reads may omit it —
+      // same-origin GETs do — but mutations without one are non-browser clients.
+      const isMutation = method !== "GET" && method !== "HEAD";
+      if (reqOrigin ? !allowedOrigins.includes(reqOrigin) : isMutation) {
+        return new Response("Forbidden: cross-origin request", { status: 403, headers: cors });
       }
 
       try {
@@ -1211,7 +1257,8 @@ export function startDashboard(port: number): { server: ReturnType<typeof Bun.se
                 if (!result.success) {
                   return jsonError("PAGE_VALIDATION_FAILED", result.error, 400);
                 }
-                updates.definition = body.layout;
+                // Zod parse strip fields, we want the parsed version
+                updates.definition = result.data.layout;
               }
               const page = updateCustomPage(pageUpdateMatch[1], updates);
               if (!page) return jsonError("PAGE_NOT_FOUND", "Page not found", 404);
