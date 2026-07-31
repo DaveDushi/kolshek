@@ -166,6 +166,7 @@ const gridSchema: z.ZodType<unknown> = z.lazy(() =>
       md: z.number().int().min(1).max(12).optional(),
       lg: z.number().int().min(1).max(12).optional(),
     }).optional(),
+    gap: z.number().int().min(0).max(16).optional(),
     children: z.array(widgetSchema).min(1).max(50),
   }),
 );

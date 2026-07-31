@@ -8,12 +8,24 @@ function gapToRem(gap: number): string {
   return `${gap * 0.25}rem`;
 }
 
+// Coerce to a bounded integer.
+function toBoundedInt(value: unknown, fallback: number, min: number, max: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  const i = Math.trunc(n);
+  if (i < min || i > max) return fallback;
+  return i;
+}
+
 export default function WidgetGrid({ config, renderWidget }: LayoutWidgetProps) {
   const children = (config.children as Record<string, unknown>[]) || [];
-  const colsSm = (config.colsSm as number) || 1;
-  const colsMd = (config.colsMd as number) || 2;
-  const colsLg = (config.colsLg as number) || 3;
-  const gap = (config.gap as number) || 4;
+  // Must match gridSchema in core/page-schema.ts, validation strips unknown
+  // keys, so a name mismatch silently disables the feature.
+  const columns = (config.columns ?? {}) as Record<string, unknown>;
+  const colsSm = toBoundedInt(columns.sm, 1, 1, 12);
+  const colsMd = toBoundedInt(columns.md, 2, 1, 12);
+  const colsLg = toBoundedInt(columns.lg, 3, 1, 12);
+  const gap = toBoundedInt(config.gap, 4, 0, 16);
 
   // Unique id for scoped responsive styles
   const rawId = useId();
